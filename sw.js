@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v86';
+const CACHE = 'unionone-launcher-v87';
 
 /* 캐시가 있을 때 네트워크를 기다려주는 시간 */
 const NET_WAIT_MS = 2500;
