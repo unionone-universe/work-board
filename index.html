@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>UNION ONE WORK BOARD</title>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#16130F">
+<meta name="color-scheme" content="dark light">
+
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./favicon.ico" sizes="any">
+<link rel="icon" type="image/png" href="./icon-192.png">
+<link rel="apple-touch-icon" href="./apple-touch-icon.png">
+
+<!-- 아이폰 홈 화면 실행용 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="WORK BOARD">
+<meta name="mobile-web-app-capable" content="yes">
+
+<style>
+  html,body{margin:0;padding:0;height:100%;background:#16130F;overflow:hidden}
+  /* 기본은 화면을 꽉 채웁니다. 여기서 벗어나면 안 됩니다. */
+  #app{position:fixed;top:0;left:0;width:100%;height:100%;
+    border:0;display:block;background:#16130F}
+
+  /* 아이폰 노치·홈바 대응은 반드시 여기(런처)에서 합니다.
+     앱 화면(app.html)은 iframe 안에 있어서 env(safe-area-inset-*) 가 언제나 0 입니다.
+     그래서 app.html 안에 아무리 적어도 상단바가 상태표시줄에 가려졌습니다.
+
+     ★ iframe 은 이미지처럼 '제 크기를 가진 요소' 입니다.
+       top/right/bottom/left 를 네 방향 다 주고 width:auto 로 두면
+       화면에 맞춰지지 않고 **기본 크기 300×150 짜리 상자**가 됩니다.
+       반드시 width·height 를 calc 로 직접 계산해서 줘야 합니다. */
+  @supports (top: env(safe-area-inset-top)){
+    #app{
+      top:env(safe-area-inset-top, 0px);
+      left:env(safe-area-inset-left, 0px);
+      width:calc(100% - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px));
+      height:calc(100% - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+    }
+  }
+
+  #splash{position:fixed;inset:0;z-index:10;background:#16130F;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
+    font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Malgun Gothic",sans-serif;
+    transition:opacity .35s ease}
+  #splash.gone{opacity:0;pointer-events:none}
+  #splash svg{width:190px;height:auto;fill:#F2F2F4}
+  #splash .t{color:#8A8A94;font-size:12px;letter-spacing:.22em}
+  #splash .s{color:#8A8A94;font-size:12px}
+  #splash .bar{width:132px;height:3px;border-radius:2px;background:#2B2B31;overflow:hidden}
+  #splash .bar i{display:block;width:40%;height:100%;background:#D22B2B;border-radius:2px;
+    animation:slide 1.1s ease-in-out infinite}
+  @keyframes slide{0%{transform:translateX(-110%)}100%{transform:translateX(340%)}}
+  #splash button{margin-top:6px;border:1px solid #454550;background:transparent;color:#B6B6BE;
+    padding:9px 16px;border-radius:8px;font-size:12.5px;cursor:pointer;font-family:inherit}
+</style>
+</head>
+<body>
+
+<div id="splash">
+  <svg viewBox="0 0 562.28 281.15" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <path d="M251.49 129.96C250.5 128.72 246.99 115.92 246.45 113.49C239.41 81.4 246.08 45.26 270.85 22.59C318.05 -20.62 392.68 1.14 409.96 62.46C413.61 75.41 413.58 96.92 410.55 110.04C400.95 151.73 355.55 184.73 312.73 171.67C311.47 171.28 307.4 170.27 307.07 169.29C307.16 162.01 311.5 155.73 316.74 151.02C326.47 142.28 335.49 143.89 346.87 139.85C391.07 124.19 390.51 47.69 345.44 34.63C311.02 24.65 279.34 44.58 276.6 80.51C275.28 97.78 278.48 112.67 263.1 124.92C261.43 126.25 253.02 131.89 251.49 129.96ZM167.88 1.09L197.71 1.09C198.53 1.59 198.5 2.23 198.6 3.07C199.58 11.41 198.41 22.99 198.55 31.79C198.75 44.72 199.12 57.76 199.17 70.78C199.24 88.02 196.52 107.99 206.12 123.41C223.45 151.23 265.84 149.93 281.28 120.74C292.75 99.03 277.74 73.59 300.11 55.27C303.58 52.42 312.5 47.28 316.96 48.76L317.82 49.62C317.25 66.57 318.84 84.31 317.92 101.17C316.23 132.25 297.49 160.44 267.54 170.64C217.2 187.79 170.09 151.5 167 100.02C165.1 68.39 168.49 34.9 166.99 3.07ZM497.46 211.52L497.46 278.89L496.6 279.75L487.99 279.75C486.18 279.75 479.28 270.06 477.67 268.27C470.45 260.24 462.86 252.33 455.58 244.48C453.9 242.67 452.95 238.87 449.84 239.04L449.84 278.31C449.84 278.5 449.08 279.18 449.27 279.75L435.79 279.75L434.93 278.89L434.93 211.8C436.62 210.44 442.75 210.54 444.42 211.49L482.34 253.31L483.69 252.51L483.69 211.8L484.55 210.94L496.02 210.94C496.21 210.94 496.89 211.7 497.46 211.52ZM306.42 253.37L306.42 212.38C306.42 212.28 307.76 210.94 307.86 210.94L319.33 210.94L320.19 211.8L320.19 278.89C317.75 280.38 312.01 280.28 309.58 278.6C298.4 266.91 288.35 254.2 277.46 242.47C276.02 240.93 274.19 238.69 272 238.46L272 278.89L271.14 279.75L258.81 279.75C258.99 279.18 258.23 278.5 258.23 278.31L258.23 212.95C258.23 212.73 258.9 211.66 259.2 211.47C267.18 208.28 272.13 216.62 276.89 221.83C286.05 231.87 294.78 242.49 304.09 252.55ZM87.28 237.89L87.28 278.89L86.42 279.75L74.37 279.75L73.51 278.89L73.51 211.52L82.4 211.52L121.68 254.27L122.85 253.66L122.85 211.52C127.06 211.92 132.23 209.53 136.04 211.8L136.04 278.89L135.18 279.75L126.58 279.75C126.1 279.75 124.18 277.99 123.7 277.47C113.43 266.25 103.88 254.08 93.31 243.04C91.63 241.29 89.51 238.68 87.28 237.89ZM404.89 228.92C392.11 216.15 369.85 225.35 368.39 242.77C366.06 270.46 402.63 278.61 410.42 252.1C412.68 244.42 410.67 234.69 404.89 228.92ZM387.2 209.97C412.54 208.02 432.38 233.45 423.73 257.37C409.79 295.93 350.82 285.4 354.62 241.63C356.11 224.47 370.16 211.28 387.2 209.97ZM207.6 223.12C185.31 226.88 184.57 262.6 206.48 267.55C228.76 272.58 240.99 246.44 227.83 230.15C223.33 224.58 214.62 221.93 207.6 223.12ZM209.34 209.96C218.79 209.08 230.33 213.77 237.02 220.4C257.91 241.1 244.86 278.88 214.91 280.89C166.13 284.16 163.14 214.25 209.34 209.96ZM561.71 223.56C561.15 223.37 560.46 224.13 560.27 224.13L524.99 224.13C525.18 224.69 524.42 225.37 524.42 225.56L524.42 238.18L525.28 239.04L555.68 239.04L556.55 239.9L556.55 250.79L555.68 251.65L524.99 251.65L524.71 266.56C524.86 266.82 526.27 267.71 526.43 267.71L562.28 267.71L562.28 279.75L510.65 279.75L510.65 211.8L511.51 210.94L560.85 210.94L561.71 211.8ZM14.42 211.52C14.24 212.08 15 212.76 15 212.95L15 254.81C15 255.14 15.81 258.36 16.01 258.95C20.74 272.51 44.32 271.52 45.98 255.95C46.99 246.45 45.8 235.38 45.95 225.54C45.98 223.86 46.61 222.29 46.59 220.39C46.57 217.56 45.15 214.76 46.48 211.85C48.58 211.07 59.74 209.9 59.74 212.38L59.74 255.38C59.74 267.74 50.54 278.09 38.64 280.15C15.72 284.13 1.91 273.99 0.63 250.82C0.09 241.09 -0.46 222.77 0.63 213.49C0.72 212.66 0.7 212.02 1.51 211.52ZM150.96 212.38C151.29 211.18 153.05 211.01 154.08 210.91C155.81 210.74 164.73 210.45 164.73 212.38L164.73 278.89L163.87 279.75L151.82 279.75L150.96 278.89Z"/>
+  </svg>
+  <div class="t">WORK BOARD</div>
+  <div class="bar"><i></i></div>
+  <div class="s" id="msg">불러오는 중입니다</div>
+  <button id="retry" style="display:none" onclick="location.reload()">다시 시도</button>
+</div>
+
+<iframe id="app" title="UNION ONE WORK BOARD" allow="clipboard-write; camera; geolocation"></iframe>
+
+<script>
+/* ------------------------------------------------------------------
+ *  앱 화면 주소
+ *
+ *  2026-08 부터 앱 화면은 구글이 아니라 이 저장소가 띄웁니다.
+ *  구글 도메인에서 로그인 화면을 띄우지 않는 것이 목적입니다.
+ *
+ *  앱스스크립트 주소는 여기가 아니라 app.html 안의 API_URL 에 있습니다.
+ *  새로 배포해서 주소가 바뀌면 app.html 을 고치세요.
+ * ---------------------------------------------------------------- */
+var APP_URL = './app.html';
+
+/* 기기 식별값
+   앱이 아니라 이 런처가 들고 있습니다.
+   브라우저가 iframe 안의 저장소를 막아도 로그인이 유지되는 이유입니다. */
+var KEY = 'unionone_device_v1';
+var token = '';
+try {
+  token = localStorage.getItem(KEY) || '';
+  if (!token) {
+    token = 'T' + Date.now() + Math.random().toString(36).substr(2, 8);
+    localStorage.setItem(KEY, token);
+  }
+} catch (e) {
+  token = 'T' + Date.now() + Math.random().toString(36).substr(2, 8);
+}
+
+var frame = document.getElementById('app');
+var splash = document.getElementById('splash');
+var msg = document.getElementById('msg');
+var retry = document.getElementById('retry');
+
+/* ★ 앱 화면의 판 번호 — 화면(app.html)을 고쳐 올릴 때 하나 올리세요.
+      sw.js 의 CACHE 번호와 같은 숫자로 맞춰두면 헷갈리지 않습니다.
+
+   예전에는 여기에 Date.now() 를 넣어 **열 때마다 다른 주소**를 만들었습니다.
+   "새로 올려도 옛 화면이 뜬다" 를 막으려던 것인데, 대가가 컸습니다.
+
+     · 주소가 매번 달라서 브라우저·서비스워커 캐시가 **한 번도 맞은 적이 없다**
+       → 앱을 열 때마다 app.html 225KB 를 통째로 다시 받았습니다
+     · 캐시에는 열 때마다 새 칸이 쌓였습니다 (100번 열면 22MB)
+       폰 저장 한도에 닿으면 캐시가 통째로 지워집니다
+     · 캐시가 맞은 적이 없으니 **오프라인에서는 앱 화면이 아예 안 떴습니다**
+
+   이제 서비스워커가 열 때마다 서버에 "바뀌었나" 를 물어봅니다(no-cache).
+   안 바뀌었으면 서버가 '그대로다' 한 줄만 보내므로 옛 화면이 남을 수 없습니다.
+   그래서 주소를 매번 바꿀 이유가 없어졌습니다.
+
+   ▶ 이 번호를 안 올려도 새 화면은 그대로 반영됩니다(서비스워커가 확인하므로).
+     올리면 확실하게 한 번 더 눌러주는 것뿐이라 부담 없이 두셔도 됩니다. */
+var APP_VER = 'v86';
+
+frame.src = APP_URL + '?dt=' + encodeURIComponent(token) + '&v=' + APP_VER;
+
+var done = false;
+function hideSplash() {
+  if (done) return;
+  done = true;
+  splash.classList.add('gone');
+  setTimeout(function () { splash.style.display = 'none'; }, 400);
+}
+
+frame.addEventListener('load', function () {
+  // 앱이 '다 그렸다'고 알려주면 바로 걷는다. 신호가 없으면 1.2초 뒤 자동으로.
+  setTimeout(hideSplash, 1200);
+});
+
+window.addEventListener('message', function (e) {
+  if (e && e.data && e.data.uo === 'ready') hideSplash();   // app.html 의 postMessage({uo:'ready'}) 와 짝 (2026-09-23)
+});
+
+// 너무 오래 걸리면 안내 문구를 바꾼다
+setTimeout(function () { if (!done) msg.textContent = '서버 응답을 기다리는 중입니다'; }, 6000);
+setTimeout(function () {
+  if (!done) {
+    msg.textContent = '연결이 지연되고 있습니다. 통신 상태를 확인해주세요.';
+    retry.style.display = 'block';
+  }
+}, 15000);
+
+// 서비스워커 등록 (홈 화면 설치에 필요)
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () {
+    navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' })
+      .then(function (reg) { reg.update(); })
+      .catch(function () {});
+  });
+}
+
+// 아이폰에서 화면이 튀는 것 방지
+document.addEventListener('touchmove', function (e) {
+  if (e.target === document.body) e.preventDefault();
+}, { passive: false });
+</script>
+</body>
+</html>

@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>공사 진행 상황</title>
+<!--
+  ============================================================
+   고객용 진행 상황 (2026-09-02)
+  ------------------------------------------------------------
+   고객이 "지금 어디까지 됐어요?" 라고 전화하는 대신 링크로 봅니다.
+
+   ★★ 여기에는 **아무 비밀값도 없습니다.** 표(#뒤의 글자)는 고객이 들고 오고,
+     서버가 서명을 확인합니다. 이 파일은 누구나 열어도 아무것도 안 보입니다.
+
+   ★ 서버가 내보내는 것은 업무명 · 진행률 · 상태 · 날짜 · 사진뿐입니다.
+     금액 · 원가 · 정산 · 댓글 · 작업내용 · 직원 전화번호는 나가지 않습니다.
+
+   ★ 담당자가 업무 상세에서 링크를 끄면 그 자리에서 안 열립니다.
+  ============================================================
+-->
+<style>
+:root{
+  --bg:#EDEBE7; --card:#FFFFFF; --line:#DDD9D3;
+  --t1:#14110D; --t2:#544D46; --t3:#6B655E;
+  --ok:#1D9E75; --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root{ --bg:#0D0D10; --card:#1B1B21; --line:#2C2C34;
+         --t1:#F4F4F7; --t2:#A6A6B0; --t3:#85858F; }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--t1);
+  font-family:-apple-system,BlinkMacSystemFont,"Malgun Gothic","맑은 고딕",sans-serif;
+  font-size:15px;line-height:1.6;
+  padding:env(safe-area-inset-top) env(safe-area-inset-right)
+          env(safe-area-inset-bottom) env(safe-area-inset-left)}
+.wrap{max-width:560px;margin:0 auto;padding:20px 16px 48px}
+.co{color:var(--t3);font-size:13px;letter-spacing:.06em;margin:0 0 4px}
+h1{font-size:22px;margin:0 0 16px;line-height:1.35}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);
+  padding:16px;margin:0 0 12px}
+.pct{font-size:34px;font-weight:800;margin:0}
+.st{color:var(--t2);margin:2px 0 12px;font-size:14px}
+.bar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}
+.bar i{display:block;height:100%;background:var(--ok);border-radius:99px;
+  transition:width .5s ease}
+.rows{display:flex;gap:20px;margin-top:14px;flex-wrap:wrap}
+.rows div{min-width:0}
+.k{color:var(--t3);font-size:13px;margin:0}
+.v{margin:0;font-weight:600}
+h2{font-size:15px;margin:22px 0 10px;color:var(--t2)}
+.shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(100px,1fr));gap:6px}
+.shots img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:8px;
+  border:1px solid var(--line);background:var(--line)}
+.msg{text-align:center;color:var(--t3);padding:48px 16px}
+.foot{color:var(--t3);font-size:12px;text-align:center;margin-top:28px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app">
+  <p class="msg">불러오는 중입니다…</p>
+</div>
+
+<script>
+var API_URL = 'https://script.google.com/macros/s/AKfycbwv2H7zPm1z3GdXtk1in5X4QedvWwGHPJlbCH5wH-z0v6d-wHw8iJonodvG0ng74Gb9/exec';
+
+function esc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function msg(t){
+  document.getElementById('app').innerHTML = '<p class="msg">'+esc(t)+'</p>';
+}
+
+/* 드라이브 주소에서 파일 번호만 뽑는다 (그림으로 보여주려고) */
+function driveId(u){
+  var m = String(u||'').match(/[-\w]{25,}/);
+  return m ? m[0] : '';
+}
+
+function draw(r){
+  var 사진 = (r.photos||[]).map(function(u){
+    var id = driveId(u);
+    if(!id) return '';
+    return '<img loading="lazy" alt="현장 사진" '+
+           'src="https://drive.google.com/thumbnail?id='+esc(id)+'&sz=w600">';
+  }).join('');
+
+  var 줄 = [];
+  if(r.start) 줄.push(['착공', r.start]);
+  if(r.due && !r.done) 줄.push(['준공 예정', r.due]);
+  if(r.done) 줄.push(['준공', r.done]);
+
+  document.getElementById('app').innerHTML =
+    '<p class="co">'+esc(r.company)+'</p>'+
+    '<h1>'+esc(r.title)+'</h1>'+
+    '<div class="card">'+
+      '<p class="pct">'+Number(r.progress||0)+'%</p>'+
+      '<p class="st">'+esc(r.status||'')+'</p>'+
+      '<div class="bar"><i style="width:'+Math.min(Number(r.progress||0),100)+'%"></i></div>'+
+      (줄.length? '<div class="rows">'+줄.map(function(x){
+        return '<div><p class="k">'+esc(x[0])+'</p><p class="v">'+esc(x[1])+'</p></div>';
+      }).join('')+'</div>' : '')+
+    '</div>'+
+    (사진 ? '<h2>현장 사진</h2><div class="shots">'+사진+'</div>' : '')+
+    '<p class="foot">문의는 담당자에게 연락 주세요</p>';
+}
+
+(function(){
+  var tok = String(location.hash||'').replace(/^#/,'').trim();
+  if(!tok){ msg('링크가 올바르지 않습니다.'); return; }
+
+  fetch(API_URL, {
+    method:'POST',
+    /* ★ text/plain 이어야 합니다. application/json 이면 사전확인(OPTIONS)이 생겨 전부 실패합니다 */
+    headers:{ 'Content-Type':'text/plain;charset=utf-8' },
+    body: JSON.stringify({ fn:'api_guestView', args:[tok] }),
+    redirect:'follow', cache:'no-store'
+  })
+  .then(function(res){ return res.text(); })
+  .then(function(t){
+    var r;
+    try{ r = JSON.parse(t); }catch(e){ msg('잠시 후 다시 열어 주세요.'); return; }
+    if(!r || !r.ok){ msg((r && r.msg) || '링크가 만료되었거나 올바르지 않습니다.'); return; }
+    draw(r);
+  })
+  .catch(function(){ msg('인터넷 연결을 확인해 주세요.'); });
+})();
+</script>
+</body>
+</html>

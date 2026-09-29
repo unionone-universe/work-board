@@ -1,0 +1,19 @@
+# 앱스스크립트로 올리지 않을 것 — 화면 파일과 잡동사니
+index.html
+app.html
+# 고객 진행 화면 — 깃허브 페이지로만 나갑니다. 서버는 이 파일을 쓰지 않습니다 (HtmlService 없음)
+guest.html
+sw.js
+manifest.webmanifest
+*.png
+*.svg
+*.woff2
+*.ico
+*.md
+*.bat
+*.txt
+.git/**
+node_modules/**
+
+# Project-local Astra review infrastructure
+.claude/**
