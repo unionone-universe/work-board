@@ -583,8 +583,9 @@ label.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;fon
   .badge{right:4px}
 }
 @media (max-width:719px){
-  .topin{gap:2px;padding:4px var(--sp-3)}
+  .topin{gap:2px;padding:2px var(--sp-3);min-height:56px}
   .topnew{display:none}          /* 폰에서는 판 머리의 [업무 추가] 가 같은 일을 합니다 */
+  .icobtn.tool{height:52px}
 }
 @media (max-width:359px){ .icobtn.tool{min-width:46px;padding:4px 2px} }
 @keyframes spin{to{transform:rotate(360deg)}}
@@ -614,6 +615,11 @@ label.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;fon
 .notice .tag{font-size:var(--wb-fs-label)}
 .notice .btn.sm{padding:0 14px;font-size:var(--wb-fs-meta);background:var(--card);color:var(--t1)}
 .notice .btn.sm:hover{background:var(--soft)}
+/* 폰 — 공지 줄 자체를 누르면 그 공지가 열리므로 [공지 보기] 는 테두리 없는 글자 단추로 가볍게 (디자인 검수 1차) */
+@media (max-width:719px){
+  .noticein{padding:2px var(--sp-4);min-height:var(--tap)}
+  .notice .btn.sm{border-color:transparent;background:transparent;color:var(--pri);padding:0 4px 0 8px}
+}
 .nrow .w{flex-shrink:0}
 .nrow.read .t{color:var(--t2)}
 .nrow:hover .t{text-decoration:underline}
@@ -979,7 +985,14 @@ table.mk-tb .al-c{text-align:center} table.mk-tb .al-r{text-align:right}
 .wrap{width:100%;max-width:1680px;margin:0 auto;padding:var(--sp-5) var(--sp-6) var(--sp-6)}
 @media (max-width:1023px){ .wrap{padding:var(--sp-4) var(--sp-4) var(--sp-6)} }
 /* 폰 — 아래 탭(64px)에 마지막 카드가 가리지 않게 */
-@media (max-width:719px){ .wrap{padding:var(--sp-3) var(--sp-4) calc(96px + env(safe-area-inset-bottom))} }
+@media (max-width:719px){
+  .wrap{padding:var(--sp-2) var(--sp-4) calc(96px + env(safe-area-inset-bottom))}
+  /* ★ 폰 첫 화면에서 업무가 한 장이라도 더 보이게 — 판 머리 · 확인할 일 · 상태 탭 사이를 좁힌다 (디자인 검수 1차) */
+  .boardbar{margin-bottom:var(--sp-3)}
+  .todobar{margin-bottom:var(--sp-2)}
+  .stabs{margin-bottom:var(--sp-3)}
+  .boardtitle{font-size:var(--fs-h1);line-height:1.3}
+}
 @media (max-width:379px){ .wrap{padding-left:var(--sp-3);padding-right:var(--sp-3)} }
 #view-doc.viewin,#view-me.viewin,#view-settings.viewin,#view-board.viewin{
   animation:riseIn .38s cubic-bezier(.16,.9,.28,1) both}
@@ -1084,30 +1097,28 @@ span.colbtn{cursor:default}
 #view-board .card.wn{box-shadow:inset 5px 0 0 var(--wn-line)}
 #view-board .card .ic{width:18px;height:18px;color:var(--t3)}
 
-/* 업무명 줄 — 제목(두 줄까지) + 오른쪽 표시 */
-.chead{display:flex;align-items:flex-start;flex-wrap:wrap;gap:var(--sp-1) var(--sp-2);min-width:0}
-#view-board .card .cn{flex:1 1 12em;min-width:0;margin:0;font-size:var(--wb-fs-title);font-weight:700;line-height:1.4;
+/* 머리 줄 — 왼쪽 업무 종류(글자) · 오른쪽 표시 · 댓글. 제목은 그 아래에서 카드 폭을 다 쓴다 */
+.ctop{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-1) var(--sp-2);min-height:24px;min-width:0}
+#view-board .card .ckind{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:var(--wb-fs-meta);font-weight:600;color:var(--t3)}
+#view-board .card .cn{min-width:0;margin:0;font-size:var(--wb-fs-title);font-weight:700;line-height:1.4;
   color:var(--t1);letter-spacing:-0.01em;
   display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
   word-break:keep-all;overflow-wrap:anywhere}
 .cside{display:flex;align-items:center;flex-wrap:wrap;justify-content:flex-end;gap:6px;margin-left:auto;
-  flex:0 1 auto;min-width:0;padding-top:2px}
+  flex:0 1 auto;min-width:0}
 #view-board .card .tag{font-size:var(--wb-fs-label);line-height:20px;padding:1px 8px;white-space:nowrap}
 /* 댓글 수 — 말풍선 + 숫자 */
 .cico{display:inline-flex;align-items:center;gap:4px;color:var(--t2);
   font-size:var(--wb-fs-meta);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
 .cico svg{width:18px;height:18px;display:block}
 #view-board .card .cdot{position:relative;margin:0;width:10px;height:10px}
-/* 완료 — 세이지 딱지 + 체크 (완료 칸의 작은 장식) */
-.cdone{display:inline-flex;align-items:center;gap:4px;padding:1px 10px 1px 6px;border-radius:99px;background:var(--soft);
-  color:var(--pri);font-size:var(--wb-fs-label);font-weight:700;white-space:nowrap}
-#view-board .card .cdone .ic{width:16px;height:16px;color:var(--pri)}
+/* 완료 카드 — 완료 날짜의 체크를 녹색으로 (칸 이름이 이미 '완료' 라 딱지는 붙이지 않는다) */
+#view-board .card.done .cb .ic{color:var(--pri)}
 
-/* 현장 줄 — 업무 종류 · 현장 · (법인이 둘 이상이면) 법인 */
-#view-board .card .csite{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-1) var(--sp-2);margin:0;min-width:0;
+/* 현장 줄 — 철거 업무에만 (이름) */
+#view-board .card .csite{display:flex;align-items:center;margin:0;min-width:0;
   font-size:var(--wb-fs-meta);line-height:1.5;color:var(--t2)}
-.csite .ckind{flex:none;padding:0 8px;border:1px solid var(--line);border-radius:8px;background:var(--bg);
-  color:var(--t1);font-weight:600;white-space:nowrap}
 .csite .cplace{display:inline-flex;align-items:center;gap:4px;min-width:0;max-width:100%}
 .csite .cplace > span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 
@@ -1205,6 +1216,7 @@ span.colbtn{cursor:default}
 }
 
 .rail h4{display:flex;align-items:center;gap:8px;margin:0 0 var(--sp-2);font-size:var(--fs-body);font-weight:700;color:var(--t1)}
+.rail h4 .ic{color:var(--t3)}
 /* ★ 오른쪽 판에서도 접을 수 있게 (2026-09-03). 판의 대기·완료와 같은 방식입니다.
    ★ 이름을 `.shut` 이라고만 지으면 나중에 또 부딪힙니다 — `.secshut` 입니다. */
 .rsec > h4{min-height:var(--tap);margin:0 0 var(--sp-1);padding:0 var(--sp-2);border-radius:var(--r-md);cursor:pointer;user-select:none}
@@ -1249,6 +1261,10 @@ span.colbtn{cursor:default}
 .sumbox .ic{width:18px;height:18px;vertical-align:-4px}
 .sumbox.go:hover{background:var(--panel2)}
 #view-board .sumbox{margin-top:var(--wb-gap)}
+/* 이달 완료 상자 — 도우미 + 숫자 */
+.sumbox.donebox{display:flex;align-items:center;gap:var(--sp-3)}
+.sumbox.donebox .helper{width:44px;height:44px}
+.sumbox.donebox .dsm{min-width:0}
 
 /* 판 위 한 줄 '확인할 일' (1023px 이하) — 결재 · 못 받은 돈 · 답 없는 견적. 셋 다 0이면 그리지 않는다.
    PC 에서는 오른쪽 판이 같은 것을 보여주므로 감춘다 */
@@ -1429,10 +1445,13 @@ span.colbtn{cursor:default}
 @media (min-width:720px){ .sheet.tdsheet,.sheet.tform{--sh-px:28px} }
 
 /* 제목·닫기 줄 — 창 맨 위에 붙어 있다. 긴 기록을 내려 읽어도 × 가 제자리에 */
-.tdsheet .tdhead,.tform .sheethead{position:sticky;top:0;z-index:3;background:var(--card);
+.tform .sheethead{position:sticky;top:0;z-index:3;background:var(--card);
   margin:0 calc(-1 * var(--sh-px)) 0;padding:18px var(--sh-px) 10px}
-.tdsheet .tdhead{align-items:flex-start;gap:var(--sp-1)}
-.tdsheet .tdhead h3{padding-top:4px;font-size:var(--fs-title);line-height:1.4;
+/* 업무 상세 — 위에 붙는 것은 짧은 도구 줄([수정] · 닫기)뿐. 제목은 그 아래에서 창 폭을 다 쓰고 같이 흘러간다 */
+.tdsheet .tdbar{position:sticky;top:0;z-index:3;display:flex;align-items:center;justify-content:flex-end;gap:var(--sp-2);
+  margin:0 calc(-1 * var(--sh-px));padding:10px var(--sh-px) 6px;background:var(--card)}
+.tdsheet .tdhead{display:block;margin:0 0 var(--sp-3)}
+.tdsheet .tdhead h3{padding-top:0;font-size:var(--fs-title);line-height:1.4;
   word-break:keep-all;overflow-wrap:anywhere}
 .tdsheet .tdico{display:inline-flex;align-items:center;justify-content:center;width:var(--tap);height:var(--tap);
   padding:0;border-radius:var(--r-md);color:var(--t2)}
@@ -1442,7 +1461,7 @@ span.colbtn{cursor:default}
 
 /* 제목 아래 — 상태 · 담당 · 마감 · 유형, 그 아래 얇은 막대 */
 /* ★ 플렉스로 두면 조각 사이의 띄어쓰기가 사라져 '담당김형석' · 'D-2·철거' 가 됩니다. 글줄로 흐르게 둡니다 */
-.tdmeta{display:block;margin:0;font-size:var(--wb-fs-meta);line-height:1.9;color:var(--t2)}
+.tdmeta{display:block;margin:0;font-size:var(--wb-fs-body);line-height:1.8;color:var(--t2)}
 .tdmeta .tdst{display:inline-flex;align-items:center;min-height:28px;padding:0 12px;margin-right:10px;vertical-align:1px;
   border-radius:99px;background:var(--soft);color:var(--pri);font-size:var(--wb-fs-label);font-weight:700}
 .tdmeta .tdst.done{color:var(--ok)}
@@ -1455,7 +1474,16 @@ span.colbtn{cursor:default}
 .tdprog .pct{flex:none;min-width:2.8em;text-align:right;font-size:var(--wb-fs-meta);font-weight:600;
   color:var(--t2);font-variant-numeric:tabular-nums}
 .tdsheet .tdtop{margin:0}
-.tdsheet .tdsite{margin:8px 0 0;font-size:var(--wb-fs-meta);color:var(--t3)}
+.tdsheet .tdsite{display:flex;align-items:flex-start;gap:6px;margin:10px 0 0;font-size:var(--wb-fs-meta);color:var(--t2)}
+.tdsheet .tdsite .ic{width:18px;height:18px;margin-top:2px;color:var(--t3)}
+/* 상세의 다음 할 일 — 카드와 같은 세이지 상자 */
+.tdnext{display:flex;align-items:flex-start;gap:8px;margin:12px 0 0;padding:10px 12px;border-radius:var(--r-md);
+  background:var(--soft);color:var(--t1);font-size:var(--wb-fs-meta);font-weight:600;line-height:1.5}
+.tdnext .k{flex:none;color:var(--pri);font-weight:700}
+/* [수정] — 제목 줄 오른쪽의 글자 단추 */
+.tdsheet .tdedit{flex:none;margin-top:0}
+/* 수정 창 맨 아래 — 이 업무 삭제 (되돌릴 수 없어 한 단계 안쪽에 둔다) */
+.tform .tfdel{margin:var(--sp-2) 0 var(--sp-4);padding-top:var(--sp-4);border-top:1px solid var(--line)}
 
 /* 구역 — 짧은 제목 + 여백. 선이나 박스로 두르지 않는다 */
 .tdsec{margin-top:28px}
@@ -1896,6 +1924,8 @@ span.colbtn{cursor:default}
   <symbol id="i-won" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M7.5 9l2 6.5 2.5-6 2.5 6 2-6.5M7 12h10"/></symbol>
   <symbol id="i-back" viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></symbol>
   <symbol id="i-dots" viewBox="0 0 24 24"><circle cx="5.5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18.5" cy="12" r="1.2"/></symbol>
+  <symbol id="i-pen" viewBox="0 0 24 24"><path d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M14 8l3 3"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6h11M9 12h11M9 18h11"/><circle cx="4.5" cy="6" r="1.2"/><circle cx="4.5" cy="12" r="1.2"/><circle cx="4.5" cy="18" r="1.2"/></symbol>
   <symbol id="i-clip" viewBox="0 0 24 24"><path d="M20 11.5l-7.8 7.8a5 5 0 0 1-7.1-7.1l8.5-8.5a3.3 3.3 0 0 1 4.7 4.7l-8.4 8.4a1.7 1.7 0 0 1-2.4-2.4l7.7-7.7"/></symbol>
 </svg>
 
@@ -1989,14 +2019,15 @@ span.colbtn{cursor:default}
         <div class="foldpart" id="doneSum"></div></div>
       <div class="rail">
         <div><h4 id="apvTitle" class="dgv">결재 대기</h4><div id="railApv"></div></div>
+        <!-- ★ 차례 (2026-09-30) — 손댈 것(결재 · 확인할 일)이 위, 보는 것(기록 · 출근)이 아래 -->
+        <div id="railTodo"></div>
+        <div><h4><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-clock"/></svg>방금 올라온 기록</h4><div id="railLog"></div></div>
         <!-- ★ 접힌 채로 시작합니다 (2026-09-03 대표님 지시). 판의 대기·완료와 같습니다.
              접혀 있어도 **몇 명 왔는지는 머리글에 남습니다** — 그게 이 칸의 요점입니다 -->
         <div class="rsec secshut" id="secAtt">
           <h4 onclick="toggleSec('secAtt')"><svg class="ic cfold" aria-hidden="true" focusable="false"><use href="#i-chev-d"/></svg>오늘 출근
             <span class="n" id="cAtt"></span></h4>
           <div id="railAtt"></div></div>
-        <div id="railTodo"></div>
-        <div><h4>방금 올라온 기록</h4><div id="railLog"></div></div>
       </div>
     </div>
   </div>
@@ -5092,7 +5123,7 @@ function renderBoard(){
      구역 `내가 결재할 문서 3` 세 곳에 같은 숫자가 있었습니다. 아래 상자 개수가 곧 숫자입니다.
      ★ 상자는 결재 탭과 같은 모양(흰 바탕 + 왼쪽 빨간 선). 제목·배경·글자가 전부 빨강이라
        진짜 빨간 것(마감 지남·못 받은 돈)과 무게가 같아졌습니다. */
-  $('apvTitle').textContent = (S.me&&S.me.grade>=3)?'결재 대기':'내 결재';
+  $('apvTitle').innerHTML = ic('doc')+((S.me&&S.me.grade>=3)?'결재 대기':'내 결재');   // 오른쪽 판 제목마다 아이콘 (2026-09-30)
   $('railApv').innerHTML = apv.map(function(a){
     return '<div class="ucard hot apv" onclick="openDoc(\''+a.no+'\')"><div class="m">'+
            '<p class="t">'+esc(a.title)+'</p>'+
@@ -5414,7 +5445,7 @@ function renderTodo(){
     h+='<button class="todo" onclick="openQuiet()">'+ic('doc')+
        '<span><b>'+qt.length+'건</b>답 없는 견적</span>'+ic('chev')+'</button>';
   }
-  box.innerHTML = h ? ('<h4>'+ic('alert')+'확인할 일</h4>'+h) : '';   // 2026-09-30 '챙길 것' → '확인할 일'
+  box.innerHTML = h ? ('<h4>'+ic('list')+'확인할 일</h4>'+h) : '';   // 2026-09-30 '챙길 것' → '확인할 일'
 }
 
 /* ★ 폰에서는 '지금 손댈 것' 을 판 **위** 한 줄로 (2026-09-09).
@@ -5466,13 +5497,15 @@ function sumBox(A){
   /* ★ 임원(3) 이상이면 눌러서 '이번 달 한 장' 으로 (2026-09-02).
      탭을 늘리지 않고 이미 있는 상자에 길을 냅니다. */
   var 볼수있나 = S.me && S.me.grade >= 3;
-  return '<div class="sumbox'+(A?' in':'')+(볼수있나?' go':'')+'"'+
+  /* ★ 완료 칸의 작은 장식 (2026-09-30) — 이달 끝낸 업무 상자에 안전모 도우미.
+     완료 칸의 카드마다 '완료' 딱지를 붙였더니 칸 이름과 같은 말이 카드 수만큼 되풀이됐다 */
+  return '<div class="sumbox donebox'+(A?' in':'')+(볼수있나?' go':'')+'"'+
     (볼수있나? ' onclick="openMonthly()"' : '')+
-    '><p class="muted" style="font-size:var(--fs-sm)">'+esc(s.month||'')+' 누적</p>'+
+    '>'+HELPER+'<div class="dsm"><p class="muted" style="font-size:var(--fs-sm)">'+esc(s.month||'')+' 누적</p>'+
     '<p>완료 '+(s.count||0)+'건</p><p>'+won(s.amount||0)+'원</p>'+
     /* 폰에는 커서가 없어 누를 수 있는지 아무도 몰랐습니다 (2026-09-09) */
     (볼수있나? '<p class="muted" style="font-size:var(--fs-sm);font-weight:400;margin-top:4px">이번 달 한 장 '+ic('chev')+'</p>' : '')+
-    '</div>';
+    '</div></div>';
 }
 
 /* ★★ 서버가 칸 하나를 안 보내도 **흰 화면이 되면 안 됩니다** (2026-09-02).
@@ -5521,28 +5554,35 @@ var ICO_DOTS=ICO_SVG('<circle cx="5.5" cy="12" r="1.2"/><circle cx="12" cy="12" 
 var ICO_CAM=ICO_SVG('<path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z"/><circle cx="12" cy="13.2" r="3.2"/>');
 var ICO_PROG=ICO_SVG('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>');
 
-/* ★★ 카드 차례 (2026-09-30 디자인) — 업무명 → 현장 → 담당자 · 기간 → (철거 칸) → 진행 상태 → 마지막 기록 → 다음 할 일.
-   대기·진행중·완료 세 칸이 같은 머리(cardHead) · 현장 줄(cardSite) · 담당·기간 줄(cardMeta)을 씁니다.
+/* ★★ 카드 차례 (2026-09-30 디자인 품질 보완) —
+     머리 줄(업무 종류 · 표시) → 업무명 → 담당자 · 기간 → 현장 → (철거 칸) → 진행 상태 → 마지막 기록 → 다음 할 일.
+   ★ 왜 이 차례인가 (실제 화면을 보고 바꿈)
+     · 표시(추가견적 · 기록 N일 없음)와 댓글 수를 업무명 옆에 두니 좁은 카드에서 제목 아래로 한 줄씩 떨어져
+       어느 것에 붙은 표시인지 흐렸다 → 제목 **위** 한 줄(머리 줄)에 모으고 제목은 카드 폭을 다 쓴다.
+     · 현장이 없는 업무는 '영업' 딱지 하나가 한 줄을 차지했다 → 종류는 머리 줄 왼쪽 글자로.
+     · 담당 · 기간은 **모든 업무에 있는 값**이라 늘 제목 바로 아래 같은 자리에 둔다 (훑어 읽기 쉽게).
+       현장은 철거 업무에만 있어 그 아래에.
    ★ 표시(flags) 판정은 서버가 합니다. 여기서는 받은 것을 그대로 글자로 보여줄 뿐입니다.
-     추가견적 필요 · 미승인 추가 · 기록 N일 없음 · 새 댓글 점 · 댓글 수는 업무명 줄 오른쪽에 붙습니다.
    ★ 법인명은 **법인이 둘 이상일 때만** — 필터 칩과 같은 조건입니다.
    ★ 빈 값은 조각째, 다 비면 줄째 만들지 않습니다 (v42 원칙 그대로). */
 function cardOpen(t, cls, i){
   return '<div data-tid="'+t.id+'" role="button" tabindex="0" class="card '+cls+anim_(i)+'"'+
          ' onkeydown="cardKey(event)" onclick="openTask(\''+t.id+'\')">';
 }
-/** 업무명 줄 — 제목(두 줄까지, 전체는 title) + 오른쪽 표시 */
-function cardHead(t, done){
+/** 머리 줄(종류 · 표시 · 댓글) + 업무명(두 줄까지, 전체는 title) */
+function cardHead(t){
   /* 마감 계열 표시는 기간 글자(빨강 + D+3)가 이미 말하므로 태그로 또 적지 않습니다 (2026-09-09) */
   var 표시들=((t&&t.flags)||[]).filter(function(f){ return f && !isDueFlag(f); });
   var tags=표시들.map(function(f){
     return '<span class="tag '+(f.lv==='danger'?'dg':'wn')+'">'+esc(f.t)+'</span>';
   }).join('');
-  var side=(done? '<span class="cdone">'+ic('checkc')+'완료</span>' : '')+tags+cmtBadge(t.id)+
+  var side=tags+cmtBadge(t.id)+
     (hasNewComment(t.id)? '<span class="cdot" title="새 댓글"><span class="sronly">새 댓글</span></span>' : '');
+  var kind=[t.typeName||'', manyCorps()? (t.corpName||'') : ''].filter(Boolean).map(esc).join(' · ');
   var title=esc(t.title);
-  return '<div class="chead"><p class="cn tt" title="'+title.replace(/"/g,'&quot;')+'">'+title+'</p>'+
-           (side? '<span class="cside">'+side+'</span>' : '')+'</div>';
+  return ((kind || side)? '<div class="ctop"><span class="ckind">'+kind+'</span>'+
+           (side? '<span class="cside">'+side+'</span>' : '')+'</div>' : '')+
+         '<p class="cn tt" title="'+title.replace(/"/g,'&quot;')+'">'+title+'</p>';
 }
 /** 현장 코드 → 현장 이름 (기준정보의 현장 목록에서). 모르면 빈 값 */
 function siteNameOf(code){
@@ -5550,13 +5590,10 @@ function siteNameOf(code){
   ((S.meta && S.meta.sites) || []).forEach(function(x){ if(x && x.code===code) n=String(x.name||''); });
   return n;
 }
-/** 현장 줄 — 업무 종류 · 현장 · (법인이 둘 이상이면) 법인. 현장은 이름으로(모르면 코드) */
+/** 현장 줄 — 있을 때만. 이름으로(모르면 코드) */
 function cardSite(t){
-  var kind=t.typeName? '<span class="ckind">'+esc(t.typeName)+'</span>' : '';
   var 이름=t.site? (siteNameOf(t.site) || t.site) : '';
-  var place=이름? '<span class="cplace">'+ic('pin')+'<span class="sronly">현장 </span><span>'+esc(이름)+'</span></span>' : '';
-  var corp=(manyCorps() && t.corpName)? '<span>'+esc(t.corpName)+'</span>' : '';
-  return (kind || place || corp)? '<p class="csite">'+kind+place+corp+'</p>' : '';
+  return 이름? '<p class="csite"><span class="cplace">'+ic('pin')+'<span class="sronly">현장 </span><span>'+esc(이름)+'</span></span></p>' : '';
 }
 /** 마감 — 언제나 '마감 MM-DD · D-2' 한 모양 (업무 상세의 제목 아래 줄이 씁니다). D-숫자는 기존 dday() 그대로 */
 function dueText(t){
@@ -5578,9 +5615,10 @@ function periodText(t){
         : (t.due ? '마감 '+esc(shortDate(t.due)) : esc(shortDate(t.start))+' 시작');
   return '<span class="due'+(dueHot(t)?' dgv':'')+'">'+ic('cal')+'<span class="sronly">기간 </span>'+글+(dd? ' · '+dd : '')+'</span>';
 }
-/** 담당자 — 사람 아이콘 + 이름 (임원·관리자는 눌러서 거르기) */
+/** 담당자 — 사람 아이콘 + 이름 (임원·관리자는 눌러서 거르기).
+   ★ 본인 업무만 보는 사람의 판은 전부 본인 것이라 이름을 적지 않는다 — 카드마다 같은 이름이 되풀이됐다 */
 function cardWho(t){
-  if(!t.ownerName) return '';
+  if(!t.ownerName || ownScope()) return '';
   return '<span>'+ic('user')+'<span class="sronly">담당 </span>'+ownerChip(t)+'</span>';
 }
 /** 담당 · 기간 한 줄. 빈 조각은 빼고, 다 비면 줄 자체를 만들지 않는다 (v42) */
@@ -5594,12 +5632,12 @@ function cardSlim(t, i){
   var parts=[cardWho(t), periodText(t)];
   if(done && t.amount) parts.push('<span>'+won(t.amount)+'원</span>');
   return cardOpen(t, lv(t)+(done?' done':''), i)+
-    cardHead(t, done)+cardSite(t)+cardMeta(parts)+
+    cardHead(t)+cardMeta(parts)+cardSite(t)+
   '</div>';
 }
 
 function cardFull(t, i){
-  var h=cardOpen(t, lv(t), i)+cardHead(t)+cardSite(t)+cardMeta([cardWho(t), periodText(t)]);
+  var h=cardOpen(t, lv(t), i)+cardHead(t)+cardMeta([cardWho(t), periodText(t)])+cardSite(t);
 
   /* ★★ 격자는 **철거에만** 둡니다 (2026-09-02).
      ★ 철거의 네 칸(오늘 투입·폐기물·계약·남는 것)은 **다른 데 없는 값**이라 그대로 둡니다. */
@@ -6063,7 +6101,6 @@ function taskSheetHtml(t, r){
     if(t.amount) site.push('계약 '+won(t.amount)+'원');
   }
 
-  var safe=esc(t.title).replace(/'/g,'');
   /* ★★ 제목 바로 아래 한 줄 (2026-09-22) — 상태 · 담당 · 마감 · 유형.
      빈 값은 조각째 뺍니다. 구분점이 홀로 남지 않습니다.
      마감 모양과 빨강은 판의 카드와 같은 dueText() 를 씁니다 (기존 D-숫자·표시 판정 그대로). */
@@ -6080,21 +6117,23 @@ function taskSheetHtml(t, r){
   if(유형) 조각.push(유형);
 
   return '<div class="veil"><div class="sheet tdsheet">'+
-    '<div class="tdhead">'+
-      '<h3>'+esc(t.title)+'</h3>'+
-      '<button class="tdico" onclick="taskMenu()" title="업무 수정·삭제" aria-label="업무 수정·삭제">'+ICO_DOTS+'</button>'+
+    /* ★ 도구 줄만 창 위에 붙인다 (디자인 검수 1차) — 제목을 단추 옆에 두고 통째로 붙여 두었더니
+       320px 에서 긴 업무명이 9줄 · 284px 를 차지한 채 떠 있어 기록 읽을 자리가 없었다 */
+    '<div class="tdbar">'+
+      /* ★ [수정] 은 글자 단추로 늘 보이게 (2026-09-30) — ⋯ 안에 숨겨 두면 처음 쓰는 사람이 고치는 길을 못 찾는다.
+         삭제는 되돌릴 수 없어 한 단계 안쪽(수정 창 맨 아래)으로 옮겼다 */
+      '<button class="btn sm tdedit" onclick="openTaskForm(\''+t.id+'\')">'+ic('pen')+'수정</button>'+
       '<button class="tdico" onclick="closeModal()" title="닫기" aria-label="닫기">'+ICO_X+'</button>'+
     '</div>'+
-    '<div class="tdmenu" id="tdMenu">'+
-      '<button class="btn sm" onclick="openTaskForm(\''+t.id+'\')">수정</button>'+
-      '<button class="btn sm dg" onclick="deleteTask(\''+t.id+'\',\''+safe+'\')">삭제</button>'+
-    '</div>'+
+    '<div class="tdhead"><h3>'+esc(t.title)+'</h3></div>'+
     '<div class="tdtop">'+
       '<p class="tdmeta">'+상태+조각.join('<span class="sep"> · </span>')+'</p>'+
       '<div class="tdprog"><div class="bar" role="progressbar" aria-label="진행률" aria-valuemin="0" '+
         'aria-valuemax="100" aria-valuenow="'+pct+'"><i style="width:'+pct+'%"></i></div>'+
         '<span class="pct">'+pct+'%</span></div>'+
-      (site.length? '<p class="tdsite">'+esc(site.join(' · '))+'</p>' : '')+
+      (site.length? '<p class="tdsite">'+ic('pin')+'<span>'+esc(site.join(' · '))+'</span></p>' : '')+
+      /* 다음 할 일 — 카드와 같은 세이지 상자 (상세에만 없던 것) */
+      (t.next? '<p class="tdnext"><span class="k">다음 할 일</span><span>'+esc(t.next)+'</span></p>' : '')+
     '</div>'+
     (t.content? '<section class="tdsec"><h4 class="tdh">업무 내용</h4>'+
                 '<div class="tdcontent">'+fmt(t.content)+'</div></section>' : '')+
@@ -7140,6 +7179,7 @@ function drawTaskForm(id, t, files){
         '<div id="tfGuest">'+guestRow_(t, '')+'</div></div>'
       : '')+
     /* 막혔을 때의 안내는 단추 **위**에 — 아래에 두면 붙어 있는 단추 줄에 가립니다 */
+    (id && t ? '<div class="tfdel"><button type="button" class="btn sm dg" onclick="tfDelete()">이 업무 삭제</button></div>' : '')+
     '<p class="tfmsg" id="tfMsg" role="alert"></p>'+
     /* 입력 창의 닫는 길은 아래 [취소] 하나 (2026-09-09).
        ★ 단추 줄은 창 아래에 붙어 있어 긴 창에서도 바로 누를 수 있습니다 (2026-09-22) */
@@ -7150,6 +7190,14 @@ function drawTaskForm(id, t, files){
   syncDemo();
   syncProg('tf');          /* 눈금과 상태 딱지를 지금 값에 맞춰 그린다 */
   tfGrow($('tfTitle'));
+}
+
+/* 수정 창 맨 아래 [이 업무 삭제] — 제목은 누를 때 판에서 찾는다.
+   ★ 제목을 단추 코드(onclick 글자)에 넣지 않는다 — 큰따옴표가 든 업무명에서 단추가 통째로 죽었다 (디자인 검수 1차) */
+function tfDelete(){
+  var id=$('tfId')? $('tfId').value : ''; if(!id) return;
+  var t=taskOf_(id);
+  deleteTask(id, (t && t.title) || ($('tfTitle')? $('tfTitle').value : ''));
 }
 
 /* 업무명 칸 — 글이 길면 줄이 늘어난다. 붙여넣은 줄바꿈은 띄어쓰기로 (업무명은 한 줄입니다) */
