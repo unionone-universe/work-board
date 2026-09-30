@@ -904,6 +904,9 @@ table.mk-tb .al-c{text-align:center} table.mk-tb .al-r{text-align:right}
 /* 답글 적는 칸 — 그 댓글 바로 아래에 */
 .cmreply{margin:4px 0 8px 22px}
 
+/* 본인 업무만 보는 직원의 판 제목 (2026-09-30) — 제목 글꼴·크기는 기존 화면 제목(--fs-h1)과 같게 */
+.boardtitle{margin:0 0 var(--sp-2);font-family:var(--font-title);font-size:var(--fs-h1);font-weight:700;color:var(--t1)}
+
 /* 법인 필터 — 본문 위로 내려옴 */
 .filterbar{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2);
   min-height:var(--wb-ctl);padding:0 0 var(--sp-3);margin:0 0 var(--sp-3);border-bottom:1px solid var(--line)}
@@ -1840,6 +1843,8 @@ span.colbtn{cursor:default}
 <div class="wrap">
   <!-- ================= 워크보드 ================= -->
   <div id="view-board">
+    <!-- 본인 업무만 보는 직원에게만 보이는 제목 (2026-09-30 · 판정은 서버가 보낸 scope) -->
+    <h2 class="boardtitle hide" id="boardTitle">내 업무 현황</h2>
     <div class="filterbar" id="corpFilter"></div>
     <!-- 폰에서만 보이는 '지금 손댈 것' 한 줄. 셋 다 0이면 그리지 않는다 (2026-09-09) -->
     <div class="todobar hide" id="todoBar"></div>
@@ -2002,6 +2007,9 @@ span.colbtn{cursor:default}
 /* ===================== 상태 ===================== */
 var S = { owner:'', type:'', token:'', me:null, meta:null, corp:'ALL', data:null, view:'board',
           lastUpdate:'', timer:null, anim:true, seen:{},
+          /* ★ 본인 업무 권한 (2026-09-30) — 옛 요청이 늦게 와서 지금 화면을 덮지 않게 */
+          epoch:0, boardSeq:0, boardApplied:0, openTask:null, openTaskFromBoard:false,
+          taskGen:{}, filterScope:null,
           taskCache:{}, docCache:{}, docCacheAt:{}, postCache:null, postCacheAt:null,
           readers:{}, readSent:{}, setCache:null, lastSync:0, lastT:null,
           /* ★ 지금 화면이 **어느 날 것인가** (2026-09-03).
@@ -3655,6 +3663,24 @@ function call(fn){
     var tt = (r && r.t) ? r.t : (r && r.board && r.board.t ? r.board.t : null);
     if(tt){ S.lastT=tt; S.lastTFn=fn; printT(fn, tt, ms); }
 
+    /* ★ 서버가 '그 업무를 볼 수 없다(denied)' 고 하면 그 업무를 이 기기에서 잊는다 (2026-09-30 · 검수 2차).
+       창을 열어 둔 사이 담당자가 바뀐 뒤 저장·기록·댓글·파일을 올리려 한 경우입니다.
+       · **창이 이미 닫혔어도**(저장은 창을 먼저 닫습니다) 보낸 값에서 업무 번호를 찾아 지운다
+       · 부른 쪽의 .then 보다 **먼저** 한다 — 잊으면 S.epoch 가 오르므로, 부른 쪽의 되돌리기(sameAccess)가
+         요청 전에 떠 둔 옛 목록을 되살리지 않는다
+       · 그리고 서버에서 판을 다시 받아 확인한다 */
+    if(r && r.denied){
+      try{
+        var 대상 = deniedTaskOf(fn, args);
+        if(대상 !== null){                       // 업무에 딸린 요청만 (null = 업무와 상관없는 요청)
+          대상 = 대상 || S.openTask || '';
+          if(대상) accessLost(대상, r.msg);
+          else S.epoch++;                        // 어느 업무인지 몰라도 옛 목록 되돌리기는 막는다
+          softRefresh();
+        }
+      }catch(e){ quiet('볼 수 없는 업무 정리', e); }
+    }
+
     return r;
   })
   .catch(function(e){
@@ -3922,19 +3948,161 @@ var LAUNCH_TOKEN = (function () {
 })();
 
 /* 마지막으로 본 화면을 이 기기에 저장해둔다.
-   다음에 열 때 서버를 기다리지 않고 바로 그려서 체감 대기를 없앤다. */
-var SNAP='uo_snap_v10';  // v58 — 달력(휴가·일정)·공지댓글·업무자료를 빠뜨리고 있었다
+   다음에 열 때 서버를 기다리지 않고 바로 그려서 체감 대기를 없앤다.
+   ★★ v11 (2026-09-30 본인 업무 권한) — v10 까지는 모든 직원의 기기에 **전체 업무**가 담겨 있었습니다.
+     그 저장본을 부팅하자마자 그리면 권한이 바뀐 뒤에도 남의 업무가 잠깐(끊겼으면 계속) 보입니다.
+     그래서 이름을 바꿔 **예전 것은 읽지 않고 지웁니다.** 서버 정책 번호(ACCESS_POLICY)가 다른 저장본도 버립니다.
+   ★ 끊긴 채로 보여 주는 지난 화면은 **서버가 마지막으로 확인한 뒤 24시간까지만** (예전 3일).
+     서버에 닿지 못하는 동안 바뀐 권한은 이 기기가 알 수 없으므로, 오래된 화면을 오래 두지 않습니다. */
+var SNAP='uo_snap_v11';
+var SNAP_OLD=['uo_snap_v10','uo_snap_v9','uo_snap_v8','uo_snap_v7'];
+var ACCESS_POLICY='own-v1';          // 서버 Code.js 의 ACCESS_POLICY 와 같은 값
+var SNAP_MAX_MS=1000*60*60*24;
+
+/** 기기 토큰을 그대로 적지 않고 짧은 지문으로 (2026-09-30 검수 1차).
+ *  저장본은 **이 토큰으로 로그인한 화면**에서만 다시 그린다 — 토큰이 바뀌면 이전 계정의 저장본은 버린다 */
+function tokenTag(t){
+  t=String(t||''); if(!t) return '';
+  var h=2166136261;
+  for(var i=0;i<t.length;i++){ h^=t.charCodeAt(i); h=Math.imul(h,16777619)>>>0; }
+  return t.length+'-'+h.toString(36);
+}
+
+/** 본인 업무만 보는 사람인가 — **서버가 보낸 값(scope)만** 본다. 화면이 등급으로 스스로 정하지 않는다 */
+function ownScope(){ return !!(S.data && S.data.scope === 'own'); }
+
+/** 사람·권한이 바뀌었을 때 이 화면이 들고 있던 것을 전부 버린다 (2026-09-30) */
+function resetUserCaches(){
+  S.epoch++;
+  S.taskCache={}; S.docCache={}; S.docCacheAt={}; S.postCache=null; S.postCacheAt=null;
+  S.readers={}; S.readSent={}; S.setCache=null; S.owner='';
+  try{ MON.cache={}; }catch(e){}               // 월별 보고 (임원) — 사람이 바뀌면 버린다
+}
+
+/** ★ 업무 한 건을 이 기기에서 잊는다 (2026-09-30 검수 1차).
+ *  카드 · 상세 재료(기록·댓글·자료·정산) · 방금 올라온 기록 · 알림까지 — 저장본에도 남지 않게.
+ *  세대 번호를 올려서, 그 업무에 대해 이미 보낸 요청의 답이 늦게 와도 버리게 한다. */
+function forgetTask(id){
+  if(!id) return;
+  /* ★ 볼 수 있는 업무가 줄었다 — 이 앞에 보낸 요청(판 · 현장 · 저장 되돌리기)은 모두 옛것이 된다 (검수 2차) */
+  S.epoch++;
+  S.taskGen[id]=(S.taskGen[id]||0)+1;
+  var 현장=null;                                 // 그 업무에 연결돼 있던 현장 (지우기 전에 알아 둔다)
+  ((S.data && Array.isArray(S.data.tasks)) ? S.data.tasks : []).forEach(function(t){ if(t && t.id===id) 현장=String(t.site||'').trim(); });
+  if(현장===null && S.taskCache[id] && S.taskCache[id].task) 현장=String(S.taskCache[id].task.site||'').trim();
+  delete S.taskCache[id]; delete S.readers[id]; delete S.readSent[id];
+  var d=S.data; if(!d) return;
+  if(Array.isArray(d.tasks)) d.tasks=d.tasks.filter(function(t){ return t && t.id!==id; });
+  ['logsByTask','logCount','settle','commentsByTask','commentCount','filesByTask','docsByTask','cmtDot']
+    .forEach(function(k){ if(d[k]) delete d[k][id]; });
+  if(Array.isArray(d.recent)) d.recent=d.recent.filter(function(x){ return x && x.taskId!==id; });
+  if(Array.isArray(d.noti)) d.noti=d.noti.filter(function(n){ return n && n.to!==id; });
+  /* ★ 본인 업무만 보는 사람의 현장(견적) 목록은 '본인 업무에 연결된 현장' 입니다 (검수 2차).
+     잊은 업무에만 걸려 있던 현장은 이름 · 주소 · 견적금액까지 화면과 저장본에서 숨긴다 — 다시 확인받을 때(판)까지.
+     어느 현장이었는지 모르면 남은 업무에 연결된 현장만 남긴다 (좁게). 전체를 보는 사람은 손대지 않는다 */
+  if(d.scope==='own' && S.meta && Array.isArray(S.meta.sites)){
+    var 남은={};
+    (Array.isArray(d.tasks) ? d.tasks : []).forEach(function(t){ if(t && t.site) 남은[String(t.site).trim()]=1; });
+    S.meta.sites=S.meta.sites.filter(function(x){
+      var c=String((x && x.code) || '').trim();
+      if(남은[c]) return true;
+      return 현장 ? c!==현장 : false;
+    });
+    if(Array.isArray(d.sites)) d.sites=S.meta.sites.slice();
+  }
+}
+
+/** 거절(denied)된 요청이 어느 업무에 대한 것이었나 — 보낸 값에서 찾는다 (검수 2차).
+ *  '' = 업무에 딸린 요청인데 번호를 못 찾음 · null = 업무와 상관없는 요청 */
+function deniedTaskOf(fn, a){
+  var p=a && a[1];
+  if(fn==='api_saveTask') return (p && p.id) || '';
+  if(fn==='api_saveLog' || fn==='api_addSettle' || fn==='api_saveDoc') return (p && p.taskId) || '';
+  if(fn==='api_addTaskFile' || fn==='api_guestLink' || fn==='api_deleteTask' || fn==='api_taskDetail' || fn==='api_settle') return p || '';
+  if(fn==='api_deleteSettle') return (a && a[2]) || '';
+  if(fn==='api_markRead' || fn==='api_saveComment') return p==='업무' ? ((a && a[2]) || '') : null;
+  if(fn==='api_deleteLog') return taskHolding('logsByTask', p);
+  if(fn==='api_deleteComment') return taskHolding('commentsByTask', p);
+  if(fn==='api_dropTaskFile') return taskHolding('filesByTask', p);
+  return null;
+}
+/** 기록·댓글·자료 한 건이 어느 업무에 딸렸나 (화면이 들고 있는 것에서) */
+function taskHolding(k, itemId){
+  var m=S.data && S.data[k], hit='';
+  if(!m || !itemId) return '';
+  Object.keys(m).forEach(function(tid){
+    if(!hit && Array.isArray(m[tid]) && m[tid].some(function(x){ return x && x.id===itemId; })) hit=tid;
+  });
+  return hit;
+}
+
+/** ★ 실패한 저장을 되돌려도 되나 (검수 2차).
+ *  요청을 보낸 뒤 계정·권한이 바뀌었거나 볼 수 있는 업무가 줄었으면(S.epoch 가 오름)
+ *  요청 전에 떠 둔 옛 목록을 되살리지 않고, 서버에서 판을 다시 받는다. */
+function sameAccess(ep){
+  if(ep === S.epoch) return true;
+  softRefresh();
+  return false;
+}
+
+/** 이 업무에 대해 보낸 요청의 답을 지금 써도 되나 — 사람·권한이 바뀌었거나 그 업무를 잊었으면 버린다 */
+function taskTicket(id){ return { ep:S.epoch, id:id||'', g:(id && S.taskGen[id])||0 }; }
+function ticketOk(tk){ return tk.ep===S.epoch && (!tk.id || ((S.taskGen[tk.id]||0)===tk.g)); }
+
+/** 열어 둔 업무 상세를 닫고 알린다 — 그 업무를 더는 볼 수 없게 됐을 때 */
+function accessLost(id, msg){
+  if(id) forgetTask(id);
+  if(S.openTask && (!id || S.openTask===id)){
+    BACK_TASK=null;                              // 닫은 뒤 그 업무 창으로 되돌아가지 않게
+    closeModal(true);
+    S.openTask=null; S.openTaskFromBoard=false;
+    if(msg !== '') toast(msg || '이 업무를 볼 수 있는 권한이 없어 창을 닫았습니다.');
+  }
+  /* ★ 카드·건수·저장본에서도 바로 지운다 (검수 1차 — 예전에는 창만 닫고 카드가 남았다) */
+  if(id){
+    try{ renderBoard(); navCount(); showNoti((S.data&&S.data.noti)||[]); if(S.view==='me') renderMe(); }
+    catch(e){ quiet('볼 수 없게 된 업무 지우기', e); }
+    saveSnap();
+  }
+}
+
+/** 판을 통째로 비운다 — 로그인이 필요해졌을 때 (지난 사람의 화면을 남기지 않는다) */
+function clearBoardData(){
+  try{ localStorage.removeItem(SNAP); }catch(e){ quiet('지난 화면 지우기', e); }
+  if(S.openTask) accessLost(null, '');
+  resetUserCaches();
+  S.me=null;
+  S.data={ ok:true, me:null, scope:'none', tasks:[], approvals:[], staff:[], recent:[], noti:[],
+           attendance:{ linked:false, rows:[] }, docs:{ toAct:[], drafts:[], others:[] }, docPack:{},
+           logsByTask:{}, logCount:{}, docsByTask:{}, filesByTask:{}, settle:{}, notices:[], noticeCmt:{},
+           commentsByTask:{}, commentCount:{}, cmtDot:{}, leaves:[], events:[] };
+  try{ renderBoard(); renderNotices(); navCount(); showNoti([]); }catch(e){ quiet('판 비우기', e); }
+}
+
+/** 판 응답이 **지금 화면에 반영해도 되는 것**인가 — 먼저 보낸 옛 요청이 늦게 오면 버린다 */
+function boardFresh(seq, ep){
+  if(ep !== S.epoch) return false;
+  if(seq < S.boardApplied) return false;
+  S.boardApplied = seq;
+  return true;
+}
 
 function saveSnap(){
   try{
     if(!S.data) return;
     var d=S.data;
+    /* ★ 권한 정책을 모르는 서버 응답(옛 서버)은 담지 않는다 — 전체 업무가 이 이름으로 남지 않게 (2026-09-30) */
+    if(d.policy !== ACCESS_POLICY) return;
     // 어느 댓글까지 봤는지만 따로 챙긴다 (안 그러면 새로고침할 때마다 점이 되살아난다)
     /* 댓글 배지는 이제 서버가 판정해서 cmtDot 으로 준다 (v44).
        화면 변수(S.seen)에 담아 저장하던 것을 없앴다 — 그게 다른 기기와 결과가 달랐던 원인이다. */
     localStorage.setItem(SNAP, JSON.stringify({
-      t:Date.now(), day:todayStr(), me:S.me, meta:S.meta, corp:S.corp,
-      data:{ ok:true, me:d.me, tasks:d.tasks, approvals:d.approvals,
+      /* t = 서버가 마지막으로 확인해 준 시각. 화면 안에서 고친 것을 저장해도 이 시각은 늘어나지 않는다 */
+      t:S.confirmedAt||Date.now(), day:todayStr(), me:S.me, meta:S.meta, corp:S.corp,
+      pol:d.policy, who:(d.me&&d.me.phone)||'',        // 어느 정책 · 누구의 화면인가 (2026-09-30)
+      tk:tokenTag(S.token),                             // 어느 로그인의 화면인가 (검수 1차)
+      data:{ ok:true, me:d.me, scope:d.scope, policy:d.policy, tasks:d.tasks, approvals:d.approvals,
+             sites:d.sites,       // 현장(견적) 목록 — 판과 같은 권한 범위 (검수 1차)
              staff:d.staff,       // 담당자 드롭다운 재료 (v46c)
              attendance:d.attendance, recent:d.recent, stat:d.stat,
              statByCorp:d.statByCorp, noti:d.noti, at:d.at,
@@ -3963,11 +4131,15 @@ function saveSnap(){
 
 function loadSnap(){
   try{
+    /* ★ 정책 이전의 저장본은 읽지 않고 지운다 (전체 업무가 들어 있다) */
+    SNAP_OLD.forEach(function(k){ try{ localStorage.removeItem(k); }catch(e){} });
     var raw=localStorage.getItem(SNAP);
     if(!raw) return null;
     var o=JSON.parse(raw);
     if(!o || !o.data || !o.me) return null;
-    if(Date.now()-o.t > 1000*60*60*24*3) return null;   // 3일 지난 건 버린다
+    if(o.pol !== ACCESS_POLICY || !o.who || o.who !== o.me.phone){ localStorage.removeItem(SNAP); return null; }
+    if(!o.tk || o.tk !== tokenTag(S.token)){ localStorage.removeItem(SNAP); return null; }   // 다른 로그인의 저장본
+    if(Date.now()-o.t > SNAP_MAX_MS){ localStorage.removeItem(SNAP); return null; }   // 서버 확인 뒤 24시간 지난 건 버린다
 
     /* ★★ 날짜가 바뀌었으면 **'오늘' 짜리 자료는 지우고 그립니다** (2026-09-03).
        지난번 화면을 그대로 그리면, 다음 날 아침에 앱을 열었을 때
@@ -4041,6 +4213,7 @@ function boot(){
   var snap=loadSnap();
   if(snap){
     S.meta=snap.meta; S.me=snap.me; S.corp=snap.corp||'ALL'; S.data=snap.data;
+    S.confirmedAt=snap.t;         // 이 화면을 서버가 마지막으로 확인해 준 시각
     useRanks(S.meta);
     takeDocPack(S.data);          // 지난번에 받아둔 문서 상세도 되살린다
     $('brandName').textContent=(S.meta.company||'UNION ONE').replace('(주)','').trim()||'UNION ONE';
@@ -4058,9 +4231,14 @@ function boot(){
   }
 
   // ② 진짜 데이터는 왕복 한 번으로 받는다
+  var seq0=++S.boardSeq, ep0=S.epoch;
   call('api_start', S.token, S.corp).then(function(r){
-    if(r.meta){
+    /* ★ 보낸 뒤 권한이 줄었으면(업무 창에서 거절을 받는 등) 이 답은 옛것이다 (검수 2차).
+       판은 다시 받고, 기준정보는 화면을 그릴 재료가 없을 때만 쓰되 현장 목록은 비운다 */
+    var 옛답 = !!(r && r.ok && !boardFresh(seq0, ep0));
+    if(r.meta && (!옛답 || !S.meta)){
       S.meta=r.meta;
+      if(옛답) S.meta.sites=[];
       useRanks(r.meta);
       $('brandName').textContent=(r.meta.company||'UNION ONE').replace('(주)','').trim()||'UNION ONE';
       loadFont(r.meta.fontTitle, r.meta.fontNum);
@@ -4077,7 +4255,14 @@ function boot(){
       if(!snap) showOffline();
       return;
     }
-    if(!r.ok){ markStale(false); showLogin(); return; }
+    if(!r.ok){
+      markStale(false);
+      /* ★ 로그인이 필요하면 이 기기의 지난 화면을 지우고 판도 비웁니다 (2026-09-30).
+         기기토큰이 풀린 뒤에도 로그인 창 뒤로 지난 사람의 업무가 보이면 안 됩니다. */
+      if(snap) clearBoardData();
+      showLogin(); return;
+    }
+    if(옛답){ markStale(false); if(ep0!==S.epoch) softRefresh(); startPolling(); return; }
     renderFilters();
     S.anim = !snap;              // 스냅샷을 이미 그렸으면 조용히 갈아끼운다
     applyBoard(r);
@@ -4265,11 +4450,16 @@ function doLogin(phone, first){
     $('lgGo').disabled=false;
     if(!r.ok){ $('lgMsg').textContent=r.msg; return; }
     S.me=r.me; $('modal').innerHTML='';
+    try{ localStorage.removeItem(SNAP); }catch(e){ quiet('지난 화면 지우기', e); }
+    resetUserCaches();
     renderFilters();
     showSkeleton();
+    var seq=++S.boardSeq, ep=S.epoch;
     call('api_start', S.token, S.corp).then(function(b){
       hideBooting();
       if(!b.ok){ toast(b.msg || '자료를 불러오지 못했습니다.'); return; }
+      if(!boardFresh(seq, ep)){ if(ep!==S.epoch){ softRefresh(); startPolling(); } return; }
+      if(b.meta) S.meta=b.meta;               // 현장 목록이 로그인한 사람에 맞게 새로 온다 (2026-09-30)
       S.anim=true; applyBoard(b); saveSnap(); startPolling();
     });
   });
@@ -4430,14 +4620,57 @@ function takeDocPack(b){
   });
 }
 
+/** 누구의 · 어떤 권한의 화면인가 — 이것이 바뀌면 들고 있던 것을 버린다 */
+function whoKey(me, d){ return me ? (String(me.phone||'')+'|'+String(me.grade||'')+'|'+String((d&&d.scope)||'')) : ''; }
+
 function applyBoard(b){
   if(!b || !b.ok) return false;
   /* ★ `me` 가 없으면 로그인한 사람이 아닙니다. 그리려 들면 흰 화면이 됩니다. */
   if(!b.me && !S.me) return false;
+  /* ★★ 사람이나 권한이 바뀌었나 (2026-09-30 본인 업무 권한).
+     다른 계정으로 들어왔거나, 등급·열람 범위가 바뀌었으면 이 화면이 들고 있던
+     업무 상세 · 결재 · 공지 캐시를 전부 버리고, 열린 업무 창도 닫습니다. */
+  var 바뀜 = !!(S.data && whoKey(S.data.me || S.me, S.data) !== whoKey(b.me || S.me, b));
+  if(바뀜){
+    if(S.openTask) accessLost(null, '계정이나 권한이 바뀌어 열려 있던 업무 창을 닫았습니다.');
+    /* ★ 업무 창이 아니어도(완료 목록 · 월별 보고 · 설정) 이전 권한으로 그린 창은 닫는다 (검수 1차) */
+    else if($('modal') && $('modal').innerHTML){
+      BACK_TASK=null; BACK_BOX='';
+      closeModal(true);
+      toast('계정이나 권한이 바뀌어 열려 있던 창을 닫았습니다.');
+    }
+    resetUserCaches();
+  }
+  /* ★ 지난 판에 있다가 새 판에서 사라진 업무 — 담당자가 바뀌었거나 지워졌다 (검수 1차).
+     들고 있던 상세·읽음을 버리고 세대 번호를 올려, 그 업무에 대해 보낸 요청의 답이 늦게 와도 버린다 */
+  if(!바뀜 && S.data && Array.isArray(S.data.tasks)){
+    var 새판={}; (Array.isArray(b.tasks) ? b.tasks : []).forEach(function(t){ if(t && t.id) 새판[t.id]=1; });
+    var 줄어듦=false;
+    S.data.tasks.forEach(function(t){
+      if(!t || !t.id || 새판[t.id] || t.id==='(저장중)') return;
+      줄어듦=true;
+      S.taskGen[t.id]=(S.taskGen[t.id]||0)+1;
+      delete S.taskCache[t.id]; delete S.readers[t.id]; delete S.readSent[t.id];
+    });
+    if(줄어듦) S.epoch++;                   // 이 앞에 보낸 요청의 답 · 저장 되돌리기는 옛것 (검수 2차)
+  }
   S.data=b; S.me=b.me||S.me;
+  S.confirmedAt=Date.now();                 // 서버가 확인해 준 시각 (지난 화면 저장본의 기준)
+  if(ownScope()) S.owner='';                // 본인 업무만 보는 사람에게 담당자 거르기는 없다
+  /* ★ 현장(견적) 목록도 판과 같이 지금 권한으로 갈아끼운다 (검수 1차).
+     등급이 낮아졌는데 예전 현장 · 견적금액이 '답 없는 견적' 과 저장본에 남지 않게 */
+  if(Array.isArray(b.sites)){ S.meta=S.meta||{}; S.meta.sites=b.sites; }
+  else if(바뀜 && S.meta) S.meta.sites=[];
   S.lastUpdate=b.lastUpdate||S.lastUpdate; S.lastSync=Date.now(); if(b.t) S.lastT=b.t;
   takeDocPack(b);
   mkSetNames(b.staff);          /* @이름 강조·고르기에 쓰는 명부 (2026-09-02) */
+  /* ★ 필터 줄은 **그린 때의 범위**가 지금과 다르면 다시 그린다 (검수 1차).
+     첫 접속에는 판을 받기 전에 필터를 먼저 그려서 담당자 칸이 남아 있었다 */
+  if(바뀜 || !$('corpFilter').innerHTML || S.filterScope !== (b.scope||'')) renderFilters();
+  /* 판에서 연 업무 창이 새 판에 없으면 — 담당자가 바뀌었거나 지워졌다 — 닫고 알린다 */
+  if(S.openTask && S.openTaskFromBoard && !(Array.isArray(b.tasks) ? b.tasks : []).some(function(t){ return t && t.id===S.openTask; })){
+    accessLost(S.openTask, '이 업무를 더 볼 수 없어 창을 닫았습니다.');
+  }
   renderBoard();
   renderNotices();
   $('atTime').textContent=b.at;
@@ -4467,17 +4700,14 @@ function softRefresh(){
   if(SOFT) clearTimeout(SOFT);
   SOFT=setTimeout(function(){
     SOFT=null;
+    /* ★ 판 받기는 모두 applyBoard 한 길로 (2026-09-30) — 사람·권한이 바뀐 것을 한 곳에서 알아챈다.
+       먼저 보낸 요청이 늦게 오면(boardFresh) 버린다 */
+    var seq=++S.boardSeq, ep=S.epoch;
     call('api_board', S.token, S.corp).then(function(r){
       if(!r || !r.ok) return;
-      S.data=r; S.me=r.me;
-      S.lastUpdate=r.lastUpdate||''; S.lastSync=Date.now(); if(r.t) S.lastT=r.t;
-      takeDocPack(r);
-      renderBoard(); renderNotices();
-      $('atTime').textContent=r.at;
-      navCount(); showNoti(r.noti);
-      if(S.view==='doc') renderDocs();
+      if(!boardFresh(seq, ep)){ if(ep!==S.epoch) softRefresh(); return; }   // 권한이 줄어든 뒤 온 옛 판 — 다시 받는다
+      applyBoard(r);
       if(S.view==='me') renderMe();
-      saveSnap();
     });
   }, 400);
 }
@@ -4485,19 +4715,13 @@ function softRefresh(){
 function refresh(showMsg){
   if(showMsg) S.anim=true;
   var rb=$('refBtn'); if(rb) rb.classList.add('spin');
+  var seq=++S.boardSeq, ep=S.epoch;
   return call('api_board', S.token, S.corp).then(function(r){
     if(rb) rb.classList.remove('spin');
     if(!r.ok) return;
-    S.data=r; S.me=r.me;
-    S.lastUpdate = r.lastUpdate||''; S.lastSync=Date.now(); if(r.t) S.lastT=r.t;
-    takeDocPack(r);
-    renderBoard();
-    renderNotices();
-    $('atTime').textContent = r.at;
-    navCount();
-    showNoti(r.noti);
-    if(S.view==='doc') renderDocs();
-    saveSnap();
+    if(!boardFresh(seq, ep)){ if(ep!==S.epoch) softRefresh(); return; }     // 권한이 줄어든 뒤 온 옛 판 — 다시 받는다
+    applyBoard(r);
+    if(S.view==='me') renderMe();
   });
 }
 
@@ -4511,6 +4735,7 @@ function renderFilters(){
      누를 이유가 없는 단추를 늘어놓으면 진짜 누를 것(담당자·종류)이 묻힙니다. */
   var corps = S.meta.corps || [];
   var h = '';
+  S.filterScope = (S.data && S.data.scope) || '';   // 어느 범위로 그렸나 (applyBoard 가 비교한다)
   if(corps.length > 1){
     h += '<button class="chip'+(S.corp==='ALL'?' on':'')+'" onclick="setCorp(&#39;ALL&#39;)">전체</button>';
     corps.forEach(function(c){
@@ -4524,12 +4749,15 @@ function renderFilters(){
      '선택지는 드롭다운 고정' 원칙 그대로 두 칸으로 둡니다. */
   if(corps.length > 1) h+='<span class="fgap"></span>';
 
-  h+='<label class="fsel"><span>담당자</span><select'+(S.owner?' class="on"':'')+' onchange="setOwner(this.value)">'+
-       '<option value=""'+(S.owner?'':' selected')+'>전체</option>';
-  staffSorted().forEach(function(x){
-    h+='<option value="'+esc(x.phone)+'"'+(S.owner===x.phone?' selected':'')+'>'+esc(x.name)+'</option>';
-  });
-  h+='</select></label>';
+  /* ★ 본인 업무만 보는 사람에게는 담당자 거르기가 없다 (2026-09-30) — 볼 수 있는 업무가 전부 본인 것입니다 */
+  if(!ownScope()){
+    h+='<label class="fsel"><span>담당자</span><select'+(S.owner?' class="on"':'')+' onchange="setOwner(this.value)">'+
+         '<option value=""'+(S.owner?'':' selected')+'>전체</option>';
+    staffSorted().forEach(function(x){
+      h+='<option value="'+esc(x.phone)+'"'+(S.owner===x.phone?' selected':'')+'>'+esc(x.name)+'</option>';
+    });
+    h+='</select></label>';
+  }
 
   h+='<label class="fsel"><span>종류</span><select'+(S.type?' class="on"':'')+' onchange="setType(this.value)">'+
        '<option value=""'+(S.type?'':' selected')+'>전체</option>';
@@ -4585,6 +4813,8 @@ function ownerNameOf(phone){
 /** 담당자 이름 — 누르면 판이 그 사람 것만 남는다. 다시 누르면 풀린다 */
 function ownerChip(t){
   if(!t.ownerName) return '';
+  /* 본인 업무만 보는 사람에게는 이름을 눌러 거를 일이 없다 — 글자만 (2026-09-30) */
+  if(ownScope()) return '<span class="who">'+esc(t.ownerName)+'</span>';
   return '<button class="who" onclick="event.stopPropagation();setOwner(\''+t.owner+'\')">'+
          esc(t.ownerName)+'</button>';
 }
@@ -4682,10 +4912,16 @@ function renderBoard(){
                'title="새 업무" aria-label="새 업무">'+ICO_PLUS+'</button>';
   /* ★ `＋`(새 업무)는 접기 밖에 그립니다 — 접었다고 업무를 못 올리면 안 됩니다.
      ★ 누적 상자는 `.foldpart` 라 **펼쳐야 보입니다** (2026-09-03 대표님 지시). */
+  /* ★ 본인 업무만 보는 사람 (2026-09-30) — 제목은 '내 업무 현황', 맡은 업무가 하나도 없으면
+     '아직 배정된 업무가 없습니다'. 남의 업무로 빈자리를 채우지 않습니다. 판정은 서버가 보낸 scope 입니다 */
+  var 본인만 = ownScope();
+  if($('boardTitle')) $('boardTitle').classList.toggle('hide', !본인만);
+  var 하나도없음 = 본인만 && !(d.tasks||[]).length;
   $('listWait').innerHTML = wait.length? wait.map(function(t,i){ return cardSlim(t, A?i:-1); }).join('')
-                                      : empty('대기 중인 업무 없음');
+                                      : empty(하나도없음 ? '아직 배정된 업무가 없습니다' : '대기 중인 업무 없음');
   if($('waitAdd')) $('waitAdd').innerHTML = addBtn;
-  $('listRun').innerHTML  = run.length ? run.map(function(t,i){ return cardFull(t, A?(i+2):-1); }).join('')  : empty('진행중인 업무 없음');
+  $('listRun').innerHTML  = run.length ? run.map(function(t,i){ return cardFull(t, A?(i+2):-1); }).join('')
+                                       : empty(하나도없음 ? '아직 배정된 업무가 없습니다' : '진행중인 업무 없음');
   $('listDone').innerHTML = done.length? done.map(function(t,i){ return cardSlim(t, A?(i+4):-1); }).join('') : empty('최근 7일 완료 없음');
   if($('doneSum')) $('doneSum').innerHTML = sumBox(A);
 
@@ -4913,7 +5149,9 @@ function openDoneAll(){
 function loadDoneOld(ym){
   var btn=$('daOld');
   if(btn){ btn.disabled=true; btn.textContent='불러오는 중...'; }
+  var tk=taskTicket('');
   call('api_doneAll', S.token, S.corp, ym||'').then(function(r){
+    if(!ticketOk(tk)) return;                 // 그사이 계정·권한이 바뀌었으면 옛 목록을 그리지 않는다 (검수 1차)
     if(!$('daBody')) return;
     if(!r.ok){ if(btn){ btn.disabled=false; btn.textContent='더 오래된 것까지 보기'; } toast(r.msg||'불러오지 못했습니다'); return; }
     /* ★ 달을 안 골랐고 잘린 것이 있으면 달 고르기를 얹는다 (2026-09-02).
@@ -5308,6 +5546,7 @@ function openTask(id, keepFold){
     var hadDot = hasNewComment(id);      // 점을 지우기 전에 기억해둔다
     var r = S.taskCache[id] || detailFromBoard(id, t);
     $('modal').innerHTML = taskSheetHtml(t, r);
+    S.openTask=id; S.openTaskFromBoard=true;   // 어느 업무 창이 열려 있나 (권한이 바뀌면 닫으려고)
     markCommentsSeen(id);
     paintReaders(id);
     sendRead(id, hadDot);        // 뒤에서 조용히. 창은 기다리지 않는다
@@ -5315,9 +5554,12 @@ function openTask(id, keepFold){
   }
 
   // 진행판에 없는 업무(오래된 완료 건 등)일 때만 서버에 묻는다
+  var tk=taskTicket(id);
   call('api_taskDetail', S.token, id).then(function(r){
-    if(!r.ok){ toast(r.msg); return; }
+    if(!ticketOk(tk)) return;                 // 그사이 계정·권한이 바뀌었거나 그 업무를 잊었으면 옛 답을 그리지 않는다
+    if(!r.ok){ if(r.denied) accessLost(id, r.msg); else toast(r.msg); return; }
     S.taskCache[id]=r;
+    S.openTask=id; S.openTaskFromBoard=false;
     if(r.readers) S.readers[id]={up:taskEditOf(id), names:r.readers};
     $('modal').innerHTML = taskSheetHtml(r.task, r);
     markCommentsSeen(id);
@@ -5348,7 +5590,12 @@ function sendRead(id, force){
   var up=taskEditOf(id);
   if(S.readSent[id]===up && !force) return;
   S.readSent[id]=up;
+  var tk=taskTicket(id);
   call('api_markRead', S.token, '업무', id).then(function(r){
+    if(!ticketOk(tk)) return;
+    /* ★ 서버가 '볼 수 없는 업무' 라고 하면 창을 닫고 이 기기에서도 지운다 (2026-09-30).
+       지난 화면 저장본으로 열었는데 그사이 담당자가 바뀐 경우가 여기서 걸립니다. */
+    if(r && r.denied){ accessLost(id, r.msg); return; }
     if(!r || !r.ok) return;
     S.readers[id]={up:up, names:r.readers||[]};
     paintReaders(id);
@@ -5424,8 +5671,10 @@ function markCommentsSeen(id){
 function loadTaskAll(id, btnId){
   var btn=btnId? $(btnId):null;
   if(btn){ btn.disabled=true; btn.textContent='불러오는 중...'; }
+  var tk=taskTicket(id);
   call('api_taskDetail', S.token, id).then(function(r){
-    if(!r.ok){ toast(r.msg); if(btn){ btn.disabled=false; } return; }
+    if(!ticketOk(tk)) return;                 // 늦게 온 답이 잊은 업무의 상세를 되살리지 않게 (검수 1차)
+    if(!r.ok){ if(r.denied){ accessLost(id, r.msg); return; } toast(r.msg); if(btn){ btn.disabled=false; } return; }
     S.taskCache[id]=r;
     if(r.readers) S.readers[id]={up:taskEditOf(id), names:r.readers};
     if(!$('tdBody')) return;                 // 그새 창을 닫았으면 그만
@@ -5689,6 +5938,7 @@ function deleteLogFromTask(logId, taskId){
     logs:(S.data.logsByTask||{})[taskId]||null,
     cnt:(S.data.logCount||{})[taskId]||0 })) : null;
 
+  var ep=S.epoch;
   dropLogLocal(taskId, logId);
   toast('삭제되었습니다');
   closeOk();
@@ -5697,7 +5947,7 @@ function deleteLogFromTask(logId, taskId){
 
   call('api_deleteLog', S.token, logId, S.corp).then(function(r){
     if(!r.ok){
-      if(back && S.data){
+      if(back && S.data && sameAccess(ep)){
         if(back.logs) S.data.logsByTask[taskId]=back.logs;
         S.data.logCount[taskId]=back.cnt;
         delete S.taskCache[taskId];
@@ -6044,7 +6294,7 @@ function taskDetailBody(r){
     if(n) coNames.push(n);
   });
   h+='<p class="tdfoot">'+esc(made)+
-     (coNames.length? (made? ' · ' : '')+'함께 보는 사람 '+esc(coNames.join(', ')) : '')+
+     (coNames.length? (made? ' · ' : '')+'협업자 '+esc(coNames.join(', ')) : '')+
      '<span id="tdRead"></span></p>';
   return h;
 }
@@ -6271,6 +6521,7 @@ function saveSettle(taskId, kind){
   /* 차감은 낙관 처리 — 즉시 반영하고 창을 닫는다.
      입금은 돈이 걸린 것이라 서버 확인 후에 닫는다. */
   if(kind==='차감'){
+    var ep=S.epoch;
     var backup=applySettleLocal(taskId, { id:'', kind:'차감', amount:amt, memo:memo,
                                           date:date||todayStr(), docNo:'', tax:'' });
     closeOk(); toast('차감이 등록되었습니다');
@@ -6279,9 +6530,10 @@ function saveSettle(taskId, kind){
 
     call('api_addSettle', S.token, send, S.corp).then(function(r){
       if(!r.ok){
+        toast('차감 저장 실패: '+r.msg);
+        if(!sameAccess(ep)) return;          // 보낸 뒤 권한이 줄었으면 되돌리지도 다시 열지도 않는다 (검수 2차)
         if(backup && S.data && S.data.settle) S.data.settle[taskId]=backup;
         renderBoard();
-        toast('차감 저장 실패: '+r.msg);
         FOLD={}; FOLD['settle:'+taskId]=1;
         openTask(taskId, true);
         return;
@@ -6355,11 +6607,13 @@ function delSettle(settleId, taskId){
   toast('삭제되었습니다');
   FOLD={}; FOLD['settle:'+taskId]=1;
   openTask(taskId, true);
+  var ep=S.epoch;
 
   call('api_deleteSettle', S.token, settleId, taskId, S.corp).then(function(r){
     if(!r.ok){
-      if(back && S.data && S.data.settle) S.data.settle[taskId]=back;
       toast('삭제하지 못했습니다: '+r.msg);
+      if(!sameAccess(ep)) return;            // 보낸 뒤 권한이 줄었으면 되돌리지 않는다 (검수 2차)
+      if(back && S.data && S.data.settle) S.data.settle[taskId]=back;
       FOLD={}; FOLD['settle:'+taskId]=1;
       openTask(taskId, true);
       return;
@@ -6384,6 +6638,7 @@ function openAddWork(taskId){
 function deleteTask(id, title){
   if(!confirm('"'+title+'" 업무를 삭제할까요?\n이 업무에 남긴 작업기록도 함께 지워지고, 되돌릴 수 없습니다.')) return;
   var backup = S.data ? JSON.parse(JSON.stringify(S.data.tasks)) : null;
+  var ep=S.epoch;
   if(S.data){
     S.data.tasks = S.data.tasks.filter(function(t){ return t.id!==id; });
     renderBoard(); if(S.view==='me') renderMe();
@@ -6392,7 +6647,7 @@ function deleteTask(id, title){
 
   call('api_deleteTask', S.token, id, S.corp).then(function(r){
     if(!r.ok){
-      if(backup && S.data){ S.data.tasks=backup; renderBoard(); if(S.view==='me') renderMe(); }
+      if(backup && S.data && sameAccess(ep)){ S.data.tasks=backup; renderBoard(); if(S.view==='me') renderMe(); }
       toast('삭제 실패: '+r.msg);
       return;
     }
@@ -6462,6 +6717,7 @@ function closeModal(force){
   }
   box.innerHTML='';
   MODAL_ROOT=null; MODAL_SIG=null; MODAL_TOUCHED=false; MODAL_DRAWN=false;
+  S.openTask=null; S.openTaskFromBoard=false;      // 열린 업무 창 표시도 지운다 (돌아갈 곳이 있으면 openTask 가 다시 적는다)
   /* ★ 어디서 열었으면 거기로 돌아간다 (2026-09-09).
      업무 상세에서 연 수정·기록·입금 창을 [취소] 하면 판으로 떨어져서,
      어떤 창은 돌아오고 어떤 창은 안 돌아오는 상태였습니다.
@@ -6530,8 +6786,10 @@ function openTaskForm(id){
   (S.data? S.data.tasks:[]).forEach(function(x){ if(x.id===id) t=x; });
   if(t){ drawTaskForm(id, t, (S.data.filesByTask && S.data.filesByTask[id])||[]); return; }
   // 진행판에 없는 업무(완료 오래된 건 등)일 때만 서버 조회
+  var tk=taskTicket(id);
   call('api_taskDetail', S.token, id).then(function(r){
-    if(!r.ok){ toast(r.msg); return; }
+    if(!ticketOk(tk)) return;                 // 그사이 계정·권한이 바뀌었으면 옛 업무로 수정 창을 열지 않는다 (검수 1차)
+    if(!r.ok){ if(r.denied) accessLost(id, r.msg); else toast(r.msg); return; }
     drawTaskForm(id, r.task, r.files||[]);
   });
 }
@@ -6563,8 +6821,13 @@ function drawTaskForm(id, t, files){
       mkEditor('tfContent', (t&&t.content)?t.content:'', 64, true)+
       '</div>'+
     '<div class="grid2">'+
+      /* ★ 본인 업무만 보는 사람은 담당자를 본인으로만 (2026-09-30) — 서버(api_saveTask)도 같은 규칙으로 막습니다 */
       '<div class="field"><label class="fl req" for="tfOwner">담당자</label>'+
-        '<select id="tfOwner" onchange="syncCo()">'+staffOptions(t?t.owner:S.me.phone)+'</select></div>'+
+        (ownScope()
+          ? '<select id="tfOwner" disabled aria-describedby="tfOwnerNote"><option value="'+esc(S.me.phone)+'" selected>'+
+              esc(S.me.name||'나')+' (본인)</option></select>'+
+            '<p class="muted" id="tfOwnerNote" style="font-size:var(--fs-sm);margin-top:4px">본인 업무만 올리고 고칠 수 있습니다</p></div>'
+          : '<select id="tfOwner" onchange="syncCo()">'+staffOptions(t?t.owner:S.me.phone)+'</select></div>')+
       '<div class="field"><label class="fl" for="tfDue">마감일</label>'+
         '<input type="date" id="tfDue" value="'+esc(t?t.due:'')+'"></div>'+
     '</div>'+
@@ -6588,10 +6851,14 @@ function drawTaskForm(id, t, files){
           '<input type="number" id="tfAmount" value="'+(t&&t.amount?t.amount:'')+'"></div>'+
       '</div>'+
     '</div>'+
-    /* 함께 보는 사람 (협업자) — 여럿 고를 수 있다. 댓글이 달리면 담당자와 함께 알림을 받는다 */
-    '<div class="field"><label class="fl">함께 보는 사람</label>'+
-      '<div class="chks tfpick" id="tfCoPick" role="group" aria-label="함께 보는 사람">'+
-        coChips(t?t.co:'', t?t.owner:S.me.phone)+'</div></div>'+
+    /* 협업자 — 여럿 고를 수 있다.
+       ★ 2026-09-30 본인 업무 권한부터 협업자라는 이유로 업무를 **보지는 못합니다** (담당자 · 임원 · 관리자만 봅니다).
+         그래서 '함께 보는 사람' 이라는 이름을 '협업자' 로 바꾸고, 알림도 볼 수 있는 사람에게만 간다고 적습니다.
+         칸 이름(id)과 저장되는 값은 그대로입니다. */
+    '<div class="field"><label class="fl">협업자</label>'+
+      '<div class="chks tfpick" id="tfCoPick" role="group" aria-label="협업자">'+
+        coChips(t?t.co:'', t?t.owner:S.me.phone)+'</div>'+
+      '<p class="muted" style="font-size:var(--fs-sm);margin-top:4px">업무는 담당자와 임원·관리자만 볼 수 있습니다. 알림도 볼 수 있는 사람에게만 갑니다</p></div>'+
     /* 진행률 — 상태는 진행률이 정합니다 (0% 대기 · 5~95% 진행중 · 100% 완료).
        ★★ 상태를 고르는 칸은 따로 두지 않습니다 (2026-09-03). 둘을 따로 고르게 하면
          '완료인데 40%' 같은 줄이 생깁니다.
@@ -6815,13 +7082,14 @@ function saveTask(){
 
   // 화면에 먼저 반영하고 창을 닫는다 (기다리지 않음)
   var backup = S.data ? JSON.parse(JSON.stringify(S.data.tasks)) : null;
+  var ep=S.epoch;
   applyTaskLocal(p);
   closeOk();
   toast('저장되었습니다');
 
   call('api_saveTask', S.token, p, S.corp).then(function(r){
     if(!r.ok){
-      if(backup && S.data){ S.data.tasks=backup; renderBoard(); if(S.view==='me') renderMe(); }
+      if(backup && S.data && sameAccess(ep)){ S.data.tasks=backup; renderBoard(); if(S.view==='me') renderMe(); }
       toast('저장 실패: '+r.msg);
       return;
     }
@@ -7074,13 +7342,14 @@ function saveLog(){
 
   // 사진이 없으면 즉시 닫고 뒤에서 보낸다
   var backup = S.data ? JSON.parse(JSON.stringify(S.data.tasks)) : null;
+  var ep=S.epoch;
   draftSent(p.taskId, seq);
   applyLogLocal(p);
   closeOk();
   toast('기록이 저장되었습니다');
   call('api_saveLog', S.token, p, S.corp).then(function(r){
     if(!r.ok){
-      if(backup && S.data){ S.data.tasks=backup; renderBoard(); }
+      if(backup && S.data && sameAccess(ep)){ S.data.tasks=backup; renderBoard(); }
       /* ★ 창은 이미 닫혔습니다. 쓴 글을 잃지 않게 상세의 적는 칸으로 돌려 둡니다 (2026-09-22 Astra 지적).
          그사이 새로 쓴 초안이 있으면 그것을 덮지 않습니다 */
       draftBack(p.taskId, p.text);
@@ -7998,6 +8267,7 @@ function saveEvent(){
 
   // 화면에 먼저 반영하고 달력으로 돌아간다 (기다리지 않음)
   var backup = (S.data && S.data.events) ? S.data.events.slice() : [];
+  var ep=S.epoch;
   var tmpId = p.id || ('TMP-'+Date.now());
   var whoName = '';
   ((S.data && S.data.staff) || []).forEach(function(s){ if(s.phone===p.phone) whoName=s.name; });
@@ -8014,7 +8284,7 @@ function saveEvent(){
 
   call('api_saveEvent', S.token, p, S.corp).then(function(r){
     if(!r || !r.ok){
-      if(S.data) S.data.events = backup;
+      if(S.data && sameAccess(ep)) S.data.events = backup;
       calRedraw();
       toast('저장 실패: '+((r&&r.msg)||'다시 시도해주세요'));
       return;
@@ -8032,13 +8302,14 @@ function deleteEvent(id){
   if(!confirm('이 일정을 지울까요?')) return;
 
   var backup = (S.data && S.data.events) ? S.data.events.slice() : [];
+  var ep=S.epoch;
   dropEventLocal(id);
   if(!calFill(0)) drawCal();          // 달력 안쪽만 (v50)
   toast('삭제되었습니다');
 
   call('api_deleteEvent', S.token, id, S.corp).then(function(r){
     if(!r || !r.ok){
-      if(S.data) S.data.events = backup;
+      if(S.data && sameAccess(ep)) S.data.events = backup;
       calRedraw();
       toast('삭제 실패: '+((r&&r.msg)||'다시 시도해주세요'));
       return;
@@ -8059,13 +8330,14 @@ function deleteLeave(id){
   if(!confirm('이 휴가 기록을 달력에서 지울까요?\n\n승인된 결재 문서는 그대로 남습니다.\n되돌릴 수 없습니다.')) return;
 
   var backup = (S.data && S.data.leaves) ? S.data.leaves.slice() : [];
+  var ep=S.epoch;
   if(S.data) S.data.leaves = (S.data.leaves || []).filter(function(v){ return v.id !== id; });
   if(!calFill(0)) drawCal();
   toast('삭제되었습니다');
 
   call('api_deleteLeave', S.token, id, S.corp).then(function(r){
     if(!r || !r.ok){
-      if(S.data) S.data.leaves = backup;
+      if(S.data && sameAccess(ep)) S.data.leaves = backup;
       calRedraw();
       toast('삭제 실패: '+((r&&r.msg)||'다시 시도해주세요'));
       return;
@@ -8704,10 +8976,13 @@ function deleteComment(id){
   if(node && par) par.removeChild(node);      // 먼저 지운다
   syncCommentCount(-1);
   S.taskCache={};
+  var ep=S.epoch;
   call('api_deleteComment', S.token, id, S.corp).then(function(r){
     if(!r.ok){
-      if(node && par) par.insertBefore(node, mark);   // 되돌린다
-      syncCommentCount(1);
+      if(sameAccess(ep)){
+        if(node && par) par.insertBefore(node, mark);   // 되돌린다
+        syncCommentCount(1);
+      }
       toast('지우지 못했습니다: '+r.msg);
       return;
     }
@@ -9596,11 +9871,12 @@ function shareDoc(no){
 function deleteDoc(no, title){
   if(!confirm('"'+title+'" 문서를 삭제할까요?\n결재선·지출내역·영수증 기록까지 함께 지워지고 되돌릴 수 없습니다.')) return;
   var back=S.data? JSON.parse(JSON.stringify(S.data.docs||null)) : null;
+  var ep=S.epoch;
   dropDocLocal(no);
   closeOk(); toast('삭제되었습니다');
   call('api_deleteDoc', S.token, no, S.corp).then(function(r){
     if(!r.ok){
-      if(back && S.data){ S.data.docs=back; renderDocs(); navCount(); }
+      if(back && S.data && sameAccess(ep)){ S.data.docs=back; renderDocs(); navCount(); }
       toast('삭제하지 못했습니다: '+r.msg);
       return;
     }
@@ -9612,6 +9888,7 @@ function deleteDoc(no, title){
 /** 열람 확인 — 눌렀으면 바로 닫는다. 되돌릴 수 있는 동작이다 */
 function readDoc(no){
   var back=S.data? JSON.parse(JSON.stringify(S.data.docs||null)) : null;
+  var ep=S.epoch;
 
   // 캐시 안의 열람 현황도 바로 고쳐서 다시 열어도 '확인' 으로 보이게
   var cd=S.docCache[no];
@@ -9626,7 +9903,7 @@ function readDoc(no){
 
   call('api_readDoc', S.token, no, S.corp).then(function(r){
     if(!r.ok){
-      if(back && S.data){ S.data.docs=back; renderDocs(); navCount(); }
+      if(back && S.data && sameAccess(ep)){ S.data.docs=back; renderDocs(); navCount(); }
       delete S.docCache[no]; delete S.docCacheAt[no];
       toast('확인 처리를 하지 못했습니다: '+r.msg);
       return;
@@ -9668,6 +9945,7 @@ function actDoc(no, action){
 
   var back=S.data? JSON.parse(JSON.stringify({docs:S.data.docs||null,
                                               apv:S.data.approvals||[]})) : null;
+  var ep=S.epoch;
   markDocLocal(no, { canAct:false });
   delete S.docCache[no]; delete S.docCacheAt[no];
   closeOk();
@@ -9675,7 +9953,7 @@ function actDoc(no, action){
 
   call('api_actDoc', S.token, no, action, c, S.corp).then(function(r){
     if(!r.ok){
-      if(back && S.data){ S.data.docs=back.docs; S.data.approvals=back.apv; }
+      if(back && S.data && sameAccess(ep)){ S.data.docs=back.docs; S.data.approvals=back.apv; }
       renderBoard(); navCount(); if(S.view==='doc') renderDocs();
       toast('처리하지 못했습니다: '+r.msg);
       return;
@@ -10957,10 +11235,14 @@ function syncNow(){
 }
 
 function refreshMeta(){
+  var tk=taskTicket('');
   call('api_refreshMeta', S.token).then(function(r){
+    if(!ticketOk(tk)) return;                 // 그사이 계정·권한이 바뀌었으면 옛 현장 목록을 쓰지 않는다
     if(!r.ok) return;
+    /* ★ 현장(견적) 목록은 여기서 받지 않는다 (검수 2차) — 바로 아래 refresh 의 판이 지금 권한으로 가져온다.
+       이 답을 기다리는 사이 담당이 바뀌면 옛 현장 · 견적금액이 되살아나기 때문 */
     if(r.meta){ S.meta.corps=r.meta.corps; S.meta.types=r.meta.types;
-                S.meta.typeAll=r.meta.typeAll; S.meta.sites=r.meta.sites; }
+                S.meta.typeAll=r.meta.typeAll; }
     // 번호표를 전부 새로 만들었으므로 화면이 들고 있던 것도 전부 버린다 (v43)
     S.setCache=null; S.postCache=null; S.postCacheAt=null;
     S.docCache={}; S.docCacheAt={}; S.taskCache={};
@@ -11055,7 +11337,9 @@ function openMonthly(ym){
   drawMonthly();
   var got = MON.cache[MON.ym];
   if(got) return;
+  var tk=taskTicket('');
   call('api_monthly', S.token, MON.ym).then(function(r){
+    if(!ticketOk(tk)) return;                 // 그사이 계정·권한이 바뀌었으면 버린다
     if(!r || !r.ok){ toast((r&&r.msg)||'불러오지 못했습니다'); return; }
     MON.cache[MON.ym] = r;
     if(MON.ym === r.ym) drawMonthly();
