@@ -32,7 +32,6 @@
      밝은 테마: 빨강 6.67:1 · 파랑 7.11:1 (흰 카드 위) */
   --cal-sun:#B81414; --cal-sat:#1257A8;
   /* 오늘 점 (v53) — 가장 진한 무채색. 빨강·파랑 날짜 위에서도 갈립니다 */
-  --cal-today:#1B2621;
   /* 지난달·다음달 날짜 (v53). 이번 달 평일의 절반쯤 대비라 한눈에 '이번 달이 아니다' 로 읽힙니다 */
   --cal-off:#98A29B;
   /* 진행률 막대 · 입금 태그 — 주요 녹색과 같은 한 벌 */
@@ -102,7 +101,6 @@ html[data-theme="dark"]{
   --ok:#6FD39C; --accent:#FF8A78;
   /* 어두운 테마: 빨강 7.66:1 · 파랑 8.53:1 — 평일(--t3)보다 확실히 밝습니다 */
   --cal-sun:#FF8C8C; --cal-sat:#7FBBFF;
-  --cal-today:#F1F5F1;
   --cal-off:#56615A;
   --ok2:#7CCBA2; --ok-bg:#12301F;
   --on-accent:#0F1311;   /* 밝은 빨강 위에는 어두운 글자가 또렷하다 */
@@ -127,120 +125,143 @@ h1,h2,h3,.tt,.num{font-family:var(--font-title); font-weight:700; letter-spacing
 button,input,select,textarea{font-family:inherit;font-size:var(--fs-body);color:var(--t1)}
 a{color:inherit}
 
-/* ===================== 휴가 달력 ===================== */
+/* ===================== 일정 달력 (2026-09-30 디자인 개선) =====================
+   ★ 하나의 달력처럼 — 날짜마다 둥근 상자를 두르지 않고, 격자 사이 1px 선으로만 나눕니다.
+     빈 날짜 칸의 테두리가 실제 일정보다 먼저 눈에 들어오던 것을 바꿨습니다.
+   ★ 오늘 = 날짜 숫자에 **녹색 동그라미** · 고른 날 = 칸의 은은한 세이지 바탕 + 녹색 안쪽 테두리.
+     둘이 같은 날이면 둘 다 보입니다. (예전 '오늘은 점 하나' 는 찾기 어려워 바꿨습니다 — 2026-09-30 지시)
+   ★ 칸 안의 이름표(.clab)는 **표시용 얇은 띠**입니다. 누르는 단추(.chip · 44px)와 이름부터 다릅니다.
+     누르는 곳은 날짜 칸 전체(단추 · calPick)입니다.
+   ★ 그달에 필요한 주(4·5·6)만 그립니다. 월 이름 · ◀▶ · 오늘 · 닫기 줄(.calhead)은 창 위에 붙어 있어
+     달을 넘겨도 손 밑에서 움직이지 않습니다.
+   ★ 좁은 폰(600px 미만)은 칸 안에 이름을 적지 않고 **종류(아이콘) · 건수**만. 글자를 줄이지 않습니다.
+     전체 이름은 아래 '고른 날' 목록에서 읽습니다 (calDayBox). */
+:root{
+  --cal-leave-bg:#FFF1CF; --cal-leave-t:#5E4200;    /* 휴가 — 옅은 황금 바탕 · 짙은 황금 글자 */
+  --cal-ev-bg:#E6F0E5;    --cal-ev-t:#1E4D38;       /* 일정 — 세이지 바탕 · 짙은 녹색 글자 */
+  --cal-cell-h:92px;
+}
+html[data-theme="dark"]{
+  /* 어두운 테마의 휴가 — 갈색 경고 상자 대신 부드러운 황금 글자 · 옅은 바탕 */
+  --cal-leave-bg:rgba(255,214,120,.14); --cal-leave-t:#F2D38B;
+  --cal-ev-bg:rgba(124,203,162,.15);    --cal-ev-t:#A9DEC2;
+}
+@media (min-width:1024px){ :root{ --cal-cell-h:104px; } }
+@media (max-width:599px){ :root{ --cal-cell-h:72px; } }
 .cal{width:100%}
-.calhd{display:flex;align-items:center;justify-content:center;gap:var(--sp-4);
-  margin:0 0 var(--sp-3)}
-.calhd .m{font-size:var(--fs-h2);font-weight:700;min-width:104px;text-align:center;
+
+/* 창 머리 — '일정' · 월 이동 · 오늘 · 닫기. 창 위에 붙는다 */
+.calhead{position:sticky;top:0;z-index:4;display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2);
+  margin:0 calc(-1 * var(--cal-px));padding:var(--sp-3) var(--cal-px) var(--sp-3);background:var(--card)}
+/* ★ 선택자를 한 단계 좁게 — 뒤에 나오는 `.sheet h3{margin-bottom}` 이 '일정' 을 위로 밀어 단추 줄과 어긋났다 */
+.calsheet .calhead h3{margin:0;font-size:var(--fs-h1);order:1}
+.calhead .calclose{order:2;margin-left:auto}
+.calnav{order:3;flex:1 1 100%;display:flex;align-items:center;justify-content:center;gap:var(--sp-2)}
+.calnav .m{min-width:116px;text-align:center;font-family:var(--font-title);font-size:var(--fs-h1);font-weight:700;
   font-variant-numeric:tabular-nums}
-.calhd button{min-width:var(--tap)}
+.calnav .btn{min-width:var(--tap)}
+.calnav .caltoday{margin-left:var(--sp-2)}
+@media (min-width:720px){
+  .calnav{order:2;flex:0 1 auto;margin:0 auto}
+  .calhead .calclose{order:3;margin-left:0}
+}
 
-/* ★ 줄 높이를 못 박습니다 (v51). min-height 만 있으면 글자 크기를 키운 사람이나
-     일정이 많은 날에 그 줄만 늘어나서, 달을 넘길 때 또 배치가 흔들립니다.
-     요일줄(auto) + 여섯 줄(80px 고정). 넘치는 것은 잘리고 '+n' 이 알려줍니다. */
-.calgrid{display:grid;grid-template-columns:repeat(7,1fr);
-  grid-template-rows:auto repeat(6,80px);gap:2px}
-.calgrid .dow{text-align:center;font-size:var(--fs-sm);color:var(--t3);
-  padding:var(--sp-1) 0 var(--sp-2);font-weight:600}
-.calgrid .dow.sun{color:var(--cal-sun);font-weight:800}
-.calgrid .dow.sat{color:var(--cal-sat);font-weight:800}
-
-.calcell{height:100%;min-width:0;border:1px solid var(--line);border-radius:var(--r-sm);
-  background:var(--card);padding:3px 4px;cursor:pointer;overflow:hidden}
-/* 지난달·다음달 날짜 (v53) — 배경을 한 단계 낮추고 날짜만 흐리게 넣는다.
-   주말 색도, 공휴일 이름표도, 휴가·일정 칩도 넣지 않는다. 이번 달 것만 보여준다.
-   누르면 그 달로 넘어가고 그 날짜가 골라진다 (calGo). */
-.calcell.off{background:var(--bg);border-color:transparent}
+/* 요일 줄 · 날짜 격자 */
+.caldows{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));margin:0 0 var(--sp-1)}
+.caldows span{text-align:center;font-size:var(--fs-sm);font-weight:600;color:var(--t3);padding:2px 0}
+.caldows .sun{color:var(--cal-sun);font-weight:700}
+.caldows .sat{color:var(--cal-sat);font-weight:700}
+.calgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));grid-auto-rows:var(--cal-cell-h);gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:var(--r-md);overflow:hidden}
+.calcell{position:relative;display:flex;flex-direction:column;align-items:stretch;gap:2px;min-width:0;height:100%;
+  margin:0;padding:5px 5px 4px;border:0;border-radius:0;background:var(--card);color:var(--t1);
+  font:inherit;text-align:left;cursor:pointer;overflow:hidden}
+.calcell:hover{background:var(--wb-hover)}
+.calcell:focus-visible{outline:3px solid var(--pri);outline-offset:-3px}
+/* 지난달 · 다음달 — 숫자만 흐리게. 바탕은 이번 달과 같다 (바탕을 깔면 어두운 테마에서 검은 덩어리로 보였다). 누르면 그 달의 그 날로 (calGo) */
+.calcell.off{background:var(--card)}
 .calcell.off .d{color:var(--cal-off);font-weight:500}
+/* 고른 날 — 은은한 세이지 바탕 + 녹색 안쪽 테두리 */
+.calcell.pick,.calcell.pick:hover{background:var(--soft);box-shadow:inset 0 0 0 2px var(--pri)}
 
-/* 오늘 — 칸을 채우지도, 테두리를 두르지도 않습니다 (v53).
-   ★★ 표시는 날짜 옆 점 하나뿐입니다.
-     v52까지는 빨간 테두리와 점이 둘 다 있었는데 테두리가 과했습니다.
-     테두리는 '고른 날짜' 가 쓰는 표시이므로, 오늘까지 테두리를 두르면
-     둘이 섞여 지금 무엇을 눌렀는지 알기 어렵습니다.
-   고른 날짜는 배경을 채우고 테두리를 두 겹으로 둘러 확실히 드러냅니다.
-   ★ 고른 날짜에는 색을 쓰지 않습니다. 달력에서 색이 뜻을 갖는 곳은
-     공휴일·주말뿐이고, 여기에 색을 더하면 그 뜻이 흐려집니다. */
-.calcell.pick{background:var(--panel2);border-color:var(--t2);
-  box-shadow:inset 0 0 0 1px var(--t2)}
-
-/* 날짜 줄 — 숫자와 오늘 점이 한 줄에 나란히. 넘치면 잘립니다 */
-.calcell .ch{display:flex;align-items:center;gap:3px;min-width:0;overflow:hidden}
-/* 남는 자리를 밀어내서 '+n' 이 오른쪽 끝에 붙게 한다 (v51).
-   ★ '+n' 을 아래에 따로 두면 줄이 하나 더 들어가 칸(74~80px)을 넘겼습니다.
-     실측 82px 필요 / 자리 72px — '+4' 가 반쯤 잘려 있었습니다. */
-.calcell .ch .sp{flex:1 1 auto}
-.calcell .d{font-size:var(--fs-sm);color:var(--t3);font-weight:500;
-  font-variant-numeric:tabular-nums;flex:0 0 auto}
-/* 오늘 점 — 이제 오늘을 알리는 유일한 표시라 조금 키웠습니다 (v53).
-   색은 --cal-today (두 테마 각각). 빨간·파란 날짜 위에서도 갈립니다. */
-.calcell .tdot{width:6px;height:6px;border-radius:50%;background:var(--cal-today);
-  flex:0 0 auto}
-/* 달력에서 색이 뜻을 갖는 곳은 셋뿐이다 — 일요일·공휴일 빨강, 토요일 파랑, 오늘 강조.
-   일정 구분마다 색을 다르게 주지 않는다. 구분은 글자로 보여준다. */
-.calcell.sun .d{color:var(--cal-sun);font-weight:800}
-.calcell.sat .d{color:var(--cal-sat);font-weight:800}
-/* ★★ 공휴일은 무슨 요일이든 빨강입니다 (v52). 달력의 기본 규칙입니다.
-   선택자를 한 단계 더 좁게(.calgrid 를 앞에) 적은 이유가 있습니다 —
-   앞의 두 줄과 세기가 같으면 **나중에 적힌 토요일 파랑이 이깁니다.**
-   실제로 2026-08-15 광복절(토)·10-03 개천절(토)이 파랑으로 나왔습니다.
-   이렇게 해두면 줄 순서를 바꿔도 공휴일 빨강이 유지됩니다. */
-.calgrid .calcell .d.hol{color:var(--cal-sun);font-weight:800}
-.calcell .chip{display:block;font-size:var(--fs-xs);line-height:1.5;
-  border-radius:3px;padding:0 3px;margin-top:2px;
-  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-  background:var(--wn-bg);color:var(--wn);border:1px solid var(--wn-line)}
-.calcell .chip.half{background:var(--panel);color:var(--t2);border-color:var(--line2)}
-.calcell .chip.ev{background:var(--panel);color:var(--t2);border-color:var(--line2)}
-/* 공휴일 — 무슨 날인지 칸 안에서 바로 읽히게 (v50).
-   예전에는 날짜 숫자만 빨갛고 이름은 마우스를 올려야 나왔습니다.
-   폰에는 마우스가 없으니 사실상 아무도 못 봤습니다.
-
-   ★ 이름을 줄이지 않습니다 (v52). '대체공휴일' 을 '대체' 로 줄여 놨더니
-     무슨 날인지 알 수 없었습니다. 대신 **두 줄까지 접어서** 온전히 보여줍니다.
-     좌우 여백도 1px 로 줄여 글자 자리를 최대한 넓혔습니다.
-     (가장 긴 이름이 '부처님오신날' 6자인데, 320px 폰에서도 두 줄로 다 들어갑니다.)
-   ★ 가운데 정렬 (v53). 크기와 글자는 그대로, 정렬만 바꿉니다. */
-.calcell .chip.hol{text-align:center;background:var(--dg-bg);color:var(--cal-sun);
-  border-color:var(--dg-line);font-weight:700;
-  padding:0 1px;line-height:1.35;
-  /* ★ word-break:keep-all 을 주면 안 됩니다. '대체공휴일' 처럼 띄어쓰기가 없는
-     이름은 아예 줄바꿈이 안 되어 한 줄로 삐져나갑니다. 한글은 기본값(normal)이
-     글자 사이에서 알아서 넘어갑니다. */
-  white-space:normal;
-  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-.calcell .more{font-size:var(--fs-xs);color:var(--t3);flex:0 0 auto;
+/* 날짜 줄 — 숫자 · '+N' */
+/* ★ 칸 안의 줄들은 눌려 줄어들지 않는다 (검수 1차) — 줄면 글자 아래가 잘린다.
+     자리가 모자라면 calFit() 이 뒤에서부터 이름표를 빼고 '+N' 을 늘린다 */
+.calcell > *{flex-shrink:0}
+.calcell .ch{display:flex;align-items:center;gap:4px;min-width:0}
+.calcell .d{display:inline-flex;align-items:center;justify-content:center;flex:none;min-width:26px;height:26px;
+  padding:0 5px;border-radius:99px;font-size:var(--fs-sm);font-weight:600;color:var(--t1);
   font-variant-numeric:tabular-nums}
+/* 달력에서 색이 뜻을 갖는 곳 — 일요일·공휴일 빨강, 토요일 파랑, 오늘 녹색 동그라미 */
+.calcell.sun .d{color:var(--cal-sun);font-weight:700}
+.calcell.sat .d{color:var(--cal-sat);font-weight:700}
+/* ★★ 공휴일은 무슨 요일이든 빨강 (v52) — 선택자를 한 단계 좁게 적어 토요일 파랑을 이긴다 */
+.calgrid .calcell .d.hol{color:var(--cal-sun);font-weight:700}
+/* 오늘 — 숫자에 녹색 동그라미. 주말·공휴일이어도 오늘 표시가 먼저 */
+.calgrid .calcell.today .d{background:var(--pri);color:var(--on-pri);font-weight:700}
+.calcell .more{margin-left:auto;font-size:var(--fs-sm);font-weight:700;color:var(--t2);font-variant-numeric:tabular-nums}
+/* 공휴일 이름 — 상자 없이 빨간 글자. 이름을 줄이지 않고 세 줄까지 (시트에 넣는 임시공휴일은 이름이 길 수 있다).
+   이름이 여러 줄이 되면 그만큼 이름표가 빠지고 '+N' 이 된다 (calFit) */
+.calcell .holn{font-size:var(--fs-sm);font-weight:700;color:var(--cal-sun);line-height:1.3;
+  display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+/* 이름표 — 표시용 얇은 띠 (단추가 아니다). 휴가는 황금, 일정은 세이지. 종류는 글자(이름 뒤 '연차' · 앞 시각)로도 전한다 */
+.calcell .clab{display:block;min-width:0;padding:0 5px;border-radius:4px;font-size:var(--fs-sm);font-weight:600;
+  line-height:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  background:var(--cal-leave-bg);color:var(--cal-leave-t)}
+.calcell .clab.ev{background:var(--cal-ev-bg);color:var(--cal-ev-t)}
+/* 좁은 폰 — 이름 대신 종류(아이콘) · 건수 */
+.calcell .cnts{display:none}
+.cnt1{display:inline-flex;align-items:center;gap:1px;padding:0 3px;border-radius:4px;
+  font-size:var(--fs-sm);font-weight:700;line-height:17px;font-variant-numeric:tabular-nums}
+.cnt1 .ic{width:12px;height:12px;stroke-width:2.2}
+.cnt1.lv{background:var(--cal-leave-bg);color:var(--cal-leave-t)}
+.cnt1.ev{background:var(--cal-ev-bg);color:var(--cal-ev-t)}
+@media (max-width:599px){
+  .calcell{align-items:center;gap:2px;padding:4px 2px 3px}
+  .calcell .ch{justify-content:center}
+  .calcell .clab,.calcell .holn,.calcell .more{display:none}
+  .calcell .cnts{display:flex;flex-direction:column;align-items:center;gap:2px}
+}
+/* 달력 아래 한 줄 — 이 달 휴가 · 일정 건수 (폰에서는 아이콘 설명을 겸한다) */
+.callegend{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2);margin:var(--sp-2) 0 0;
+  font-size:var(--fs-sm);color:var(--t2)}
+.callegend .cnt1{font-weight:600}
+.callegend .hint{color:var(--t3)}
 
-/* 달을 넘길 때 (v50) — 창을 통째로 다시 그리지 않고 달력 안쪽만 바꿉니다.
-   예전에는 모달 전체를 다시 그려서 .sheet 의 sheetUp(0.38초, 아래에서 위로)이
-   ▶ 를 누를 때마다 처음부터 다시 돌았습니다. 지워졌다 떴다 해 보인 원인입니다.
-   지금은 0.16초 동안 옆으로 살짝 스치기만 합니다. transform·opacity 만 씁니다. */
+/* 달을 넘길 때 (v50) — 창을 통째로 다시 그리지 않고 달력 안쪽만 바꿉니다. transform·opacity 만 */
 @keyframes calNext{from{opacity:.4;transform:translateX(8px)}to{opacity:1;transform:none}}
 @keyframes calPrev{from{opacity:.4;transform:translateX(-8px)}to{opacity:1;transform:none}}
 .calbody.next{animation:calNext .16s ease-out}
 .calbody.prev{animation:calPrev .16s ease-out}
 
-/* 달력 창은 위에 붙인다 (v50). 날짜를 눌러 아래가 펼쳐지거나 접혀도
-   ◀▶ 버튼이 손 밑에서 위아래로 움직이지 않게 하려는 것입니다. */
+/* 달력 창은 위에 붙인다 (v50) — 아래가 바뀌어도 ◀▶ 가 손 밑에서 움직이지 않게 */
 .veil.calveil{align-items:flex-start}
-/* 달력은 칸이 일곱 개라 좌우 여백 1px 이 아깝습니다.
-   폰에서 창 여백을 18 → 8px 로 줄여 칸을 넓혔습니다.
-   ★ 선택자가 `.sheet.calsheet` 인 이유 — 아래쪽 `.sheet{padding: 한 줄로}` 가
-     나중에 나와서, `.calsheet` 하나만 쓰면 그 한 줄이 이걸 통째로 덮어씁니다.
-     한 번 그렇게 써서 여백이 전혀 안 줄었습니다. */
-.sheet.calsheet{border-radius:0 0 16px 16px;padding-left:8px;padding-right:8px}
-@media (min-width:720px){ .sheet.calsheet{padding-left:22px;padding-right:22px} }
-@media (min-width:720px){ .calsheet{margin-top:4vh;border-radius:16px} }
-
-.calday{margin-top:var(--sp-4);border-top:1px solid var(--line);padding-top:var(--sp-3)}
-.calday h4{margin:0 0 var(--sp-2);font-size:var(--fs-h2)}
-.calday .lrow{padding:var(--sp-2) 0}
-
-@media (max-width:640px){
-  /* 폰에서는 조금 작게. 그래도 세 줄은 들어간다 */
-  .calgrid{grid-template-rows:auto repeat(6,74px)}
+/* ★ 선택자가 `.sheet.calsheet` 인 이유 — 아래쪽 `.sheet{padding}` 이 나중에 나와 덮어쓰지 않게 */
+.sheet.calsheet{--cal-px:12px;border-radius:0 0 20px 20px;padding:0 var(--cal-px) var(--sp-5)}
+@media (min-width:720px){
+  .sheet.calsheet{--cal-px:24px;margin-top:4vh;border-radius:20px;max-width:760px}
 }
+/* 넓은 화면 — 달력 옆에 '고른 날' 을 둔다 (스크롤 없이 달력과 그날 내용을 같이 본다) */
+@media (min-width:1024px){
+  .sheet.calsheet{max-width:1100px}
+  .calbody{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:var(--sp-5);align-items:start}
+  /* ★ 붙여 두기(sticky)는 쓰지 않는다 — 창 머리 높이와 어긋나 목록이 짧은 달에만 상자가 아래로 밀렸다 */
+  .calbody .calday{margin-top:0;padding:var(--sp-4);border:1px solid var(--line);
+    border-radius:var(--r-lg);background:var(--card)}
+}
+
+/* 고른 날 — 날짜 · 오늘 · 공휴일 이름, 그날 휴가 · 일정 목록 */
+.calday{margin-top:var(--sp-4);padding-top:var(--sp-3);border-top:1px solid var(--line)}
+.calday .cdh{margin:0;font-family:var(--font-title);font-size:var(--fs-h1);font-weight:700;color:var(--t1)}
+.calday .cdh .tdy{color:var(--pri)}
+.calday .cdhol{margin:4px 0 0;font-size:var(--fs-sm);font-weight:700;color:var(--cal-sun)}
+.calday .sec{margin-top:var(--sp-4)}
+.calday .lrow{padding:var(--sp-2) 0}
+/* 고른 날 목록은 전체를 읽는 곳 — 공용 목록 줄의 한 줄 자르기(…)를 풀어 긴 제목도 끝까지 */
+.calday .lrow .t{white-space:normal;overflow-wrap:anywhere}
+.calday .tag.lv{background:var(--cal-leave-bg);color:var(--cal-leave-t)}
+.calday .none{padding:var(--sp-3) 0 0;font-size:var(--fs-body);color:var(--t2)}
+.calday .actions{flex-wrap:wrap}
 
 /* ===================== 브라우저가 그리는 것들 (v46f) =====================
    달력·시계·파일 고르기·select 목록·체크박스·스크롤바는 우리 CSS 가 닿지 않는
@@ -8151,25 +8172,37 @@ function holidayOf(ds){
 
 var CAL = { ym:'', pick:'' };
 
+/* ★ 처음 열 때는 오늘을 고른 채로 연다 (2026-09-30) — 달력 아래(넓으면 옆) 목록에 오늘 누가 쉬는지 바로 보인다 */
 function openCal(){
   var t = todayStr();
   CAL.ym = t.substring(0,7);
-  CAL.pick = '';
+  CAL.pick = t;
   drawCal();
 }
 
+/** 달을 넘기면 — 그달이 이번 달이면 오늘, 아니면 1일을 고른다 (목록이 비지 않게) */
 function calMove(n){
   var y = Number(CAL.ym.substring(0,4));
   var m = Number(CAL.ym.substring(5,7)) + n;
   while(m < 1){ m += 12; y -= 1; }
   while(m > 12){ m -= 12; y += 1; }
   CAL.ym = y + '-' + p2(m);
-  CAL.pick = '';
+  var t = todayStr();
+  CAL.pick = (t.substring(0,7) === CAL.ym) ? t : (CAL.ym + '-01');
   if(!calFill(n)) drawCal();          // 창 전체가 아니라 달력 안쪽만 바꾼다 (v50)
 }
 
+/** [오늘] — 이번 달 · 오늘로 돌아온다 */
+function calToday(){
+  var t = todayStr(), before = CAL.ym;
+  CAL.ym = t.substring(0,7);
+  CAL.pick = t;
+  if(!calFill(CAL.ym === before ? 0 : (CAL.ym < before ? -1 : 1))) drawCal();
+}
+
+/* 날짜를 누르면 그 날을 고른다. ★ 같은 날을 다시 눌러도 풀지 않는다 — 아래 목록이 비면 무엇을 봐야 할지 모른다 */
 function calPick(d){
-  CAL.pick = (CAL.pick === d) ? '' : d;
+  CAL.pick = d;
   if(!calFill(0)) drawCal();
 }
 
@@ -8210,11 +8243,10 @@ function holidayOn(ds){
 
 /* ★ 공휴일 이름을 줄이는 표가 여기 있었습니다 (v51). v52에서 없앴습니다.
      '대체공휴일' 을 '대체' 로, '부처님오신날' 을 '부처님' 으로 줄여 놨더니
-     무슨 날인지 알 수 없었습니다. 지금은 이름을 그대로 넣고,
-     칩이 두 줄까지 접히게 해서 온전히 보여줍니다 (.calcell .chip.hol 참고).
-     ★ 다시 줄이는 표를 만들지 마세요. */
+     무슨 날인지 알 수 없었습니다. 지금은 이름을 그대로 넣고, 세 줄까지 접습니다 (.calcell .holn).
+     ★ 다시 줄이는 표를 만들지 마세요. 폰처럼 칸이 좁으면 칸 안에 적지 않고 아래 목록에서 읽습니다. */
 
-/** 달력 칩에 적을 휴가 이름 — 종류 그대로 (2026-09-11 대표님 지시).
+/** 달력 칸에 적을 휴가 이름 — 종류 그대로 (2026-09-11 대표님 지시).
     예전에는 무엇이든 '휴가' 라고만 적어서 병가인지 연차인지 달력에서 알 수 없었습니다.
     종류는 휴가 신청서의 선택지(연차·월차·오전반차·오후반차·경조·병가·기타)에서 옵니다.
     '기타' 나 종류가 빈 옛 줄은 예전처럼 반차·휴가 로 적습니다. */
@@ -8224,15 +8256,15 @@ function leaveLabel(v){
   return (Number(v && v.days) < 1) ? '반차' : '휴가';
 }
 
-/** 달력 칸에 넣을 한 줄짜리 글 */
+/** 달력 칸에 넣을 한 줄짜리 글 — kind: 'lv' 휴가 · 'ev' 일정 */
 function calChips(ds){
   var out = [];
   leavesOn(ds).forEach(function(v){
-    out.push({ cls:'chip', text:(v.name||'') + ' ' + leaveLabel(v) });
+    out.push({ kind:'lv', cls:'clab', text:(v.name||'') + ' ' + leaveLabel(v) });
   });
   eventsOn(ds).forEach(function(v){
-    if(isHolidayEvent(v)) return;                 // 공휴일은 날짜 숫자를 빨갛게 하는 것으로 충분하다
-    out.push({ cls:'chip ev',
+    if(isHolidayEvent(v)) return;                 // 공휴일은 이름 줄(.holn)과 빨간 날짜로 보여준다
+    out.push({ kind:'ev', cls:'clab ev',
                text:[v.time, v.name, v.title].filter(Boolean).join(' ') });
   });
   return out;
@@ -8250,19 +8282,24 @@ function calRedraw(){
  * ★ 달을 넘길 때는 이것을 부르지 마세요 (v50).
  *   modal 을 통째로 다시 그리면 .sheet 의 등장 애니메이션이 매번 다시 돌아서
  *   화면이 지워졌다 떴다 하는 것처럼 보입니다. 그때는 calFill() 을 씁니다.
+ * ★ 머리 줄(.calhead — 일정 · ◀ 월 ▶ · 오늘 · 닫기)은 창 위에 붙어 있고 calFill 이 건드리지 않습니다.
+ *   그래서 달을 넘겨도 단추가 제자리이고, 눌러 둔 단추의 키보드 초점도 그대로입니다.
  */
 function drawCal(){
   $('modal').innerHTML='<div class="veil calveil"><div class="sheet calsheet">'+
-    '<div class="sheethead"><h3 class="tt">일정</h3>'+
-    '<button class="btn sm" onclick="closeModal(true)">닫기</button></div>'+
-    '<div class="cal">'+
-      '<div class="calhd">'+
+    '<div class="calhead">'+
+      '<h3 class="tt">일정</h3>'+
+      '<div class="calnav">'+
         '<button class="btn sm" onclick="calMove(-1)" title="지난 달" aria-label="지난 달">'+ic('chev-l')+'</button>'+
-        '<span class="m" id="calM">'+calTitle()+'</span>'+
+        '<span class="m" id="calM" aria-live="polite">'+calTitle()+'</span>'+
         '<button class="btn sm" onclick="calMove(1)" title="다음 달" aria-label="다음 달">'+ic('chev')+'</button>'+
+        '<button class="btn sm caltoday" onclick="calToday()">오늘</button>'+
       '</div>'+
-      '<div class="calbody" id="calBody">'+calBody()+'</div>'+
-    '</div></div></div>';
+      '<button class="btn sm calclose" onclick="closeModal(true)">'+ic('x')+'닫기</button>'+
+    '</div>'+
+    '<div class="calbody" id="calBody">'+calBody()+'</div>'+
+    '</div></div>';
+  calFit($('calBody'));
 }
 
 function calTitle(){
@@ -8270,34 +8307,71 @@ function calTitle(){
 }
 
 /**
- * 달력 안쪽만 다시 그린다 (v50). 창도, 제목줄도, ◀▶ 버튼도 그대로 있습니다.
+ * 달력 안쪽만 다시 그린다 (v50). 창도, 머리 줄도, ◀▶ · 오늘 단추도 그대로 있습니다.
  *   dir  1 다음 달 · -1 지난 달 · 0 제자리 (날짜를 눌렀을 때 · 저장·삭제 뒤)
  * 달력이 열려 있지 않으면 아무것도 하지 않고 false 를 돌려줍니다.
+ * ★ 날짜 칸에 키보드 초점이 있었으면 다시 그린 뒤 고른 날짜 칸으로 초점을 옮깁니다 (초점이 사라지지 않게).
  */
 function calFill(dir){
   var box=$('calBody'), ttl=$('calM');
   if(!box || !ttl) return false;
+  var a=document.activeElement, 칸에있었나=!!(a && box.contains(a) && a.classList && a.classList.contains('calcell'));
   ttl.textContent=calTitle();
   box.innerHTML=calBody();
+  calFit(box);
   box.className='calbody';
   if(dir){ void box.offsetWidth; box.classList.add(dir>0?'next':'prev'); }
+  if(칸에있었나){
+    var c=box.querySelector('.calcell[data-ds="'+CAL.pick+'"]');
+    if(c){ try{ c.focus({ preventScroll:true }); }catch(e){} }
+  }
   return true;
 }
 
 /**
+ * 칸에 실제로 들어가는 만큼만 이름표를 남긴다 (검수 1차).
+ * calCap() 은 공휴일 이름을 한 줄로 어림하므로, 이름이 두세 줄이 되거나 글자를 키우면 자리가 모자란다.
+ * 칸이 넘치면 뒤에서부터 이름표를 빼고 날짜 줄 오른쪽 '+N' 을 그만큼 늘린다. 빠진 것은 아래 목록에 다 있다.
+ * ★ 칸 안의 줄은 눌려 줄지 않게(.calcell > * flex-shrink:0) 해 두어야 넘침이 scrollHeight 로 드러난다.
+ */
+function calFit(box){
+  if(!box) return;
+  [].forEach.call(box.querySelectorAll('.calgrid .calcell'), function(c){
+    var labs=c.querySelectorAll('.clab');
+    if(!labs.length || c.scrollHeight <= c.clientHeight + 1) return;
+    var n=labs.length-1, 뺀=0;
+    while(n>=0 && c.scrollHeight > c.clientHeight + 1){ labs[n].remove(); n--; 뺀++; }
+    var ch=c.querySelector('.ch'), more=ch && ch.querySelector('.more');
+    if(!ch || !뺀) return;
+    if(!more){ more=document.createElement('span'); more.className='more'; more.setAttribute('aria-hidden','true'); ch.appendChild(more); more.textContent='+0'; }
+    more.textContent='+'+((Number(more.textContent.replace('+',''))||0)+뺀);
+  });
+}
+
+/** 칸 안에 이름표를 몇 줄까지 적나 — 칸 높이(--cal-cell-h)와 같이 간다. 폰(600px 미만)은 이름 대신 건수 */
+function calCap(){
+  var w=window.innerWidth||1024;
+  return w>=1024 ? 3 : (w>=600 ? 2 : 0);
+}
+
+/** 2026-09-30 → 9월 30일 수요일 */
+function dateLabelLong(ds){
+  var y=Number(ds.substring(0,4)), m=Number(ds.substring(5,7)), d=Number(ds.substring(8,10));
+  var w=['일','월','화','수','목','금','토'][new Date(y,m-1,d).getDay()];
+  return m+'월 '+d+'일 '+w+'요일';
+}
+
+/**
  * 지난달·다음달 날짜 칸 (v53).
- *
- * 달을 넘겨서 받아도(0월·13월) 알아서 연도를 맞춥니다.
- * ★ 날짜 숫자만 흐리게 넣습니다. 주말 색·공휴일 이름표·휴가·일정은 넣지 않습니다.
- *   이번 달 날짜와 헷갈리지 않게 하려는 것입니다.
+ * ★ 날짜 숫자만 흐리게 넣습니다. 주말 색·공휴일 이름·휴가·일정은 넣지 않습니다 — 이번 달 것과 헷갈리지 않게.
  * ★ 누르면 그 달로 넘어가고 그 날짜가 골라집니다 (calGo).
  */
 function offCell(y, m, day){
   while(m < 1){ m += 12; y -= 1; }
   while(m > 12){ m -= 12; y += 1; }
   var ds = y + '-' + p2(m) + '-' + p2(day);
-  return '<div class="calcell off" onclick="calGo(\''+ds+'\')">'+
-    '<div class="ch"><span class="d">'+day+'</span></div></div>';
+  return '<button type="button" class="calcell off" data-ds="'+ds+'" tabindex="-1" onclick="calGo(\''+ds+'\')" '+
+    'aria-label="'+esc(dateLabelLong(ds))+' (다른 달)"><span class="ch"><span class="d">'+day+'</span></span></button>';
 }
 
 /**
@@ -8308,29 +8382,44 @@ function calGo(ds){
   var before = CAL.ym;
   CAL.ym = ds.substring(0,7);
   CAL.pick = ds;
-  if(!calFill(CAL.ym < before ? -1 : 1)) drawCal();
+  if(!calFill(CAL.ym === before ? 0 : (CAL.ym < before ? -1 : 1))) drawCal();
 }
 
-/** 요일줄 + 날짜칸 + 한 줄 요약 + 그날 상세 */
+/** 날짜 칸에서 화살표 — 하루(←→) · 한 주(↑↓) 옮긴다. 달이 바뀌면 그 달로 넘어간다 (2026-09-30)
+    ★ 기준은 **초점이 있는 칸의 날짜**입니다 (검수 1차). 고른 날(CAL.pick)을 기준으로 하면
+      다른 칸에 초점을 둔 채 → 를 눌렀을 때 엉뚱한 날로 건너뛰었습니다. */
+function calKey(e){
+  var k=e.key, step = k==='ArrowLeft' ? -1 : k==='ArrowRight' ? 1 : k==='ArrowUp' ? -7 : k==='ArrowDown' ? 7 : 0;
+  if(!step) return;
+  var t=e.target; if(!t || !t.classList || !t.classList.contains('calcell')) return;
+  var 기준=t.getAttribute('data-ds'); if(!기준) return;
+  e.preventDefault();
+  var p=기준.split('-').map(Number);
+  var nd=new Date(p[0], p[1]-1, p[2]+step);
+  var ds=nd.getFullYear()+'-'+p2(nd.getMonth()+1)+'-'+p2(nd.getDate());
+  calGo(ds);
+}
+
+/** 요일줄 + 날짜칸(그달에 필요한 주만) + 이 달 건수 + 고른 날
+    ★ 날짜 칸은 Tab 으로 한 번만 들어간다 — 고른 칸만 tabindex 0, 나머지는 -1 이고 칸 사이는 화살표(calKey).
+      칸 35개가 모두 Tab 에 걸리면 키보드로 아래 목록까지 가기가 너무 멀었다 (검수 1차) */
 function calBody(){
   var y = Number(CAL.ym.substring(0,4));
   var m = Number(CAL.ym.substring(5,7));
   var td = todayStr();
+  var cap = calCap();
 
   var first = new Date(y, m-1, 1);
   var startDow = first.getDay();                 // 0 일요일
   var lastDate = new Date(y, m, 0).getDate();
 
-  var dows = ['일','월','화','수','목','금','토'];
-  var cells = dows.map(function(d,i){
-    var c = (i===0?' sun':(i===6?' sat':''));
-    return '<div class="dow'+c+'">'+d+'</div>';
-  });
+  var dows = ['일','월','화','수','목','금','토'].map(function(d,i){
+    return '<span'+(i===0?' class="sun"':(i===6?' class="sat"':''))+'>'+d+'</span>';
+  }).join('');
 
   /* 앞줄의 빈자리에 지난달 끝 날짜를 흐리게 넣는다 (v53).
-     ★ 주말 색·공휴일 이름표·휴가·일정은 넣지 않는다. 이번 달 것만 보여준다.
      ★ 1일이 일요일이면 startDow 가 0 이라 이 반복은 한 번도 돌지 않는다. */
-  var i;
+  var cells = [], i;
   var prevLast = new Date(y, m-1, 0).getDate();     // 지난달 마지막 날
   for(i=startDow; i>0; i--) cells.push(offCell(y, m-1, prevLast - i + 1));
 
@@ -8339,60 +8428,60 @@ function calBody(){
     var ds = y + '-' + p2(m) + '-' + p2(i);
     var hol = holidayOn(ds);
     var items = calChips(ds);
-    monthLeave += leavesOn(ds).length;
-    eventsOn(ds).forEach(function(v){ if(!isHolidayEvent(v)) monthEvent += 1; });
+    var nLv = items.filter(function(c){ return c.kind==='lv'; }).length;
+    var nEv = items.length - nLv;
+    monthLeave += nLv; monthEvent += nEv;
 
+    var dow = (startDow + i - 1) % 7;
     var cls = 'calcell';
-    if(((startDow + i - 1) % 7) === 0) cls += ' sun';
-    if(((startDow + i - 1) % 7) === 6) cls += ' sat';
+    if(dow === 0) cls += ' sun';
+    if(dow === 6) cls += ' sat';
     if(ds === td) cls += ' today';
     if(ds === CAL.pick) cls += ' pick';
 
-    /* 공휴일이면 무슨 날인지 먼저 놓고, 남는 자리에 휴가·일정을 채운다.
-       ★ 칸 높이에 실제로 들어가는 줄 수만 그린다 (v51).
-         날짜 줄 18 + 칩 20 x 2 = 58 이라 칩은 두 줄까지다.
-         세 줄을 그리면 82px 가 되는데 자리는 72~78px 뿐이라
-         마지막 줄이 반쯤 잘려 있었다 (실측).
-       ★ 공휴일 칩은 이름을 줄이지 않으려고 두 줄까지 차지합니다 (v52).
-         그래서 공휴일이 있는 날은 휴가·일정을 칸 안에 따로 그리지 않고
-         개수(+n)로만 알립니다. 자세한 것은 날짜를 누르면 나옵니다.
-       ★ 못 그린 개수(+n)는 아래에 줄을 더 만들지 않고
-         날짜 줄 오른쪽 빈자리에 붙인다. 그래야 줄 하나를 되찾는다. */
-    var holChip = hol ? '<span class="chip hol">'+esc(hol)+'</span>' : '';
-    var cap = hol ? 0 : 2;
-    var show = items.slice(0, cap);
+    /* 공휴일이면 이름 줄을 먼저 놓고 남는 자리에 휴가 · 일정을 채운다.
+       ★ 칸 높이에 실제로 들어가는 줄 수만 그린다 (v51) — 못 그린 개수는 날짜 줄 오른쪽 '+N'.
+       ★ 폰(cap 0)은 이름 대신 종류 · 건수 (.cnts). 전체는 아래 '고른 날' 목록에서 읽는다 */
+    var room = Math.max(0, cap - (hol ? 1 : 0));
+    var show = items.slice(0, room);
     var rest = items.length - show.length;
-    var chips = show.map(function(c){
-      return '<span class="'+c.cls+'">'+esc(c.text)+'</span>';
-    }).join('');
+    var labs = show.map(function(c){ return '<span class="'+c.cls+'">'+esc(c.text)+'</span>'; }).join('');
+    var cnts = (nLv? '<span class="cnt1 lv">'+ic('user')+nLv+'</span>' : '')+
+               (nEv? '<span class="cnt1 ev">'+ic('clock')+nEv+'</span>' : '');
 
-    cells.push('<div class="'+cls+'" onclick="calPick(\''+ds+'\')">'+
-      '<div class="ch"><span class="d'+(hol?' hol':'')+'">'+i+'</span>'+
-      (ds===td ? '<i class="tdot" title="오늘"></i>' : '')+
-      '<span class="sp"></span>'+
-      (rest > 0 ? '<span class="more">+'+rest+'</span>' : '')+'</div>'+
-      holChip+chips+'</div>');
+    /* 화면 읽기 프로그램에는 날짜 · 오늘 · 공휴일 · 건수를 한 번에 */
+    var 이름 = dateLabelLong(ds)+(ds===td? ', 오늘' : '')+(hol? ', 공휴일 '+hol : '')+
+               (nLv? ', 휴가 '+nLv+'건' : '')+(nEv? ', 일정 '+nEv+'건' : '');
+    cells.push('<button type="button" class="'+cls+'" data-ds="'+ds+'" onclick="calPick(\''+ds+'\')" '+
+      'aria-label="'+esc(이름)+'" aria-pressed="'+(ds===CAL.pick?'true':'false')+'"'+(ds===td? ' aria-current="date"' : '')+
+      ' tabindex="'+(ds===CAL.pick?'0':'-1')+'">'+
+      '<span class="ch"><span class="d'+(hol?' hol':'')+'">'+i+'</span>'+
+        (rest > 0 && cap > 0 ? '<span class="more" aria-hidden="true">+'+rest+'</span>' : '')+'</span>'+
+      (hol && cap > 0 ? '<span class="holn">'+esc(hol)+'</span>' : '')+
+      labs+
+      (cnts ? '<span class="cnts" aria-hidden="true">'+cnts+'</span>' : '')+
+      '</button>');
   }
 
-  /* ★ 언제나 여섯 줄로 그린다 (v50).
-     달마다 4~6줄로 달라지면 달력 아래에 있는 것들과 창 높이가 같이 움직여서,
-     ▶ 를 연달아 누를 때 버튼이 손 밑에서 도망갔습니다.
-     요일줄 7칸 + 날짜 42칸 = 49칸.
-     남는 칸은 다음 달 첫 날짜로 채웁니다 (v53). 31일이 토요일이라 뒷자리가
-     없는 달이면 이 반복이 한 번도 돌지 않습니다. */
+  /* ★★ 그달에 필요한 주만 그린다 (2026-09-30 지시 — 예전에는 늘 여섯 줄).
+     여섯 줄 고정은 ◀▶ 가 손 밑에서 도망가지 않게 하려던 것인데, 지금은 머리 줄이 창 위에 붙어 있어
+     줄 수가 달라도 단추가 움직이지 않습니다. 남는 칸은 다음 달 첫 날짜로 채웁니다 (v53). */
+  var 주 = Math.ceil((startDow + lastDate) / 7);
   var nextDay = 1;
-  while(cells.length < 49) cells.push(offCell(y, m+1, nextDay++));
+  while(cells.length < 주 * 7) cells.push(offCell(y, m+1, nextDay++));
 
-  var head = monthLeave + monthEvent
-    ? ('이 달 휴가 '+monthLeave+'건 · 일정 '+monthEvent+'건 · 날짜를 누르면 자세히 보입니다')
-    : '이 달에 등록된 휴가·일정이 없습니다';
+  var legend = '<p class="callegend">'+
+    '<span class="cnt1 lv">'+ic('user')+'휴가 '+monthLeave+'건</span>'+
+    '<span class="cnt1 ev">'+ic('clock')+'일정 '+monthEvent+'건</span>'+
+    '<span class="hint">빨간 날짜는 일요일 · 공휴일</span></p>';
 
-  return '<div class="calgrid">'+cells.join('')+'</div>'+
-    '<p class="muted" style="margin:var(--sp-3) 0 0;font-size:var(--fs-sm)">'+head+'</p>'+
+  return '<div class="calmain"><div class="caldows" aria-hidden="true">'+dows+'</div>'+
+    '<div class="calgrid" role="group" aria-label="'+esc(calTitle())+' 날짜" onkeydown="calKey(event)">'+cells.join('')+'</div>'+
+    legend+'</div>'+
     calDayBox();
 }
 
-/** 날짜를 눌렀을 때 아래에 펼쳐지는 그날 내용 */
+/** 고른 날 — 날짜 · 오늘 · 공휴일 이름, 그날 휴가 · 일정 전부 (칸 안에 못 적은 이름도 여기서 다 읽는다) */
 function calDayBox(){
   if(!CAL.pick) return '';
   var ds = CAL.pick;
@@ -8400,9 +8489,9 @@ function calDayBox(){
   var lv = leavesOn(ds);
   var ev = eventsOn(ds).filter(function(v){ return !isHolidayEvent(v); });
 
-  var h = '<div class="calday"><h4>'+esc(dateLabelK(ds))+
-    (ds===todayStr()? ' <span class="tag">오늘</span>' : '')+
-    (hol? ' <span class="dgv">'+esc(hol)+'</span>' : '')+'</h4>';
+  var h = '<section class="calday" aria-live="polite">'+
+    '<h4 class="cdh">'+esc(dateLabelLong(ds))+(ds===todayStr()? '<span class="tdy"> · 오늘</span>' : '')+'</h4>'+
+    (hol? '<p class="cdhol">'+esc(hol)+'</p>' : '');
 
   if(lv.length){
     h += sechead('휴가', lv.length);
@@ -8415,7 +8504,7 @@ function calDayBox(){
         ? '<button class="btn sm dg" onclick="deleteLeave(\''+esc(v.id)+'\')">삭제</button>'
         : '';
       return '<div class="lrow plain"><div class="m">'+
-        '<p class="t">'+esc(v.name)+' <span class="tag wn">'+esc(v.kind||'휴가')+'</span></p>'+
+        '<p class="t">'+esc(v.name)+' <span class="tag lv">'+esc(leaveLabel(v))+'</span></p>'+
         byline([v.from + (v.to!==v.from ? (' ~ '+v.to) : ''),
                 v.days ? (String(v.days)+'일') : ''])+
         '</div>'+(btn? '<div class="r">'+btn+'</div>' : '')+'</div>';
@@ -8439,25 +8528,28 @@ function calDayBox(){
     }).join('');
   }
 
-  if(!lv.length && !ev.length) h += empty('휴가도 일정도 없습니다.');
+  if(!lv.length && !ev.length) h += empty('등록된 휴가·일정이 없습니다');
 
   h += '<div class="actions">'+
        '<button class="btn" onclick="openLeaveDoc(\''+esc(ds)+'\')">휴가 신청</button>'+
-       '<button class="btn pri" onclick="openEventForm(\''+esc(ds)+'\')">일정 추가</button>'+
-       '</div></div>';
+       '<button class="btn pri" onclick="openEventForm(\''+esc(ds)+'\')">'+ic('plus')+'일정 추가</button>'+
+       '</div></section>';
   return h;
 }
+
+/* 창 폭이 바뀌면(폰을 눕히는 등) 칸에 적는 줄 수가 달라진다 — 달력이 열려 있을 때만 안쪽을 다시 그린다 (calFill 이 없으면 아무것도 안 함) */
+(function(){
+  var 틀=0, 옛=window.innerWidth;
+  window.addEventListener('resize', function(){
+    clearTimeout(틀);
+    /* 높이만 바뀐 것(폰 자판)은 무시 — 폭이 바뀌면 칸 폭 · 공휴일 이름 줄 수가 달라지므로 다시 맞춘다 */
+    틀=setTimeout(function(){ var w=window.innerWidth; if(w!==옛){ 옛=w; calFill(0); } }, 150);
+  });
+})();
 
 /** 그 날짜를 시작일로 하는 휴가 신청서. 결재는 그대로 거친다 */
 function openLeaveDoc(ds){
   openDocForm('LEAVE', { '시작일':ds, '종료일':ds });
-}
-
-/** 2026-08-28 → 8월 28일 (금) */
-function dateLabelK(ds){
-  var y=Number(ds.substring(0,4)), m=Number(ds.substring(5,7)), d=Number(ds.substring(8,10));
-  var w=['일','월','화','수','목','금','토'][new Date(y,m-1,d).getDay()];
-  return m+'월 '+d+'일 ('+w+')';
 }
 
 /* ---------------- 일정 넣기 · 고치기 ---------------- */
