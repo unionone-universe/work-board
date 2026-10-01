@@ -596,9 +596,6 @@ label.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;fon
 .cdot{display:inline-block;width:7px;height:7px;border-radius:99px;
   background:var(--dg);margin-left:5px;vertical-align:middle;flex-shrink:0}
 
-/* 댓글 수는 카드의 .cico (말풍선 + 숫자) — 판 CSS 구역에 있습니다 (2026-09-22).
-   ★ 점(.cdot)과 뜻이 다릅니다. 숫자는 '모두 몇 개', 점은 '내가 안 본 것이 있다'. */
-
 /* 글 서식 (저장은 순수 글자, 보여줄 때만 서식) */
 /* 글자 크기는 세 단계로만 쓴다 (v42)
      제목  .tt / .sheet h3      가장 크고 밝고 굵게
@@ -965,11 +962,18 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
   .fsel select{flex:1 1 auto;max-width:none;width:100%;font-size:var(--fs-body)}
   .fsum{order:21}
   .lbar .stabs{flex:1 1 0}
-  .lbar .stabs button{flex:1 1 0;padding:0 8px}
+  .lbar .stabs button{flex:1 1 auto;padding:0 8px}   /* 글자 길이만큼 — '진행 중 N' 이 좁은 칸에 끼지 않게 */
 }
-@media (max-width:479px){ .ftoggle .flbl,.refbtn .clock{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap} .ftoggle{padding:0 12px} }
-/* 359px↓ — 상태 선택은 한 줄 전체, 그 아래에 [거르기] · 새로고침 (잘리지 않게) */
-@media (max-width:359px){
+/* 폰 — [거르기] 는 글자로(깔때기 아이콘만으로는 뜻이 모호하다 · 15 지시), 새로고침은 아이콘 + 숨은 이름 */
+@media (max-width:479px){
+  .refbtn .clock{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .ftoggle{padding:0 12px}
+  .ftoggle > .ic{display:none}
+  .lbar{column-gap:8px}
+  .lbar .stabs button{padding:0 6px}
+}
+/* 379px↓ — 상태 선택은 한 줄 전체, 그 아래에 [거르기] · 새로고침 (잘리지 않게) */
+@media (max-width:379px){
   .lbar .stabs{flex:1 1 100%}
   .lbar .stabs button{padding:0 4px}
   .ftoggle{flex:1 1 auto;justify-content:flex-start}
@@ -981,9 +985,41 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
   .lbar{padding:0 0 10px;border-bottom:0}
 }
 
-/* ── 판 — 고른 상태의 목록 하나만 보인다 (진행 중이 기본). 대기 · 완료는 누르면 바로 ── */
+/* ── 판 — 폰 · 태블릿은 고른 상태의 목록 하나만 보인다 (진행 중이 기본). 대기 · 완료는 누르면 바로 ── */
 .board > .col{display:none;min-width:0}
 .board[data-tab="colWait"] > #colWait,.board[data-tab="colRun"] > #colRun,.board[data-tab="colDone"] > #colDone{display:block}
+/* ★ PC(1200px↑) — 진행 중은 넓게, 대기 · 완료는 오른쪽 작은 칸(#waitBox · #doneBox) (15 지시 · 사용자 확정 선호).
+     상태 선택 대신 '진행 중 N' 머리. 건수는 보이는 곳 한 군데에만 */
+.lhead{display:none}
+@media (min-width:1200px){
+  #stateTabs{display:none}
+  .lhead{display:flex;align-items:baseline;gap:8px;margin:0 auto 0 6px;font-family:var(--font-ui);font-size:var(--fs-body);font-weight:800;color:var(--t1)}
+  .lhead .n{font-size:var(--fs-sm);font-weight:700;color:var(--pri);font-variant-numeric:tabular-nums}
+  #view-board .board > #colRun{display:block}
+  #view-board .board > #colWait,#view-board .board > #colDone{display:none}
+}
+/* 오른쪽 작은 칸 — 대기 · 완료 (업무명 + 담당 · 마감 한 마디). 칸이 넷이라 따라 내려오지 않는다 */
+@media (min-width:1200px){ .aside{position:static} }
+.spanel .sempty{margin:0 4px 6px;font-size:var(--fs-sm);color:var(--t3)}
+.crow{display:flex;flex-direction:column;gap:2px;width:100%;min-height:var(--tap);padding:9px 8px;border:0;border-radius:var(--r-md);
+  background:transparent;color:var(--t1);font:inherit;text-align:left;cursor:pointer}
+.crow:hover{background:var(--card)}
+.crow .ct{font-size:15px;font-weight:700;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  word-break:keep-all;overflow-wrap:anywhere}
+.crow .cm{font-size:var(--fs-sm);color:var(--t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.crow .cm .dgv{color:var(--dg);font-weight:700}
+.crow.hot .ct::before{content:"";display:inline-block;width:8px;height:8px;margin-right:6px;border-radius:99px;background:var(--dg);vertical-align:2px}
+/* 작은 줄의 표시 하나 · 새 댓글 — 큰 줄과 같은 모양 */
+.crow .cx{display:flex;align-items:center;flex-wrap:wrap;gap:2px 10px;min-width:0;font-size:var(--fs-sm)}
+.crow .cx > *{display:inline-flex;align-items:center;gap:4px;min-width:0}
+.crow .tag{padding:0;background:transparent;border-radius:0;font-size:var(--fs-sm);font-weight:700;line-height:inherit}
+.crow .tag.wn{color:var(--wn)} .crow .tag.dg{color:var(--dg)}
+.crow .tag::before{content:"";flex:none;width:14px;height:14px;background:currentColor;
+  -webkit-mask:var(--mask-alert) center/contain no-repeat;mask:var(--mask-alert) center/contain no-repeat}
+.crow .cnew{color:var(--t1);font-weight:700;white-space:nowrap}
+.crow .cdot{position:relative;margin:0;width:9px;height:9px}
+.spanel .sfoot{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-top:4px}
+.spanel .sfoot .dsum{font-size:var(--fs-sm)}
 .colhead{display:flex;align-items:center;flex-wrap:wrap;gap:6px 12px;padding:12px 20px;border-bottom:1px solid var(--line);
   font-size:var(--fs-sm);color:var(--t3)}
 .colhead:empty{display:none}
@@ -1012,41 +1048,38 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .trow .cnext{display:flex;align-items:baseline;gap:6px;margin:0;min-width:0;font-size:var(--wb-fs-body);line-height:1.45;color:var(--t1)}
 .cnext .k{flex:none;font-size:var(--fs-sm);font-weight:800;color:var(--pri)}
 .cnext .tx{min-width:0;font-weight:500;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;word-break:keep-all;overflow-wrap:anywhere}
-.trow .lastline{display:flex;align-items:baseline;gap:6px;margin:0;min-width:0;font-size:var(--fs-sm);color:var(--t2)}
-.lastline .dt{flex:none;color:var(--t3);font-weight:600;font-variant-numeric:tabular-nums}
-.lastline .tx{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.trow .lastline.nolog{color:var(--t3)}
-/* 보조 한 줄 — 담당 · 종류 · 현장 · 표시 · 댓글 (모두 14px, 흐린 글자) */
+/* 보조 한 줄 — 담당 · 가장 중요한 표시 하나 · 새 댓글 (모두 14px) */
 .trow .ctop{display:flex;align-items:center;flex-wrap:wrap;gap:2px 10px;margin:2px 0 0;min-width:0;font-size:var(--fs-sm);color:var(--t3)}
 .trow .ctop > *{display:inline-flex;align-items:center;gap:4px;min-width:0}
 .trow .ctop .who{color:var(--t2);font-weight:700}
-.trow .ckind{font-weight:600;white-space:nowrap}
-.trow .csite{max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.trow .csite .ic,.trow .ctop .ic{width:15px;height:15px}
+.trow .ctop .ic{width:15px;height:15px}
 /* 표시(추가견적 · 기록 N일 없음) — 알약 상자 대신 아이콘 + 색 글자 */
 .trow .tag{padding:0;background:transparent;border-radius:0;font-size:var(--fs-sm);font-weight:700;line-height:inherit}
 .trow .tag.wn{color:var(--wn)} .trow .tag.dg{color:var(--dg)}
 .trow .tag::before{content:"";flex:none;width:14px;height:14px;background:currentColor;
   -webkit-mask:var(--mask-alert) center/contain no-repeat;mask:var(--mask-alert) center/contain no-repeat}
-.cico{display:inline-flex;align-items:center;gap:4px;color:var(--t2);font-size:var(--fs-sm);font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
-.cico svg{width:16px;height:16px;display:block}
 .trow .cmts{gap:6px;white-space:nowrap}
 .trow .cdot{position:relative;margin:0;width:9px;height:9px}
-/* 오른쪽 — 마감 · D-숫자 · 진행률 */
+/* 새 댓글 — 점 + 글자 (색만으로 전하지 않는다). 댓글 수는 상세에서 */
+.trow .cnew{color:var(--t1);font-weight:700;white-space:nowrap}
+/* 오른쪽 — 마감 한 마디 (15 지시: 날짜 · D-숫자 · 진행률을 겹쳐 적지 않는다) */
 .trow .cb{grid-column:3;grid-row:1 / span 3;align-self:start;display:flex;flex-direction:column;align-items:flex-end;gap:2px;
-  min-width:0;padding-top:1px;text-align:right}
-.trow .tdue{font-size:var(--wb-fs-body);font-weight:700;color:var(--t1);white-space:nowrap;font-variant-numeric:tabular-nums}
+  min-width:0;padding-top:2px;text-align:right}
+.trow .tdue{font-size:var(--wb-fs-body);font-weight:650;color:var(--t2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.trow .tdue.dgv{font-weight:750}
 .trow .tdue.dgv{color:var(--dg)}
-.trow .tdue.done{color:var(--t2);font-weight:600}
-.trow .tsub{font-size:var(--fs-sm);color:var(--t3);white-space:nowrap;font-variant-numeric:tabular-nums}
-.trow .tsub .dgv{color:var(--dg);font-weight:700}
-.trow .pct{font-weight:700;color:var(--t2)}
-/* 좁은 목록(폰 · 펼친 창) — 오른쪽 칸을 보조 한 줄 위로 내린다 */
+.trow .tdue.done{color:var(--t3);font-weight:600}
+/* 본인 업무만 보는 직원 — 동그라미 칸이 없다 */
+.trow.noav{grid-template-columns:minmax(0,1fr) auto}
+.trow.noav .tm{grid-column:1}
+.trow.noav .cb{grid-column:2}
+.trow.noav.hot .cn::before{content:"";display:inline-block;width:9px;height:9px;margin-right:6px;border-radius:99px;background:var(--dg);vertical-align:2px}
+/* 좁은 목록(폰 · 펼친 창) — 동그라미를 빼고, 마감 한 마디는 오른쪽 위 그대로 */
 @container (max-width:560px){
-  .trow{grid-template-columns:minmax(0,1fr);padding:16px 4px}
+  .trow,.trow.noav{grid-template-columns:minmax(0,1fr) auto;column-gap:12px;padding:14px 4px}
   .trow .tav{display:none}
-  .trow .tm,.trow .cb{grid-column:1;grid-row:auto}
-  .trow .cb{flex-direction:row;align-items:baseline;flex-wrap:wrap;gap:4px 10px;text-align:left;padding:0}
+  .trow .tm{grid-column:1}
+  .trow .cb{grid-column:2}
   .trow.hot .cn::before{content:"";display:inline-block;width:9px;height:9px;margin-right:6px;border-radius:99px;background:var(--dg);vertical-align:2px}
 }
 /* 빈 목록 — 안전모 도우미 + 짧은 한 줄 (+ 할 수 있는 일 하나) */
@@ -1094,8 +1127,7 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .aitem.hot .ai{background:var(--dg-bg);color:var(--dg)}
 .aitem .at{flex:1;min-width:0}
 .aitem .at b{display:block;font-size:15px;font-weight:700;line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.aitem .at span{display:block;font-size:var(--fs-sm);color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.aitem.hot .at span{color:var(--dg);font-weight:600}
+.aitem .at > span{display:block;font-size:var(--fs-sm);color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .amore{display:block;width:100%;min-height:var(--tap);margin-top:2px;border:0;border-radius:var(--r-md);background:transparent;color:var(--pri);
   font:inherit;font-size:var(--fs-sm);font-weight:700;cursor:pointer}
 .amore:hover{background:var(--card)}
@@ -1122,14 +1154,35 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 #todaySheet .attrow .k{font-size:var(--fs-sm);font-weight:700;color:var(--t3)}
 #todaySheet .aatt{padding:4px 0 8px}
 #todaySheet .aatt span{background:var(--panel)}   /* 창 바탕(--sheet) 위에서도 이름표가 보이게 */
-/* 폰 · 태블릿 — 확인할 일을 칩 한 줄로 (옆으로 밀기) */
+/* 확인할 일 묶음 — 종류 이름(할 일)이 머리, 줄은 대상과 꼭 필요한 사실만 (15 지시) */
+.agrp{display:flex;align-items:baseline;gap:6px;margin:10px 8px 2px;font-size:var(--fs-sm);font-weight:800;color:var(--t2)}
+.agrp:first-of-type{margin-top:0}
+.agrp .n{font-weight:700;color:var(--t3);font-variant-numeric:tabular-nums}
+.agrp.hot{color:var(--dg)} .agrp.hot .n{color:var(--dg)}
+.aitem .ach{flex:none;align-self:center;width:18px;height:18px;color:var(--t3)}
+.aitem .at > span .dgv{color:var(--dg);font-weight:700}
+.attnsheet .aitem{padding:12px 8px}
+.attnsheet .agrp{margin:16px 8px 4px}
+.attnsheet .sheethead + .agrp{margin-top:0}
+.sheethead .tt .n{font-size:var(--fs-sm);font-weight:700;color:var(--t3)}
+/* 폰 · 태블릿 — 진입점 둘: [확인할 일 N건 · 급한 일 M ›] + 작은 [출근]. 옆으로 미는 칩 줄은 없앴다 (15 지시) */
 .achips{display:none}
 @media (max-width:1199px){
-  .achips{display:flex;gap:8px;margin:0 0 16px;overflow-x:auto;scrollbar-width:none}
-  .achips::-webkit-scrollbar{display:none}
+  .achips{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 16px}
   .achips:empty{display:none}
 }
-@media (max-width:719px){ .achips{margin:0 -16px 12px;padding:0 16px} }
+@media (max-width:719px){ .achips{margin:0 0 12px} }
+.aentry{display:flex;align-items:center;gap:10px;flex:1 1 220px;min-width:0;min-height:var(--tap-main);padding:0 12px 0 8px;
+  border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card);color:var(--t1);font:inherit;text-align:left;cursor:pointer}
+.aentry:hover{border-color:var(--line2)}
+.aentry .ai{display:inline-flex;align-items:center;justify-content:center;flex:none;width:32px;height:32px;border-radius:10px;background:var(--soft);color:var(--pri)}
+.aentry .ai .ic{width:18px;height:18px}
+.aentry .al{flex:none;font-size:var(--fs-body);font-weight:700;white-space:nowrap}
+.aentry .al b{font-weight:800}
+.aentry .ahot{flex:none;padding:2px 8px;border-radius:99px;background:var(--dg-bg);color:var(--dg);font-size:var(--fs-sm);font-weight:800;white-space:nowrap}
+.aentry .ach{flex:none;margin-left:auto;width:18px;height:18px;color:var(--t3)}
+.aentry.hot{border-color:var(--dg-line)}
+.achips .achip{min-height:var(--tap-main)}
 .achip{display:inline-flex;align-items:center;gap:6px;flex:none;min-height:var(--tap);padding:0 14px;border:1px solid var(--line);border-radius:99px;
   background:var(--card);color:var(--t2);font:inherit;font-size:var(--fs-sm);font-weight:600;white-space:nowrap;cursor:pointer}
 .achip b{color:var(--t1);font-size:var(--fs-body);font-weight:800}
@@ -1258,6 +1311,11 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
 .tdsheet[data-tab="files"] .tdpane[data-pane="files"]{display:block}
 /* 넓은 화면에서 '기록' 탭이 골라져 있으면(좁은 화면에서 넘어온 경우) 개요를 보인다 */
 .tdsheet[data-tab="log"] .tdpane[data-pane="info"]{display:block}
+/* 그때 '개요' 탭도 골라진 모양으로 — 아무 탭도 안 골라진 것처럼 보이지 않게 */
+@media (min-width:1100px){
+  .tdsheet[data-tab="log"] .tdtabs button[data-tab="info"]{color:var(--t1);font-weight:800}
+  .tdsheet[data-tab="log"] .tdtabs button[data-tab="info"]::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:3px;border-radius:3px 3px 0 0;background:var(--pri)}
+}
 @media (max-width:1099px){
   .tdcols{grid-template-columns:minmax(0,1fr);row-gap:0}
   .tdtabs .tlog{display:inline-flex}
@@ -1275,14 +1333,14 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
   .tdsheet[data-tab="log"] .tdside{padding:4px 16px 16px}
   .tdhero{padding:4px 0 18px}
 }
-/* 폰 · 태블릿 — 아래에 붙은 [기록 남기기] 한 줄 (어느 탭에서든 한 번에 적는 칸으로) */
+/* 폰 · 태블릿 — 아래에 붙은 [기록 남기기](기록 창) · [댓글](기록 탭의 댓글 칸). 어느 탭에서든 */
 .tdquick{display:none}
 @media (max-width:1099px){
   .tdquick{position:sticky;bottom:0;z-index:5;display:flex;gap:8px;margin:16px -16px 0;padding:10px 16px calc(10px + env(safe-area-inset-bottom));
     background:var(--bg);border-top:1px solid var(--line)}
-  .tdquick .btn{flex:1;justify-content:flex-start;color:var(--t3);font-weight:500;background:var(--card)}
-  .tdquick .btn .ic{color:var(--pri)}
-  .tdsheet[data-tab="log"] .tdquick{display:none}
+  .tdquick .btn.pri{flex:1}
+  .tdquick .btn:not(.pri){flex:none;padding:0 18px}
+  .tdquick .btn:only-child{flex:1}
 }
 @media (min-width:720px) and (max-width:1099px){ .tdquick{margin:16px -28px 0;padding:10px 28px} }
 /* 구획 — 짧은 제목(아이콘 + 이름 + 건수) + 여백 */
@@ -1348,18 +1406,20 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
   background:transparent;color:var(--t2);font-size:var(--fs-sm);font-weight:700;cursor:pointer}
 .tdmore:hover{color:var(--t1);background:var(--panel)}
 .tdempty{margin:var(--sp-3) 0 0;padding:16px;text-align:center;border-radius:var(--r-lg);background:var(--panel);color:var(--t2);font-size:var(--fs-sm)}
-.tdcompose{margin:0 0 var(--sp-4);border:1px solid var(--line2);border-radius:var(--r-lg);background:var(--field)}
+/* 기록 머리 — '기록 N' + [기록 남기기] (기록 창). 좁은 화면은 탭 이름 · 아래 줄이 같은 일을 해서 감춘다 */
+.tdlhead{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 12px}
+.tdlhead .tdh{margin:0}
+.tdlhead .tdlog{flex:none}
+@media (max-width:1099px){ .tdlhead{display:none} }
+/* 댓글 칸 — 한 줄 칸 + [댓글 등록]. 엔터로 등록 */
+.tdcompose{display:flex;align-items:flex-end;gap:6px;margin:0 0 var(--sp-4);padding:4px 4px 4px 0;border:1px solid var(--line2);border-radius:var(--r-lg);background:var(--field)}
 .tdcompose:focus-within{border-color:var(--pri);box-shadow:0 0 0 3px var(--soft)}
-.tdcompose textarea,.tdcompose textarea:focus{display:block;width:100%;min-height:76px;margin:0;padding:12px 14px 6px;border:0;background:transparent;
-  resize:none;font-size:var(--fs-body);line-height:1.6;box-shadow:none}
+.tdcompose textarea,.tdcompose textarea:focus{display:block;flex:1;min-width:0;width:auto;min-height:44px;max-height:160px;margin:0;padding:10px 14px;border:0;background:transparent;
+  resize:none;font-size:var(--fs-body);line-height:1.5;box-shadow:none;field-sizing:content}
 .tdcompose textarea::placeholder{color:var(--t3)}
-.tdwbar{display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:4px 6px 6px}
-.tdwbar .tdtool{display:inline-flex;align-items:center;gap:6px;min-height:var(--tap);padding:0 10px;border-color:transparent;background:transparent;
-  color:var(--t2);font-size:var(--fs-sm)}
-.tdwbar .tdtool:hover{background:var(--panel2);color:var(--t1)}
-.tdwbar .tdtool svg{width:20px;height:20px;display:block}
-.tdwbar .btn.pri{margin-left:auto;min-height:var(--tap);padding:0 20px;font-size:var(--fs-body);font-weight:800}
+.tdcompose .btn.pri{flex:none;min-height:var(--tap);padding:0 16px;font-size:var(--fs-sm);font-weight:800}
 .tdfoot{margin:24px 0 0;padding-top:12px;border-top:1px solid var(--line);font-size:var(--fs-sm);line-height:1.6;color:var(--t3)}
+.tdfoot:has(> #tdRead:empty){display:none}
 .tdfoot .linkbtn{color:var(--t2)}
 
 /* ── 입력 창 (2.0) — 지금 필요한 것만 먼저, 나머지는 [더 입력하기] ──
@@ -1466,7 +1526,24 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
 @media (max-width:719px){
   .veil.tfveil{align-items:stretch}
   .sheet.tform{height:var(--vvh,100vh);max-height:none;border-radius:0}
+  /* 창 바닥을 보이는 화면 바닥에 — 자판이 오른 iOS 에서도 아래 단추 줄이 자판 위에 남는다 */
+  .veil{top:var(--vvt,0px);bottom:auto;height:var(--vvh,100vh)}
+  /* 칸이 적어도 [취소] · [저장] 은 화면 맨 아래 (가운데 떠 있지 않게) */
+  .sheet.tform{display:flex;flex-direction:column}
+  .sheet.tform > .actions.tfoot{margin-top:auto}
 }
+/* 기록 창 머리 — 어느 업무인지 한 줄 (길면 줄임표) */
+.lform #lgDest{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--t2);font-weight:600}
+.lform #lgDest:empty{display:none}
+/* 업무 공간 오른쪽 — 첫 구획은 위 여백 없이 */
+.tdside #tdBody > .tdsec:first-child{margin-top:0}
+/* [사진 추가] — 고르는 칸은 감추고 단추가 대신 (초점은 칸이 받고 단추에 테두리가 보인다) */
+.photoin{position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;clip:rect(0 0 0 0)}
+.photobtn{display:inline-flex;gap:8px;color:var(--t1)}
+.photobtn .ic{color:var(--pri)}
+.photoin:focus-visible + .photobtn{outline:3px solid var(--pri);outline-offset:2px}
+span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font-weight:600}
+.tform span.fl{margin:0 0 8px;font-weight:700}
 /* '나' 화면 맨 위 — 내 정보 줄의 조각은 카드에 바로 얹는다 */
 .mecard .meinfo{display:contents}
 .mecard .tfrow{flex:0 0 auto}
@@ -1477,6 +1554,8 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
 #view-doc .sec + .ucard,#view-doc .fb > .ucard:first-child{border-top:1px solid var(--line);border-top-left-radius:var(--wb-radius);border-top-right-radius:var(--wb-radius)}
 #view-doc .ucard:last-child,#view-doc .ucard:has(+ :not(.ucard)){border-bottom-left-radius:var(--wb-radius);border-bottom-right-radius:var(--wb-radius);margin-bottom:var(--sp-2)}
 #view-doc .ucard .t{font-size:var(--fs-row);font-weight:700}
+/* 결재 제목 — 종류 태그와 같은 줄이라 폰에서 '자재 구…' 로 잘렸다. 두 줄까지 보인다 (15 지시) */
+#view-doc .ucard .t{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;word-break:keep-all;overflow-wrap:anywhere;line-height:1.45}
 
 /* 카운터 */
 .count{display:flex;align-items:center;gap:8px}
@@ -1858,6 +1937,8 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
       <div class="bmain">
         <section class="lsurf" aria-label="업무 목록">
           <div class="lbar">
+            <!-- PC(1200px↑) — 진행 중은 넓게, 대기 · 완료는 오른쪽 작은 칸 (15 지시). 상태 선택은 폰 · 태블릿만 -->
+            <h2 class="lhead">진행 중 <span class="n" id="runN">0</span></h2>
             <div class="stabs" id="stateTabs" role="tablist" aria-label="업무 상태">
               <button role="tab" data-col="colRun" aria-selected="true" aria-controls="colRun" onclick="boardTab('colRun')">진행 중 <span class="n" id="tRun">0</span></button>
               <button role="tab" data-col="colWait" aria-selected="false" aria-controls="colWait" onclick="boardTab('colWait')">대기 <span class="n" id="tWait">0</span></button>
@@ -1878,10 +1959,12 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
           </div>
         </section>
       </div>
-      <!-- PC 오른쪽 — 지금 확인할 일 · 오늘 출근 -->
-      <aside class="aside" aria-label="지금 확인할 일 · 오늘 출근">
+      <!-- PC 오른쪽 — 지금 확인할 일 · 오늘 출근 · 대기 · 완료(작게) -->
+      <aside class="aside" aria-label="지금 확인할 일 · 오늘 출근 · 대기 · 완료">
         <section class="apanel" id="todoBar"></section>
         <section class="apanel" id="todayBox" aria-label="오늘 출근" hidden></section>
+        <section class="apanel spanel" id="waitBox" aria-label="대기 업무"></section>
+        <section class="apanel spanel" id="doneBox" aria-label="완료 업무 · 최근 7일"></section>
       </aside>
     </div>
   </div>
@@ -4915,6 +4998,7 @@ function renderBoard(){
   if($('tWait')) $('tWait').textContent = wait.length;
   if($('tRun'))  $('tRun').textContent  = run.length;
   if($('tDone')) $('tDone').textContent = done.length;
+  if($('runN'))  $('runN').textContent  = run.length;
 
   /* ★ 머리 — 본인 업무만 보는 사람은 '내 업무 현황', 임원·관리자는 담당 거르기에 따라 '전체 업무 · 내 업무 · ○○ 업무'.
      판정은 서버가 보낸 scope 입니다. 아래 줄은 오늘 날짜와 **정렬 기준**(사람이 업무를 다시 찾을 수 있게) */
@@ -4933,6 +5017,7 @@ function renderBoard(){
                                       : emptyBoard(하나도없음 ? '아직 배정된 업무가 없습니다' : '대기 중인 업무 없음');
   $('listDone').innerHTML = done.length? done.map(function(t,i){ return taskRow(t, A?i:-1); }).join('') : emptyBoard('최근 7일 완료 없음');
   if($('doneSum')) $('doneSum').innerHTML = sumBox(A);
+  renderSideLists(wait, done);   // PC 오른쪽 대기 · 완료 (작게)
 
   // 새로 올라온 업무는 한 번만 반짝
   list.forEach(function(t){
@@ -4950,6 +5035,38 @@ function renderBoard(){
   renderTodo();            // 지금 확인할 일 (PC 오른쪽 · 폰 칩)
   renderToday();           // 오늘 출근 한 줄 (PC 오른쪽)
   markSel();
+}
+
+/** PC 오른쪽 대기 · 완료 칸 (15 지시 — 진행 중은 넓게, 대기 · 완료는 작게).
+    다섯 줄까지 보이고 나머지는 [N건 더 보기] — 숫자는 실제 남은 줄 수. 거르기(담당 · 종류)는 같이 걸린다 */
+var SIDE_MAX=5;
+function renderSideLists(wait, done){
+  var w=$('waitBox'), d=$('doneBox');
+  if(w){
+    w.innerHTML='<h2>'+ic('clock')+'대기<span class="n">'+wait.length+'건</span></h2>'+
+      (wait.length ? wait.slice(0,SIDE_MAX).map(compactRow).join('') : '<p class="sempty">대기 중인 업무가 없습니다</p>')+
+      (wait.length>SIDE_MAX ? '<button class="amore" onclick="openStateAll(\'wait\')">'+(wait.length-SIDE_MAX)+'건 더 보기</button>' : '');
+  }
+  if(d){
+    d.innerHTML='<h2>'+ic('checkc')+'완료 · 최근 7일<span class="n">'+done.length+'건</span></h2>'+
+      (done.length ? done.slice(0,SIDE_MAX).map(compactRow).join('') : '<p class="sempty">최근 7일 완료 없음</p>')+
+      '<div class="sfoot">'+sumBox()+'</div>'+
+      '<button class="amore" onclick="openDoneAll()">완료 전체 보기</button>';
+  }
+}
+/** PC 대기 칸의 [더 보기] — 대기 업무 전부를 큰 줄로 (거른 그대로) */
+function openStateAll(k){
+  var list=((S.data && S.data.tasks)||[]).filter(function(t){
+    if(!t || t.status==='완료' || t.status==='진행중') return false;
+    if(S.corp!=='ALL' && t.corp!==S.corp) return false;
+    if(S.owner && t.owner!==S.owner) return false;
+    if(S.type && t.type!==S.type) return false;
+    return true;
+  }).sort(taskRecent);
+  $('modal').innerHTML='<div class="veil"><div class="sheet">'+
+    '<div class="sheethead"><h3 class="tt">대기 업무 <span class="n">'+list.length+'건</span></h3><button class="btn sm" onclick="closeModal()">닫기</button></div>'+
+    '<div class="tlist">'+(list.length? list.map(function(t){ return taskRow(t, -1); }).join('') : empty('대기 중인 업무가 없습니다'))+'</div>'+
+    '</div></div>';
 }
 
 /** 업무 제목 — 본인 업무만 보는 사람은 '내 업무 현황', 그 밖에는 거른 담당에 따라 */
@@ -4983,7 +5100,14 @@ function meInfoHtml(me){
     (att && (att.state==='출근'||att.state==='퇴근')) ? '오늘 출근 '+att.time : '오늘 출근 기록 없음';
   return avatar(me.name)+
     '<div class="mm"><p class="mn">'+esc(me.name||'(이름 없음)')+' <span>'+esc([me.rank, me.dept].filter(Boolean).join(' · '))+'</span></p>'+
-    '<p class="ms">'+esc([me.phone, gradeName(me.grade), 출근글].filter(Boolean).join(' · '))+'</p></div>';
+    '<p class="ms">'+esc([phoneFmt(me.phone), gradeName(me.grade), 출근글].filter(Boolean).join(' · '))+'</p></div>';
+}
+/** 01012345678 → 010-1234-5678 (숫자가 아니거나 자리 수가 다르면 받은 그대로) */
+function phoneFmt(v){
+  var d=String(v==null?'':v).replace(/\D/g,'');
+  if(/^01\d{9}$/.test(d)) return d.substring(0,3)+'-'+d.substring(3,7)+'-'+d.substring(7);
+  if(/^0\d{9}$/.test(d)) return d.substring(0,3)+'-'+d.substring(3,6)+'-'+d.substring(6);
+  return String(v==null?'':v);
 }
 
 /* ★ 판의 상태 선택 — 진행 중 · 대기 · 완료 (2.0 은 PC · 폰 모두 같은 방식).
@@ -5010,32 +5134,54 @@ function panelSync(){
      누르면 그 처리 화면으로. 자료가 없으면 없다고 적는다 (0건을 꾸미지 않는다).
    ★ 서버 왕복 0회 — 이미 받은 approvals · tasks · settle · meta.sites · notices 로 셉니다.
    ★ PC(1200px↑)는 오른쪽 칸(#todoBar), 좁으면 머리 아래 칩 한 줄(#todoChips) */
+var ATTN_KINDS=[['apv','결재할 문서'], ['late','마감 지난 업무'], ['today','오늘 마감'], ['unpaid','못 받은 돈'], ['quiet','답 없는 견적'], ['post','새 공지']];
 function attnItems(){
   var d=S.data||{}, out=[];
-  var 임원=!!(S.me && S.me.grade>=3);
+  var 남=!ownScope();                       // 본인 업무만 보는 직원에게는 자기 이름을 되풀이하지 않는다
+  function 조각(arr){ return arr.filter(function(x){ return x && (x.tx||x.tx===0); }).map(function(x){
+    return x.cls ? '<span class="'+x.cls+'">'+esc(x.tx)+'</span>' : esc(x.tx); }).join(' · '); }
   (d.approvals||[]).forEach(function(a){
     out.push({ k:'apv', icon:'doc', go:"openDoc('"+esc(a.no)+"')", t:a.title||'결재 문서',
-      s:[임원? '결재할 문서' : '내 결재', a.who, a.amount? won(a.amount)+'원' : ''].filter(Boolean).join(' · ') });
+      s:조각([{tx:a.who}, {tx:a.amount? won(a.amount)+'원' : ''}]) });
   });
   (d.tasks||[]).forEach(function(t){
     if(!t || t.status==='완료') return;
     if(S.corp!=='ALL' && t.corp!==S.corp) return;
-    var 급=dueState(t), 지남=(급==='late');
+    var 급=dueState(t);
     if(급!=='late' && 급!=='today') return;
-    out.push({ k:지남? 'late' : 'today', hot:true, icon:'clock', go:"openTask('"+esc(t.id)+"')", t:t.title,
-      s:[지남? '마감 지남 · '+krDate(t.due) : '오늘 마감', ownScope()? '' : t.ownerName].filter(Boolean).join(' · ') });
+    var w=dueWord(t);
+    out.push({ k:급, hot:true, icon:'clock', go:"openTask('"+esc(t.id)+"')", t:t.title,
+      s:조각([{tx:남? t.ownerName : ''}, {tx:급==='late' && w? w.tx : '', cls:'dgv'}]) });
   });
-  var up=unpaidList();
-  if(up.length){
-    var sum=0; up.forEach(function(x){ sum+=x.unpaid; });
-    out.push({ k:'unpaid', n:up.length, hot:true, icon:'won', go:'openUnpaid()', t:'못 받은 돈 '+won(sum)+'원', s:up.length+'건 · 청구했지만 입금 전' });
-  }
-  var qt=quietList();
-  if(qt.length) out.push({ k:'quiet', n:qt.length, icon:'brief', go:'openQuiet()', t:'답 없는 견적 '+qt.length+'건', s:'보낸 지 '+UNPAID_DAYS+'일이 넘었습니다' });
+  /* ★ 못 받은 돈 · 답 없는 견적은 한 건에 한 줄 (15 지시) — 묶은 한 줄로 세면 칩 · 머리 · 목록의 숫자가 서로 달랐다 */
+  unpaidList().forEach(function(x){
+    out.push({ k:'unpaid', hot:true, icon:'won', go:"TD_TAB['"+esc(x.id)+"']='settle';openTask('"+esc(x.id)+"')", t:x.title,
+      s:조각([{tx:남? x.owner : ''}, {tx:won(x.unpaid)+'원 못 받음', cls:'dgv'}]) });
+  });
+  quietList().forEach(function(x){
+    out.push({ k:'quiet', icon:'brief', go:'openQuiet()', t:x.name, s:조각([{tx:'보낸 지 '+x.days+'일'}]) });
+  });
   /* 새 공지 — 가장 최근 것 하나, 올라온 지 7일 안이고 이 기기에서 아직 안 열어 본 것만 */
   var n=((d.notices)||[])[0];
-  if(n && !postRead(n.no) && (!n.at || daysBetweenStr(String(n.at).substring(0,10), todayStr())<=7)) out.push({ k:'post', icon:'mega', go:"openPost('"+esc(n.no)+"')", t:n.title, s:'새 공지 · '+(n.who||'') });
+  if(n && !postRead(n.no) && (!n.at || daysBetweenStr(String(n.at).substring(0,10), todayStr())<=7))
+    out.push({ k:'post', icon:'mega', go:"openPost('"+esc(n.no)+"')", t:n.title, s:조각([{tx:n.who}]) });
   return out;
+}
+/** 확인할 일을 종류별로 묶어 그린다 — 종류 이름이 할 일을 말하므로 줄마다 '마감 지남 · 결재할 문서' 를 되풀이하지 않는다.
+    max 줄까지만 그리고 몇 줄 그렸는지 돌려준다 (나머지는 [N건 더 보기] — 실제 남은 줄 수) */
+function attnGroupsHtml(items, max, 닫고){
+  var h='', 그림=0;
+  ATTN_KINDS.forEach(function(kd){
+    var 묶음=items.filter(function(x){ return x.k===kd[0]; });
+    if(!묶음.length || 그림>=max) return;
+    h+='<p class="agrp'+(묶음[0].hot?' hot':'')+'">'+esc(kd[1])+' <span class="n">'+묶음.length+'</span></p>';
+    묶음.slice(0, max-그림).forEach(function(x){
+      그림+=1;
+      h+='<button class="aitem'+(x.hot?' hot':'')+'" onclick="'+(닫고? 'closeOk();' : '')+x.go+'"><span class="ai">'+ic(x.icon)+'</span>'+
+        '<span class="at"><b>'+esc(x.t)+'</b>'+(x.s? '<span>'+x.s+'</span>' : '')+'</span>'+ic('chev','ach')+'</button>';
+    });
+  });
+  return { html:h, n:그림 };
 }
 function renderTodo(){
   var items=attnItems();
@@ -5045,26 +5191,22 @@ function renderTodo(){
     if(!items.length){
       h+='<p class="aempty">'+HELPER+'<span>지금 확인할 일이 없습니다</span></p>';
     } else {
-      h+=items.slice(0,6).map(function(x){
-        return '<button class="aitem'+(x.hot?' hot':'')+'" onclick="'+x.go+'"><span class="ai">'+ic(x.icon)+'</span>'+
-          '<span class="at"><b>'+esc(x.t)+'</b><span>'+esc(x.s)+'</span></span></button>';
-      }).join('');
-      if(items.length>6) h+='<button class="amore" onclick="openAttn()">'+(items.length-6)+'건 더 보기</button>';
+      var g=attnGroupsHtml(items, 4);     // PC 는 네 줄까지 — 아래 출근 · 대기 · 완료 칸이 화면 밖으로 밀리지 않게
+      h+=g.html;
+      if(items.length>g.n) h+='<button class="amore" onclick="openAttn()">'+(items.length-g.n)+'건 더 보기</button>';
     }
     box.innerHTML=h;
   }
-  /* 폰 · 태블릿 — 같은 것을 종류별 칩으로 (한 줄, 옆으로 밀기) */
+  /* 폰 · 태블릿 — 잘리는 칩 줄 대신 진입점 둘: [확인할 일 N건 · 급한 일 M] + 작은 [출근] (15 지시).
+     ★ N 은 열었을 때의 줄 수 그대로, 급한 일은 마감 지남 · 오늘 마감 · 못 받은 돈. 숨긴 것을 더해 세지 않는다 */
   var chips=$('todoChips');
   if(chips){
-    /* ★ 건수는 실제 건수로 — 못 받은 돈 · 답 없는 견적은 한 줄에 여러 건을 묶는다(n). 줄 수를 세면 2건이 1로 보였다 (검수 1차) */
-    var 셈={}; items.forEach(function(x){ 셈[x.k]=(셈[x.k]||0)+(x.n||1); });
-    var c=[];
-    if(셈.apv) c.push('<button class="achip" onclick="go(\'doc\')"><b>'+셈.apv+'</b> 결재</button>');
-    if(셈.late) c.push('<button class="achip hot" onclick="openAttn(\'late\')"><b>'+셈.late+'</b> 마감 지남</button>');
-    if(셈.today) c.push('<button class="achip hot" onclick="openAttn(\'today\')"><b>'+셈.today+'</b> 오늘 마감</button>');
-    if(셈.unpaid) c.push('<button class="achip hot" onclick="openUnpaid()"><b>'+셈.unpaid+'</b> 못 받은 돈</button>');
-    if(셈.quiet) c.push('<button class="achip" onclick="openQuiet()"><b>'+셈.quiet+'</b> 답 없는 견적</button>');
-    if(셈.post) c.push('<button class="achip" onclick="openAttn(\'post\')">'+ic('mega')+' 새 공지</button>');
+    var c=[], 급=items.filter(function(x){ return x.hot; }).length;
+    if(items.length){
+      c.push('<button class="aentry'+(급?' hot':'')+'" onclick="openAttn()" aria-label="지금 확인할 일 '+items.length+'건'+(급? ', 급한 일 '+급+'건' : '')+'">'+
+        '<span class="ai">'+ic('checkc')+'</span><span class="al">확인할 일 <b>'+items.length+'</b>건</span>'+
+        (급? '<span class="ahot">급한 일 '+급+'</span>' : '')+ic('chev','ach')+'</button>');
+    }
     var 출근=attCount(), 출근상태=attRead().st;
     if(출근상태==='unlinked') c.push('<button class="achip" onclick="openToday()">'+ic('users')+' 출퇴근앱 미연결</button>');   // 0 / 5 를 지어내지 않는다
     else if(출근상태==='bad') c.push('<button class="achip" onclick="openToday()">'+ic('users')+' 출근 확인 불가</button>');
@@ -5072,16 +5214,14 @@ function renderTodo(){
     chips.innerHTML=c.join('');
   }
 }
-/** 지금 확인할 일 전부 (또는 한 종류) — 폰의 칩 · PC 의 '더 보기' */
+/** 지금 확인할 일 전부 (또는 한 종류) — 폰의 [확인할 일] · PC 의 '더 보기'. 종류별로 묶어 고르기 쉽게 */
 function openAttn(k){
   var items=attnItems().filter(function(x){ return !k || x.k===k; });
-  var 이름={ late:'마감 지남', today:'오늘 마감', post:'새 공지' }[k] || '지금 확인할 일';
-  $('modal').innerHTML='<div class="veil"><div class="sheet">'+
-    '<div class="sheethead"><h3 class="tt">'+esc(이름)+'</h3><button class="btn sm" onclick="closeModal()">닫기</button></div>'+
-    (items.length ? items.map(function(x){
-      return '<button class="aitem'+(x.hot?' hot':'')+'" onclick="closeOk();'+x.go+'"><span class="ai">'+ic(x.icon)+'</span>'+
-        '<span class="at"><b>'+esc(x.t)+'</b><span>'+esc(x.s)+'</span></span></button>';
-    }).join('') : empty('지금 확인할 일이 없습니다'))+
+  var 이름=(ATTN_KINDS.filter(function(x){ return x[0]===k; })[0] || [0,'지금 확인할 일'])[1];
+  $('modal').innerHTML='<div class="veil"><div class="sheet attnsheet">'+
+    '<div class="sheethead"><h3 class="tt">'+esc(이름)+(items.length? ' <span class="n">'+items.length+'건</span>' : '')+'</h3>'+
+      '<button class="btn sm" onclick="closeModal()">닫기</button></div>'+
+    (items.length ? attnGroupsHtml(items, items.length, true).html : '<p class="aempty">'+HELPER+'<span>지금 확인할 일이 없습니다</span></p>')+
     '</div></div>';
 }
 
@@ -5448,15 +5588,12 @@ function emptyBoard(msg, cta){ return '<div class="none">'+HELPER+'<p class="ems
   (cta? '<button class="btn pri sm" onclick="openTaskForm()">'+ic('plus')+'새 업무</button>' : '')+'</div>'; }
 
 /* 판에서 쓰는 선 아이콘 — 상단바와 같은 한 벌 */
-var ICO_CMT='<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14.5a2 2 0 0 1-2 2H9l-4.5 3.5V6.5a2 2 0 0 1 2-2H18a2 2 0 0 1 2 2z"/></svg>';
 var ICO_PLUS='<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
 /* 창 안의 아이콘 (2026-09-22) — 상단바와 같은 선 굵기 */
 var ICO_SVG=function(d){ return '<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" '+
   'stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">'+d+'</svg>'; };
 var ICO_X=ICO_SVG('<path d="M6 6l12 12M18 6L6 18"/>');
 var ICO_DOTS=ICO_SVG('<circle cx="5.5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="18.5" cy="12" r="1.2"/>');
-var ICO_CAM=ICO_SVG('<path d="M4 8.5h3l1.6-2.5h6.8L17 8.5h3v10H4z"/><circle cx="12" cy="13.2" r="3.2"/>');
-var ICO_PROG=ICO_SVG('<path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/>');
 
 /* ★★ 업무 한 줄 (워크보드 2.0 · 2026-10-01) — 업무명 · 다음 할 일 · 책임자 · 일정을 자연스럽게 읽는다.
      [사람 동그라미] · 업무명(17px) → 다음 할 일(없으면 마지막 기록, 기록도 없으면 '아직 기록 없음')
@@ -5503,11 +5640,12 @@ function taskRow(t, i, opt){
   opt=opt||{};
   var done=(t.status==='완료'), 급함=dueState(t);
   var hot=(급함==='late' || 급함==='today');
+  /* 본인 업무만 보는 직원 — 줄마다 자기 이름 · 종류 아이콘을 되풀이하지 않는다 (15 지시). 동그라미 칸째 없다 */
   var 사람=(t.ownerName && !ownScope() && !opt.noWho);
-  return '<div data-tid="'+t.id+'" role="button" tabindex="0" class="trow'+(hot?' hot':'')+(done?' done':'')+
+  return '<div data-tid="'+t.id+'" role="button" tabindex="0" class="trow'+(hot?' hot':'')+(done?' done':'')+(사람?'':' noav')+
          (t.id===S.openTask?' sel':'')+anim_(i)+'"'+
          ' onkeydown="cardKey(event)" onclick="openTask(\''+t.id+'\')">'+
-    '<span class="tav" aria-hidden="true">'+(사람? avatar(t.ownerName) : '<span class="tico">'+ic(typeIco(t))+'</span>')+'</span>'+
+    (사람? '<span class="tav" aria-hidden="true">'+avatar(t.ownerName)+'</span>' : '')+
     '<div class="tm">'+
       '<p class="cn tt" title="'+esc(t.title).replace(/"/g,'&quot;')+'">'+esc(t.title)+'</p>'+
       rowNext(t)+rowTop(t, opt)+
@@ -5515,54 +5653,69 @@ function taskRow(t, i, opt){
     rowMeta(t)+
   '</div>';
 }
-/** 보조 한 줄 — 담당 · 종류 · 현장 · 표시 · 댓글 수 · 새 댓글 점 */
+/** 줄에 하나만 보일 표시 — 마감 계열은 오른쪽 마감 글자가 말한다. 돈 → 추가견적 → 기록 없음 순 (나머지는 상세에서) */
+function topFlag(t){
+  var 차례=function(f){ return (f.lv==='danger'? 0 : 10) + (/미승인/.test(f.t)? 0 : /추가견적/.test(f.t)? 1 : 2); };
+  return ((t && t.flags)||[]).filter(function(f){ return f && f.t && !isDueFlag(f); })
+    .sort(function(a,b){ return 차례(a)-차례(b); })[0] || null;
+}
+/** 보조 한 줄 — 담당 · 가장 중요한 표시 하나 · 새 댓글. 종류 · 현장 · 댓글 수는 상세에서 (15 지시). 없으면 줄째 없다 */
 function rowTop(t, opt){
   var parts=[];
   if(t.ownerName && !ownScope() && !(opt && opt.noWho))
     parts.push('<span class="twho"><span class="sronly">담당 </span>'+ownerChip(t)+'</span>');
-  var kind=[t.typeName||'', manyCorps()? (t.corpName||'') : ''].filter(Boolean).map(esc).join(' · ');
-  if(kind) parts.push('<span class="ckind">'+kind+'</span>');
-  var 현장=t.site? (siteNameOf(t.site) || t.site) : '';
-  if(현장) parts.push('<span class="csite">'+ic('pin')+'<span class="sronly">현장 </span>'+esc(현장)+'</span>');
-  /* 마감 계열 표시는 오른쪽 마감 글자가 이미 말하므로 여기서 또 적지 않는다 (2026-09-09) */
-  ((t && t.flags)||[]).filter(function(f){ return f && !isDueFlag(f); }).forEach(function(f){
-    parts.push('<span class="tag '+(f.lv==='danger'?'dg':'wn')+'">'+esc(f.t)+'</span>');
-  });
-  var 댓글=cmtBadge(t.id)+(hasNewComment(t.id)? '<span class="cdot" title="새 댓글"><span class="sronly">새 댓글</span></span>' : '');
-  if(댓글) parts.push('<span class="cmts">'+댓글+'</span>');
+  var f=topFlag(t);
+  if(f) parts.push('<span class="tag '+(f.lv==='danger'?'dg':'wn')+'">'+esc(f.t)+'</span>');
+  if(hasNewComment(t.id)) parts.push('<span class="cnew"><span class="cdot" aria-hidden="true"></span>새 댓글</span>');
   return parts.length? '<p class="ctop">'+parts.join('')+'</p>' : '';
 }
-/** 다음 할 일 — 있으면 그것, 없으면 마지막 기록, 기록도 없으면 없다고 (진행 중 업무만). 지어내지 않는다 */
+/** 다음 할 일 — 있을 때만. 없으면 빈 자리 · '아직 기록 없음' 같은 반복 안내를 만들지 않는다 (마지막 기록은 상세에서) */
 function rowNext(t){
-  if(t.next) return '<p class="cnext"><span class="k">다음</span><span class="tx">'+esc(t.next)+'</span></p>';
-  if(t.lastLog){
-    var sp=String(t.lastLog).indexOf(' ');
-    var dt=sp>0? shortDate(t.lastLog.substring(0,sp)) : '';
-    var tx=sp>0? t.lastLog.substring(sp+1) : t.lastLog;
-    return '<p class="lastline">'+(dt? '<span class="dt">'+esc(dt)+'</span>' : '')+'<span class="tx">'+esc(tx)+'</span></p>';
-  }
-  return t.status==='진행중' ? '<p class="lastline nolog">아직 기록 없음</p>' : '';
+  return t.next ? '<p class="cnext"><span class="k">다음</span><span class="tx">'+esc(t.next)+'</span></p>' : '';
 }
-/** 오른쪽 — 마감 날짜(굵게) 아래에 D-숫자 · 진행률. 완료는 '완료 · 날짜'. 빈 값은 만들지 않는다 */
+/** 마감까지 남은 날 (지났으면 음수). 날짜가 아니면 null */
+function dueN(due){
+  var dd=dday(due); if(/NaN/.test(dd)) return null;
+  return dd.charAt(1)==='+' ? -Number(dd.substring(2)) : Number(dd.substring(2));
+}
+/** 마감을 한 마디로 — 날짜와 D-숫자를 같이 적지 않는다 (15 지시). 목록 오른쪽 · 확인할 일 · 상세가 같이 쓴다.
+    오늘 마감 · 마감 N일 지남 · 내일 마감 · N일 뒤 마감(7일 안) · M월 D일 마감 / 완료 · 시작 */
+function dueWord(t){
+  if(!t) return null;
+  if(t.status==='완료') return t.done ? { tx:krDate(t.done)+' 완료', cls:'done' } : null;
+  if(!t.due) return t.start ? { tx:krDate(t.start)+' 시작', cls:'' } : null;
+  var 급=dueState(t), n=dueN(t.due);
+  if(급==='today') return { tx:'오늘 마감', cls:'dgv' };
+  if(급==='late') return { tx:(n!==null && n<0)? '마감 '+(-n)+'일 지남' : '마감 지남', cls:'dgv' };
+  if(n===1) return { tx:'내일 마감', cls:'' };
+  if(급==='soon' && n>1) return { tx:n+'일 뒤 마감', cls:'' };
+  return { tx:krDate(t.due)+' 마감', cls:'' };
+}
+/** 오른쪽 — 마감 한 마디만. 진행률 숫자 · D-숫자는 상세에서 (15 지시). 빈 값은 만들지 않는다 */
 function rowMeta(t){
-  var 위='', 아래=[];
-  var p=Number(t.progress); if(!isFinite(p)) p=0;
-  p=Math.max(0, Math.min(100, Math.round(p)));
-  var 진행률 = (t.status!=='완료' && (t.type==='DEMO' || t.progress>0 || t.status==='진행중'))
-    ? '<span class="pct" role="img" aria-label="진행률 '+p+'%">'+p+'%</span>' : '';
-  if(t.status==='완료'){
-    if(t.done) 위='<span class="tdue done">완료</span>', 아래.push(esc(krDate(t.done)));
-  } else if(t.due){
-    var 급함=dueState(t), dd=dday(t.due); if(/NaN/.test(dd)) dd='';
-    if(급함==='today') 위='<span class="tdue dgv"><span class="sronly">마감 </span>오늘 마감</span>';
-    else if(급함==='late') 위='<span class="tdue dgv"><span class="sronly">마감 </span>마감 지남</span>', 아래.push('<span class="dgv">'+esc(krDate(t.due))+'</span>');
-    else { 위='<span class="tdue"><span class="sronly">마감 </span>'+esc(krDate(t.due))+'</span>'; 아래.push(급함==='soon' && dd ? esc(dd) : '마감'); }
-  } else if(t.start){
-    위='<span class="tdue">'+esc(krDate(t.start))+'</span>'; 아래.push('시작');
-  }
-  if(진행률) 아래.push(진행률);
-  if(!위 && !아래.length) return '';
-  return '<div class="cb">'+위+(아래.length? '<span class="tsub">'+아래.join(' · ')+'</span>' : '')+'</div>';
+  var w=dueWord(t); if(!w) return '';
+  var 날=t.status==='완료'? '' : (t.due? '마감 '+krDate(t.due) : '');
+  return '<div class="cb"><span class="tdue'+(w.cls? ' '+w.cls : '')+'"'+(날? ' title="'+esc(날)+'"' : '')+'>'+esc(w.tx)+'</span></div>';
+}
+/** PC 오른쪽 대기 · 완료 칸의 작은 줄 — 업무명 + (담당 ·) 마감/시작/완료 한 마디
+    + 큰 줄과 같은 규칙의 표시 하나(`topFlag`) · 새 댓글 (검수 1차 — 작은 줄에서 경고 · 새 댓글이 사라졌다) */
+function compactRow(t){
+  var w=dueWord(t), 급=dueState(t), hot=(급==='late' || 급==='today');
+  var 아래=[], 표시=[], f=topFlag(t);
+  if(t.ownerName && !ownScope()) 아래.push(esc(t.ownerName));
+  if(w) 아래.push('<span class="'+(w.cls||'')+'">'+esc(w.tx)+'</span>');
+  if(f) 표시.push('<span class="tag '+(f.lv==='danger'?'dg':'wn')+'">'+esc(f.t)+'</span>');
+  if(hasNewComment(t.id)) 표시.push('<span class="cnew"><span class="cdot" aria-hidden="true"></span>새 댓글</span>');
+  return '<button type="button" class="crow'+(hot?' hot':'')+'" data-cid="'+esc(t.id)+'" onclick="openTask(\''+t.id+'\')">'+
+    '<span class="ct">'+esc(t.title)+'</span>'+(아래.length? '<span class="cm">'+아래.join(' · ')+'</span>' : '')+
+    (표시.length? '<span class="cx">'+표시.join('')+'</span>' : '')+'</button>';
+}
+/** 그 업무의 줄 중 지금 보이는 것 — 판의 큰 줄(.trow[data-tid]) 또는 PC 오른쪽 작은 줄(.crow[data-cid]).
+    ★ 상세를 닫을 때 초점을 돌려줄 곳. 읽음 처리로 줄이 새로 그려져도 같은 업무의 보이는 줄을 찾는다 (검수 1차) */
+function visibleTaskRow(id, 종류){
+  if(!id) return null;
+  var 고를=종류==='cid' ? '.crow[data-cid="'+id+'"]' : 종류==='tid' ? '.trow[data-tid="'+id+'"]' : '.trow[data-tid="'+id+'"],.crow[data-cid="'+id+'"]';
+  return [].filter.call(document.querySelectorAll(고를), function(x){ return x.offsetParent!==null; })[0] || null;
 }
 
 /** 현장 코드 → 현장 이름 (기준정보의 현장 목록에서). 모르면 빈 값 */
@@ -5571,13 +5724,16 @@ function siteNameOf(code){
   ((S.meta && S.meta.sites) || []).forEach(function(x){ if(x && x.code===code) n=String(x.name||''); });
   return n;
 }
-/** 마감 — 언제나 '마감 9월 30일 · D-2' 한 모양 (업무 상세의 제목 아래 줄). D-숫자는 기존 dday() 그대로 */
+/** 마감 — 업무 상세 머리: '마감 10월 2일 · 내일' (D-숫자 대신 한 마디 · 15 지시). 날짜가 아니면 받은 글자 그대로 */
 function dueText(t){
   if(!t.due) return '';
-  var dd=dday(t.due);
-  if(/NaN/.test(dd)) dd='';                       // 날짜가 아닌 값이 와도 'D+NaN' 을 적지 않는다
-  var hot=dueHot(t);
-  return '<span class="due'+(hot?' dgv':'')+'">마감 '+esc(krDate(t.due))+(dd? ' · '+dd : '')+'</span>';
+  var 급=dueState(t), n=dueN(t.due), 말='';
+  if(급==='today') 말='오늘';
+  else if(급==='late') 말=(n!==null && n<0)? (-n)+'일 지남' : '지남';
+  else if(n===1) 말='내일';
+  else if(급==='soon' && n>1) 말=n+'일 남음';
+  var hot=(급==='late' || 급==='today');
+  return '<span class="due'+(hot?' dgv':'')+'">마감 '+esc(krDate(t.due))+(말? ' · '+말 : '')+'</span>';
 }
 /** 철거 카드에 '남는 것' — 단가를 안 넣었으면 칸을 만들지 않는다 */
 function settleMargin_(id){
@@ -5768,11 +5924,11 @@ function paintReaders(id){
   var box=$('tdRead'); if(!box || S.openTask!==id) return;   // 옆 패널에 다른 업무가 열려 있으면 그 업무의 읽음을 덮지 않는다
   var e=S.readers[id];
   var names=(e && e.up===taskEditOf(id)) ? e.names : [];
-  /* 맨 아래 '누가 올림' 줄에 이어 붙인다. 아무도 안 읽었으면 줄을 만들지 않는다 (v55)
+  /* 기록 맨 아래 한 줄. 아무도 안 읽었으면 줄을 만들지 않는다 (v55 · 15 지시로 '누가 올림' 은 개요로)
      ★ 이름이 많으면 셋까지 + '외 N명' (2026-09-22). 누르면 전부 보입니다 */
   if(!names.length){ box.innerHTML=''; return; }
   var all = !!READ_OPEN[id] || names.length<=3;
-  box.innerHTML = ' · 읽음 '+esc((all? names : names.slice(0,3)).join(', '))+
+  box.innerHTML = '읽음 '+esc((all? names : names.slice(0,3)).join(', '))+
     (all? '' : ' <button type="button" class="linkbtn" onclick="readersAll(\''+esc(id)+'\')">외 '+
                (names.length-3)+'명</button>');
 }
@@ -5789,24 +5945,7 @@ function readersAll(id){ READ_OPEN[id]=1; paintReaders(id); }
  *   점이 되살아나고 다른 기기에서는 결과가 달랐다.
  *   지금은 '읽음' 시트에 사람별·업무별 마지막으로 본 시각이 남는다.
  */
-/**
- * 업무 카드 제목 옆 댓글 수 — [2] (2026-09-02 대표님 지시).
- *
- * ★ 0건이면 아무것도 그리지 않습니다. '[0]' 은 빈 값을 적는 것과 같습니다.
- * ★ 옆의 빨간 점(.cdot)과 뜻이 다릅니다 —
- *     [2]   달린 댓글이 모두 몇 개인가
- *     빨간 점  내가 아직 안 본 것이 있는가
- *   그래서 둘은 같이 뜰 수 있습니다.
- */
-/* 댓글 수 — 말풍선 + 숫자 (2026-09-22). 예전 `[3]` 은 무엇의 숫자인지 알 수 없었습니다.
-   화면 읽기 프로그램에는 '댓글 3개' 로 읽힙니다. */
-function cmtBadge(id){
-  var n=(S.data && S.data.commentCount && S.data.commentCount[id]) || 0;
-  if(!n) return '';
-  return '<span class="cico" title="댓글 '+n+'개">'+ICO_CMT+
-         '<span class="sronly">댓글 </span>'+n+'<span class="sronly">개</span></span>';
-}
-
+/* ★ 줄의 댓글 수(말풍선 + 숫자)는 15 지시로 뺐습니다 — 줄에는 '새 댓글' 만, 모두 몇 개인지는 상세의 기록 탭 숫자가 말한다 */
 function hasNewComment(id){
   var d=S.data||{};
   return !!(d.cmtDot && d.cmtDot[id]);
@@ -6055,8 +6194,9 @@ function tdPanesHtml(t, r){
     ph=ph.trim(); if(!ph) return;
     ((S.data&&S.data.staff)||[]).forEach(function(x){ if(x.phone===ph) 협업.push(x.name); });
   });
-  var 사람=[['담당', t.ownerName], ['협업자', 협업.join(', ')], ['올린 날', t.at? krDate(String(t.at).substring(0,10)) : ''],
-            ['시작', t.start? krDate(t.start) : ''], ['마감', t.due? krDate(t.due) : '']].filter(function(kv){ return kv[1]; });
+  /* 담당 · 마감은 머리 줄이 말하므로 되풀이하지 않는다 (15 지시) */
+  var 사람=[['협업자', 협업.join(', ')], ['올린 날', t.at? krDate(String(t.at).substring(0,10)) : ''],
+            ['시작', t.start? krDate(t.start) : '']].filter(function(kv){ return kv[1]; });
   if(사람.length) h+='<section class="tdsec"><h4 class="tdh">'+ic('user')+'사람 · 날짜</h4><dl class="tdinfo">'+
     사람.map(function(kv){ return '<div><dt>'+esc(kv[0])+'</dt><dd>'+esc(kv[1])+'</dd></div>'; }).join('')+'</dl></section>';
   h+='</section>';
@@ -6103,7 +6243,7 @@ function taskSheetHtml(t, r){
     ? '<span class="tdst done">'+esc(t.done? '완료 '+krDate(t.done) : '완료')+'</span>'
     : '<span class="tdst'+(t.status==='진행중'?'':' wait')+'">'+esc(t.status||'대기')+'</span>';
   var 조각=[];
-  if(t.ownerName) 조각.push('<span><span class="k">담당</span> <b>'+esc(t.ownerName)+'</b></span>');
+  if(t.ownerName && !ownScope()) 조각.push('<span><span class="k">담당</span> <b>'+esc(t.ownerName)+'</b></span>');   // 본인 업무 직원에게 자기 이름을 되풀이하지 않는다
   if(t.status!=='완료'){
     if(t.due) 조각.push(dueText(t));
     else if(t.start) 조각.push('<span>시작 '+esc(krDate(t.start))+'</span>');
@@ -6113,7 +6253,7 @@ function taskSheetHtml(t, r){
     /* 도구 줄 — [← 업무 목록] · [수정] (삭제는 되돌릴 수 없어 수정 창 맨 아래) */
     '<div class="tdbar"><div class="tdwrapbar">'+
       '<button class="btn tdclose" onclick="closeModal()">'+ic('chev-l')+'업무 목록</button>'+
-      '<button class="btn sm tdedit" onclick="openTaskForm(\''+t.id+'\')">'+ic('pen')+'수정</button>'+
+      '<button class="btn sm tdedit" onclick="openTaskForm(\''+t.id+'\')">'+ic('pen')+'업무 수정</button>'+
     '</div></div>'+
     '<div class="tdwrap">'+
       '<header class="tdhero">'+
@@ -6131,7 +6271,10 @@ function taskSheetHtml(t, r){
         '<div class="tdmain">'+tdTabsHtml(t, r)+'<div id="tdPanes">'+tdPanesHtml(t, r)+'</div></div>'+
         '<aside class="tdside" data-pane="log" aria-label="활동"><div id="tdBody">'+(r? taskDetailBody(r) : '')+'</div></aside>'+
       '</div>'+
-      '<div class="tdquick"><button class="btn" onclick="tdWriteNow()">'+ic('pen')+'기록 남기기…</button></div>'+
+      /* 폰 · 태블릿 아래 — [기록 남기기](기록 창: 오늘 한 일 · 진행률 · 사진) · [댓글](기록 탭의 댓글 칸). 이름과 하는 일을 맞췄다 (15 지시) */
+      '<div class="tdquick">'+(t.status==='완료' ? '' :
+        '<button class="btn pri" onclick="tdLogWith(\''+t.id+'\',\'\')">'+ic('pen')+'기록 남기기</button>')+
+        '<button class="btn" onclick="tdWriteNow()">'+ic('cmt')+'댓글</button></div>'+
     '</div>'+
     '</div></div>';
 }
@@ -6437,18 +6580,16 @@ function taskDetailBody(r){
   /* ★★ 활동 — 기록 남기기 칸이 맨 위, 새 기록이 위 (2.0).
      ★ 저장 방식은 그대로 — 엔터로 등록하면 댓글, [사진 첨부] · [진행률] 로 연 기록 창에서 저장하면 업무일지.
      ★ 쓰던 글은 치는 대로 이 업무의 초안(tdKeepDraft) — 업무를 바꾸거나 다른 창으로 가도 남는다 */
-  h+='<section class="tdsec"><h4 class="tdh">'+ic('clock')+'진행 기록'+(건수? ' <span class="n">'+건수+'</span>' : '')+'</h4>';
+  /* ★ 이름과 하는 일을 맞췄다 (15 지시) — [기록 남기기] 는 기록 창(오늘 한 일 · 진행률 · 사진 → 업무일지),
+       아래 칸은 댓글(엔터로 등록). 예전에는 칸 이름이 '기록 남기기' 인데 실제로는 댓글로 저장됐다.
+       칸에 쓰던 글은 [기록 남기기] 를 누르면 기록 창으로 들고 간다. 기록 창은 완료 업무를 고를 수 없어 완료 업무에는 단추가 없다 */
+  h+='<section class="tdsec"><div class="tdlhead"><h4 class="tdh">'+ic('clock')+'기록'+(건수? ' <span class="n">'+건수+'</span>' : '')+'</h4>'+
+       (t.status==='완료' ? '' : '<button type="button" class="btn sm tdlog" onclick="tdLogWith(\''+t.id+'\',\'\')">'+ic('pen')+'기록 남기기</button>')+
+     '</div>';
   h+='<div class="tdcompose">'+
-       '<textarea id="tdWrite" rows="2" spellcheck="false" placeholder="오늘 한 일 · 전할 말을 남겨주세요" '+
-         'aria-label="기록 남기기" oninput="tdKeepDraft()" onkeydown="flowKey(event,\''+t.id+'\')">'+esc(TD_DRAFT[t.id]||'')+'</textarea>'+
-       '<div class="tdwbar">'+
-         /* 기록 창은 완료된 업무를 고를 수 없으므로 완료 업무에는 두 단추가 없습니다 */
-         (t.status==='완료' ? '' :
-         '<button type="button" class="btn sm tdtool" onclick="tdLogWith(\''+t.id+'\',\'photo\')">'+ICO_CAM+'사진</button>'+
-         '<button type="button" class="btn sm tdtool" onclick="tdLogWith(\''+t.id+'\',\'prog\')">'+
-           ICO_PROG+(t.type==='DEMO' ? '진행률 · 인력' : '진행률')+'</button>')+
-         '<button type="button" class="btn sm pri" onclick="sendFlow(\''+t.id+'\')">등록</button>'+
-       '</div>'+
+       '<textarea id="tdWrite" rows="1" spellcheck="false" placeholder="댓글을 남겨주세요" '+
+         'aria-label="댓글" oninput="tdKeepDraft()" onkeydown="flowKey(event,\''+t.id+'\')">'+esc(TD_DRAFT[t.id]||'')+'</textarea>'+
+       '<button type="button" class="btn sm pri" onclick="sendFlow(\''+t.id+'\')">댓글 등록</button>'+
      '</div>';
   h+='<div class="flow" id="tdFlow">'+
      shown.slice().reverse().map(function(it){ return flowRow(it, t.id); }).join('')+'</div>';
@@ -6458,11 +6599,8 @@ function taskDetailBody(r){
        '지난 기록 '+more+'건 더 보기</button>';
   }
   h+='</section>';
-  // 맨 아래 — 누가 봤나 (거의 안 보는 것이라 작게)
-  var made='';
-  if(t.ownerName) made = t.ownerName + (t.at? ('이 '+shortDate(String(t.at).substring(0,10))+' 올림') : '이 올림');
-  else if(t.at)   made = shortDate(String(t.at).substring(0,10))+' 올림';
-  h+='<p class="tdfoot">'+esc(made)+'<span id="tdRead"></span></p>';
+  // 맨 아래 — 누가 봤나 (거의 안 보는 것이라 작게). 올린 날은 개요에 있으므로 되풀이하지 않는다 (15 지시)
+  h+='<p class="tdfoot"><span id="tdRead"></span></p>';
   return h;
 }
 
@@ -6913,8 +7051,8 @@ function closeModal(force){
   /* ★ 업무 상세를 닫을 때 돌아갈 자리가 없으면(검색 · 알림 · 기록 목록에서 연 경우) 그 업무의 줄로 초점을 돌린다 (2026-09-30) */
   var 닫은업무=S.openTask;
   if(닫은업무 && !(MODAL_FROM && MODAL_FROM.isConnected && MODAL_FROM.offsetParent!==null)){
-    var 그줄=document.querySelector('.trow[data-tid="'+닫은업무+'"]');
-    if(그줄 && 그줄.offsetParent!==null) MODAL_FROM=그줄;
+    var 그줄=visibleTaskRow(닫은업무);
+    if(그줄) MODAL_FROM=그줄;
   }
   box.innerHTML='';
   MODAL_ROOT=null; MODAL_SIG=null; MODAL_TOUCHED=false; MODAL_DRAWN=false;
@@ -6977,9 +7115,10 @@ function focusBack(){
   var t=MODAL_FROM; MODAL_FROM=null;
   if(!t) return;
   if(t.isConnected && t.offsetParent!==null){ try{ t.focus({ preventScroll:true }); }catch(e){} return; }
-  var tid=t.getAttribute && t.getAttribute('data-tid');
-  var c=tid? document.querySelector('[data-tid="'+tid+'"]') : null;
-  if(c && c.offsetParent!==null){ try{ c.focus({ preventScroll:true }); }catch(e){} }
+  /* 연 줄이 다시 그려졌으면(읽음 처리 등) 같은 업무의 같은 종류 줄로 — 큰 줄(data-tid) · PC 작은 줄(data-cid) 둘 다 (검수 1차) */
+  var tid=t.getAttribute && t.getAttribute('data-tid'), cid=t.getAttribute && t.getAttribute('data-cid');
+  var c=visibleTaskRow(tid||cid, tid? 'tid' : 'cid') || visibleTaskRow(tid||cid);
+  if(c){ try{ c.focus({ preventScroll:true }); }catch(e){} }
 }
 document.addEventListener('keydown', function(e){
   if(e.key!=='Tab') return;
@@ -6996,8 +7135,13 @@ document.addEventListener('keydown', function(e){
 /* ★ 폰 자판이 올라오면 보이는 높이가 줄어듭니다 — 창 높이(--vvh)를 그만큼 줄여 [저장] 이 자판에 가리지 않게 */
 (function(){
   var vv=window.visualViewport; if(!vv) return;
-  function set(){ document.documentElement.style.setProperty('--vvh', Math.round(vv.height)+'px'); }
-  vv.addEventListener('resize', set); set();
+  /* ★ iOS 는 자판이 오르면 보이는 곳이 위로 밀린다(offsetTop) — 창 위치(--vvt)도 같이 따라가야 [취소] · [저장] 이 보인다 (15 지시) */
+  function set(){
+    var r=document.documentElement.style;
+    r.setProperty('--vvh', Math.round(vv.height)+'px');
+    r.setProperty('--vvt', Math.max(0, Math.round(vv.offsetTop))+'px');
+  }
+  vv.addEventListener('resize', set); vv.addEventListener('scroll', set); set();
 })();
 /* 손가락 화면에서 창 안의 칸에 들어가면 그 칸을 보이는 곳 가운데로 (자판·아래 단추 줄에 가리지 않게) */
 document.addEventListener('focusin', function(e){
@@ -7069,6 +7213,8 @@ function tfDraw(p, msg){
   t.id=p.id||'';
   BACK_TASK=p.id||null;
   drawTaskForm(p.id||'', t, (p.id && S.data && S.data.filesByTask && S.data.filesByTask[p.id]) || []);
+  /* 저장하지 못했던 글은 접힌 칸에 있었을 수 있다 — 되살린 창은 다 펼쳐서 보여 준다 */
+  var 창=document.querySelector('#modal .tform'); if(창){ 창.classList.add('more'); var b=창.querySelector('.fmorebtn'); if(b) b.setAttribute('aria-expanded','true'); }
   var m=$('tfMsg'); if(m && msg) m.textContent=msg;
 }
 function openTaskForm(id){
@@ -7105,7 +7251,7 @@ function drawTaskForm(id, t, files){
   }
   /* ★★ 워크보드 2.0 입력 창 — **지금 필요한 것만 먼저** (업무명 · 종류 · 담당 · 마감 · 지금 상태).
        내용 · 현장 · 협업자 · (법인) · 세밀한 진행률 · 자료는 [더 입력하기] 로 그 자리에서 펼친다 (창을 새로 열지 않는다).
-       수정할 때는 적어 둔 것이 다 보이게 처음부터 펼친다.
+       ★ 수정도 같은 순서로 접어서 연다 (15 지시 — 필수 정보와 저장이 먼저). 저장 실패로 되살린 창만 펼친다(tfDraw).
      ★ 칸 이름(id) · 필수 규칙 · 기본값은 그대로 — 업무명 · 종류 필수, 담당자는 나, 종류는 미리 안 고름.
      ★ 법인이 하나뿐이면 고를 것이 없으므로 칸을 감추고 그 값으로 저장한다 (서버 필수값은 그대로 보낸다).
      ★ 닫는 길은 아래 [취소] 하나 (2026-09-09) */
@@ -7114,9 +7260,10 @@ function drawTaskForm(id, t, files){
   var 법인칸='<div class="field"'+(한법인? ' hidden' : '')+'><label class="fl req" for="tfCorp">법인</label><select id="tfCorp">'+
       corps.map(function(c){ return '<option value="'+c.code+'"'+(t&&t.corp===c.code?' selected':'')+'>'+esc(c.name)+'</option>'; }).join('')+
     '</select></div>';
-  var h='<div class="veil tfveil"><div class="sheet tform'+(수정?' more':'')+'">'+
+  var h='<div class="veil tfveil"><div class="sheet tform">'+
     '<div class="sheethead"><h3 class="tt">'+(수정?'업무 수정':'새 업무')+'</h3>'+
-      '<p class="tfdest" id="tfDest" aria-live="polite"></p></div>'+
+      /* 저장될 자리 안내는 새 업무에만 — 수정은 이미 있는 업무라 되풀이하지 않는다 */
+      (수정? '' : '<p class="tfdest" id="tfDest" aria-live="polite"></p>')+'</div>'+
     '<input type="hidden" id="tfId" value="'+(id||'')+'">'+
     '<input type="hidden" id="tfCo" value="'+esc(t&&t.co?t.co:'')+'">'+
     '<div class="fgrp f1">'+
@@ -7152,7 +7299,7 @@ function drawTaskForm(id, t, files){
       (한법인? 법인칸 : '')+
     '</div>'+
     '<button type="button" class="fmorebtn" onclick="tfMore()" aria-expanded="false">'+ic('plus')+'더 입력하기'+
-      '<span class="fmh">내용 · 현장 · 협업자'+(한법인? '' : ' · 법인')+'</span></button>'+
+      '<span class="fmh">내용 · 현장 · 협업자'+(한법인? '' : ' · 법인')+(수정? ' · 진행률 · 자료' : '')+'</span></button>'+
     '<div class="fmorebox">'+
       '<div class="fgrp"><p class="fgh">'+ic('list')+'자세한 내용</p>'+
         '<div class="field"><label class="fl">업무 내용</label>'+
@@ -7370,12 +7517,15 @@ function fillFromSite(){
 /* ★ 막혔을 때 (2026-09-30) — 이유는 단추 위 빨간 상자에, 칸에는 빨간 테두리. 그 칸으로 초점을 옮겨
    긴 창에서도 어디를 고칠지 바로 보이게 합니다. 다시 적거나 고르면 표시가 풀립니다 */
 function tfFail(msg, el){
-  var m=$('tfMsg'); if(m) m.textContent=msg;
-  if(!el) return;
+  var m=$('tfMsg');
+  /* 칸이 있으면 이유는 그 칸 바로 아래 한 곳에만 — 단추 위 상자에 같은 글을 또 쓰지 않는다 (15 지시). 칸이 없을 때(서버 거절)만 단추 위 */
+  if(!el){ if(m) m.textContent=msg; return; }
+  if(m) m.textContent='';
+  var 창=el.closest ? el.closest('.tform') : null;
+  if(창 && el.closest('.fmorebox') && !창.classList.contains('more')) tfMore();   // 접힌 칸이면 펴서 보이게
   el.classList.add('err'); el.setAttribute('aria-invalid','true');
-  /* 이유를 그 칸 바로 아래에도 — 긴 창에서 단추 위 상자는 멀리 있습니다 */
   var eid=(el.id||'tfx')+'Err', e2=$(eid);
-  if(!e2){ e2=document.createElement('p'); e2.className='ferr'; e2.id=eid; el.parentNode.insertBefore(e2, el.nextSibling); }
+  if(!e2){ e2=document.createElement('p'); e2.className='ferr'; e2.id=eid; e2.setAttribute('role','alert'); el.parentNode.insertBefore(e2, el.nextSibling); }
   e2.textContent=msg;
   el.setAttribute('aria-describedby', eid);
   var f=(el.tagName==='DIV')? el.querySelector('label') : el;
@@ -7552,9 +7702,9 @@ function syncLogForm(){
   var sl=$('lgProg');
   if(sl){ sl.value=cur; syncProg('lg'); }
   fillFromAttendance(sel.value);
-  /* 어느 업무의 진행 기록에 남는지 — 업무 이름으로 */
-  var dest=$('lgDest'), t=taskOf_(sel.value);
-  if(dest) dest.innerHTML = t ? '<b>'+esc(t.title)+'</b>의 진행 기록에 남습니다' : '';
+  /* 어느 업무의 기록인지 — 업무 공간에서 열어 고르는 칸이 없을 때만 이름 한 줄 (고르는 칸이 있으면 그 칸이 말한다) */
+  var dest=$('lgDest'), t=taskOf_(sel.value), 고름=sel.closest('.field');
+  if(dest) dest.innerHTML = (t && 고름 && 고름.hidden) ? esc(t.title) : '';
 }
 
 /**
@@ -7752,9 +7902,11 @@ var PICKED = {};            // { 칸이름: [ {url, name, blob, thumb} ] }
 /** 사진 칸 하나를 그린다. 창을 만들 때 이 한 줄만 넣으면 된다 */
 function photoField(id, label){
   photoClear(id);
-  return '<div class="field"><label class="fl">'+esc(label)+'</label>'+
-    '<input type="file" id="'+id+'" accept="image/*" multiple '+
+  /* 브라우저 기본 '파일 선택 · 선택된 파일 없음' 대신 [사진 추가] 단추 (15 지시). 고르는 칸은 그대로라 키보드 · photoAdd 그대로 */
+  return '<div class="field"><span class="fl">'+esc(label)+'</span>'+
+    '<input type="file" class="photoin" id="'+id+'" accept="image/*" multiple '+
       'onchange="photoAdd(&#39;'+id+'&#39;,this)">'+
+    '<label class="btn photobtn" for="'+id+'">'+ic('camera')+'사진 추가</label>'+
     '<div class="thumbs" id="'+id+'Box"></div></div>';
 }
 
@@ -9504,7 +9656,7 @@ function paintDocs(r){
   if(고를수있는.length > 1){
     h+='<div class="bulkbar">'+
          '<label class="bulkall"><input type="checkbox" onchange="docPickAll(this.checked)">'+
-         '<span>모두</span></label>'+
+         '<span>모두 고르기</span></label>'+
          '<div id="docBulk" class="hide">'+
            '<button class="btn" onclick="docBulkAct(&quot;reject&quot;)">반려</button>'+
            '<button class="btn pri" id="docBulkGo" onclick="docBulkAct(&quot;approve&quot;)">승인</button>'+
