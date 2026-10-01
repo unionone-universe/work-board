@@ -4977,10 +4977,13 @@ function paintMe(){
 /** 내 정보 카드 — '나' 화면 맨 위 (이름 · 직급 · 오늘 출근 · 연락처) */
 function meInfoHtml(me){
   me=me||{};
-  var att=((S.data && S.data.attendance && S.data.attendance.rows)||[]).filter(function(a){ return a.name===me.name; })[0];
+  var 자료=attRead();
+  var att=자료.rows.filter(function(a){ return a.name===me.name; })[0];
+  var 출근글=자료.st==='bad' ? '오늘 출근 확인 불가' :      // 형식이 틀린 응답을 '기록 없음' 으로 바꿔 말하지 않는다
+    (att && (att.state==='출근'||att.state==='퇴근')) ? '오늘 출근 '+att.time : '오늘 출근 기록 없음';
   return avatar(me.name)+
     '<div class="mm"><p class="mn">'+esc(me.name||'(이름 없음)')+' <span>'+esc([me.rank, me.dept].filter(Boolean).join(' · '))+'</span></p>'+
-    '<p class="ms">'+esc([me.phone, gradeName(me.grade), (att && (att.state==='출근'||att.state==='퇴근')) ? '오늘 출근 '+att.time : '오늘 출근 기록 없음'].filter(Boolean).join(' · '))+'</p></div>';
+    '<p class="ms">'+esc([me.phone, gradeName(me.grade), 출근글].filter(Boolean).join(' · '))+'</p></div>';
 }
 
 /* ★ 판의 상태 선택 — 진행 중 · 대기 · 완료 (2.0 은 PC · 폰 모두 같은 방식).
@@ -5062,8 +5065,9 @@ function renderTodo(){
     if(셈.unpaid) c.push('<button class="achip hot" onclick="openUnpaid()"><b>'+셈.unpaid+'</b> 못 받은 돈</button>');
     if(셈.quiet) c.push('<button class="achip" onclick="openQuiet()"><b>'+셈.quiet+'</b> 답 없는 견적</button>');
     if(셈.post) c.push('<button class="achip" onclick="openAttn(\'post\')">'+ic('mega')+' 새 공지</button>');
-    var 출근=attCount(), 연결=((S.data && S.data.attendance) || {}).linked;
-    if(연결===false) c.push('<button class="achip" onclick="openToday()">'+ic('users')+' 출퇴근앱 미연결</button>');   // 0 / 5 를 지어내지 않는다
+    var 출근=attCount(), 출근상태=attRead().st;
+    if(출근상태==='unlinked') c.push('<button class="achip" onclick="openToday()">'+ic('users')+' 출퇴근앱 미연결</button>');   // 0 / 5 를 지어내지 않는다
+    else if(출근상태==='bad') c.push('<button class="achip" onclick="openToday()">'+ic('users')+' 출근 확인 불가</button>');
     else if(출근.all) c.push('<button class="achip" onclick="openToday()">'+ic('users')+' 출근 <b>'+출근.on+'</b> / '+출근.all+'</button>');
     chips.innerHTML=c.join('');
   }
@@ -5086,8 +5090,33 @@ function openAttn(k){
    ★ 출퇴근 앱이 보낸 출근으로 — 서버 왕복 0회.
    ★★ 미연결이면 서버가 직원마다 state '-' 인 줄을 보냅니다. 줄 수로 세면 '0 / 5명' 을 지어내므로 linked 부터 봅니다 */
 var TODAY_OPEN={ att:false };
+/** 출근 자료를 한 번 걸러 읽는다 — 출근을 읽는 곳은 모두 이것만 쓴다 (2026-10-01 · v94 검수 권장).
+    st: ok(명단) · empty(빈 명단 — 카드를 숨긴다) · unlinked(출퇴근앱 미연결) · bad(형식이 틀림 — '확인 불가')
+    ★ 명단이 배열이 아니거나 항목 하나라도 틀리면 셈 전체를 믿지 않는다 — '출근 0명'으로 바꿔 말하지 않는다.
+    ★ 예전에는 rows.forEach 가 터져 판 갱신(renderBoard) 전체가 멈췄다
+    ★★ 항목은 서버(attendanceToday_)가 실제로 보내는 모양만 맞다고 본다 (검수 1차 — 상태가 빠진 줄 · leave:{} 가 0명으로 셌다)
+       이름 · 상태 · 시각은 늘 글자, 휴가 줄만 leave:true + 휴가 종류, 나머지 상태는 출근 · 퇴근 · 미출근 셋, 출근 · 퇴근은 시각이 있다 */
+function attRowOk(r){
+  if(!r || typeof r!=='object' || Array.isArray(r)) return false;
+  if(typeof r.name!=='string' || !r.name.trim()) return false;
+  if(typeof r.state!=='string' || typeof r.time!=='string') return false;
+  if(r.site!==undefined && r.site!==null && typeof r.site!=='string') return false;
+  if(r.leave!==undefined && r.leave!==null && typeof r.leave!=='boolean') return false;
+  if(r.leave===true) return !!r.state.trim();
+  if(r.state==='미출근') return true;
+  return (r.state==='출근' || r.state==='퇴근') && !!r.time.trim();
+}
+function attRead(){
+  var a=S.data && S.data.attendance;
+  if(!a || typeof a!=='object' || Array.isArray(a)) return { st:'bad', rows:[] };
+  if(a.linked===false) return { st:'unlinked', rows:[] };
+  if(!Array.isArray(a.rows)) return { st:'bad', rows:[] };
+  var 맞음=a.rows.every(attRowOk);
+  if(!맞음) return { st:'bad', rows:[] };
+  return { st:a.rows.length? 'ok' : 'empty', rows:a.rows };
+}
 function attCount(){
-  var rows=((S.data && S.data.attendance) || {}).rows || [];
+  var rows=attRead().rows;
   var on=0, all=0;
   rows.forEach(function(a){ if(a.leave) return; all+=1; if(a.state==='출근'||a.state==='퇴근') on+=1; });
   return { on:on, all:all };
@@ -5095,10 +5124,12 @@ function attCount(){
 /** 출근 한 줄 + (펼치면) 명단. 판(#todayBox)과 폰 창(#todaySheet)이 같이 쓴다.
     창은 제목이 '출근 현황' 이라 줄 머리를 '오늘' 로 — 출근을 두 번 쓰지 않는다. 자료가 없으면 '' (판은 숨긴다) */
 function todayHtml(창){
-  var att=(S.data && S.data.attendance) || {}, rows=att.rows || [];
+  var 자료=attRead(), rows=자료.rows;
   var 머리='<span class="k">'+(창? '오늘' : ic('users')+'출근')+'</span>';
-  if(att.linked===false) return '<div class="arow attrow">'+(창? '' : 머리)+'<span class="m">출퇴근앱 미연결</span></div>';
-  if(!rows.length) return '';
+  var 한줄=function(m){ return '<div class="arow attrow">'+(창? '' : 머리)+'<span class="m">'+m+'</span></div>'; };
+  if(자료.st==='unlinked') return 한줄('출퇴근앱 미연결');
+  if(자료.st==='bad') return 한줄('확인 불가');
+  if(자료.st==='empty') return '';
   var 셈=attCount();
   var h='<div class="arow attrow">'+머리+'<span class="m"><b>'+셈.on+'</b> / '+셈.all+'명</span>'+
     '<button class="btn sm ghost atoggle" onclick="todayAtt(this)" aria-expanded="'+(TODAY_OPEN.att?'true':'false')+'"'+
@@ -7567,8 +7598,7 @@ function attCountFor(taskId){
   if(!현장명) return 0;
 
   var n=0;
-  var rows=((S.data&&S.data.attendance)||{}).rows||[];
-  rows.forEach(function(r){
+  attRead().rows.forEach(function(r){         /* 형식이 틀리면 빈 명단 — 인원을 채우지 않는다 */
     if(!r.site) return;                       /* 사무실·기타는 site 가 비어 있다 */
     if(String(r.site).indexOf(현장명)>=0 || 현장명.indexOf(String(r.site))>=0) n+=1;
   });
