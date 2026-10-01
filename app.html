@@ -205,7 +205,6 @@ html[data-theme="dark"]{
 .callegend{display:flex;align-items:center;flex-wrap:wrap;gap:var(--sp-2);margin:var(--sp-2) 0 0;
   font-size:var(--fs-sm);color:var(--t2)}
 .callegend .cnt1{font-weight:600}
-.callegend .hint{color:var(--t3)}
 
 /* 달을 넘길 때 (v50) — 창을 통째로 다시 그리지 않고 달력 안쪽만 바꿉니다. transform·opacity 만 */
 @keyframes calNext{from{opacity:.4;transform:translateX(8px)}to{opacity:1;transform:none}}
@@ -1107,10 +1106,22 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .arow b{color:var(--t1);font-weight:700}
 .arow .m{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .arow .wnv{color:var(--wn)}
-.aatt{display:flex;flex-wrap:wrap;gap:6px;padding:4px 4px 8px 48px}
+.aatt{display:flex;flex-wrap:wrap;gap:6px;padding:4px 4px 8px}
 .aatt span{display:inline-flex;align-items:center;gap:4px;min-height:28px;padding:0 10px;border-radius:99px;background:var(--card);
   font-size:var(--fs-sm);color:var(--t2)}
 .aatt span.no{color:var(--wn)}
+/* 오늘 출근 한 줄 — '출근  3 / 5명  ……  열기'. 좁거나 글자를 키웠을 때만 단추가 아래로 (2026-10-01 간소화) */
+#todayBox{padding:6px 8px 6px 16px}
+#todayBox[hidden]{display:none}
+.attrow{flex-wrap:wrap;align-items:center;row-gap:0;min-height:var(--tap);padding:0 4px}
+.attrow .k{display:inline-flex;align-items:center;gap:8px;width:auto;font-size:var(--fs-body);font-weight:800;color:var(--t1)}
+.attrow .k .ic{width:18px;height:18px;color:var(--pri)}
+.attrow .m{font-size:var(--fs-body)}
+.attrow .atoggle{margin-left:auto;color:var(--pri);font-weight:700}
+#todayBox .atoggle:hover{background:var(--card)}
+#todaySheet .attrow .k{font-size:var(--fs-sm);font-weight:700;color:var(--t3)}
+#todaySheet .aatt{padding:4px 0 8px}
+#todaySheet .aatt span{background:var(--panel)}   /* 창 바탕(--sheet) 위에서도 이름표가 보이게 */
 /* 폰 · 태블릿 — 확인할 일을 칩 한 줄로 (옆으로 밀기) */
 .achips{display:none}
 @media (max-width:1199px){
@@ -1867,10 +1878,10 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
           </div>
         </section>
       </div>
-      <!-- PC 오른쪽 — 지금 확인할 일 · 오늘 -->
-      <aside class="aside" aria-label="지금 확인할 일 · 오늘">
+      <!-- PC 오른쪽 — 지금 확인할 일 · 오늘 출근 -->
+      <aside class="aside" aria-label="지금 확인할 일 · 오늘 출근">
         <section class="apanel" id="todoBar"></section>
-        <section class="apanel" id="todayBox"></section>
+        <section class="apanel" id="todayBox" aria-label="오늘 출근" hidden></section>
       </aside>
     </div>
   </div>
@@ -4937,7 +4948,7 @@ function renderBoard(){
   pushOnce();              // 폰 알림 주소표 갱신 (한 번만)
   roomDot();               // 로고 위의 점 (명단에 든 사람에게만)
   renderTodo();            // 지금 확인할 일 (PC 오른쪽 · 폰 칩)
-  renderToday();           // 오늘 — 휴가 · 일정 · 출근 (PC 오른쪽)
+  renderToday();           // 오늘 출근 한 줄 (PC 오른쪽)
   markSel();
 }
 
@@ -5051,8 +5062,9 @@ function renderTodo(){
     if(셈.unpaid) c.push('<button class="achip hot" onclick="openUnpaid()"><b>'+셈.unpaid+'</b> 못 받은 돈</button>');
     if(셈.quiet) c.push('<button class="achip" onclick="openQuiet()"><b>'+셈.quiet+'</b> 답 없는 견적</button>');
     if(셈.post) c.push('<button class="achip" onclick="openAttn(\'post\')">'+ic('mega')+' 새 공지</button>');
-    var 출근=attCount();
-    if(출근.all) c.push('<button class="achip" onclick="openToday()">'+ic('users')+' 출근 <b>'+출근.on+'</b> / '+출근.all+'</button>');
+    var 출근=attCount(), 연결=((S.data && S.data.attendance) || {}).linked;
+    if(연결===false) c.push('<button class="achip" onclick="openToday()">'+ic('users')+' 출퇴근앱 미연결</button>');   // 0 / 5 를 지어내지 않는다
+    else if(출근.all) c.push('<button class="achip" onclick="openToday()">'+ic('users')+' 출근 <b>'+출근.on+'</b> / '+출근.all+'</button>');
     chips.innerHTML=c.join('');
   }
 }
@@ -5069,9 +5081,10 @@ function openAttn(k){
     '</div></div>';
 }
 
-/* ===================== 오늘 — 휴가 · 일정 · 출근 (2.0) =====================
-   ★ 예전의 '오늘 출근' 칸과 '방금 올라온 기록' 을 합쳐 다시 짰습니다. 기록은 업무마다 마지막 기록이 줄에 보이므로 뺐습니다.
-   ★ 달력이 이미 가진 휴가 · 일정(leaves · events)과 출퇴근 앱이 보낸 출근으로 — 서버 왕복 0회 */
+/* ===================== 오늘 — 출근 한 줄 (2.0 · 2026-10-01 간소화) =====================
+   ★ 휴일 · 휴가 · 일정 요약과 [일정 전체 보기] 는 뺐습니다 — 일정 화면에서 봅니다 (13 지시).
+   ★ 출퇴근 앱이 보낸 출근으로 — 서버 왕복 0회.
+   ★★ 미연결이면 서버가 직원마다 state '-' 인 줄을 보냅니다. 줄 수로 세면 '0 / 5명' 을 지어내므로 linked 부터 봅니다 */
 var TODAY_OPEN={ att:false };
 function attCount(){
   var rows=((S.data && S.data.attendance) || {}).rows || [];
@@ -5079,52 +5092,48 @@ function attCount(){
   rows.forEach(function(a){ if(a.leave) return; all+=1; if(a.state==='출근'||a.state==='퇴근') on+=1; });
   return { on:on, all:all };
 }
-function todayHtml(){
-  var td=todayStr(), h='';
-  var 휴일=holidayOn(td), lv=leavesOn(td), ev=eventsOn(td).filter(function(v){ return !isHolidayEvent(v); });
-  if(휴일) h+='<div class="arow"><span class="k">휴일</span><span class="m"><b>'+esc(휴일)+'</b></span></div>';
-  lv.forEach(function(v){ h+='<div class="arow"><span class="k">휴가</span><span class="m"><b>'+esc(v.name)+'</b> '+esc(leaveLabel(v))+'</span></div>'; });
-  ev.forEach(function(v){ h+='<div class="arow"><span class="k">'+esc(v.time||'일정')+'</span><span class="m"><b>'+esc(v.title||'')+'</b>'+(v.name? ' · '+esc(v.name) : '')+'</span></div>'; });
-  if(!휴일 && !lv.length && !ev.length) h+='<div class="arow"><span class="k">일정</span><span class="m">오늘 등록된 휴가 · 일정이 없습니다</span></div>';
-  var att=(S.data && S.data.attendance) || { rows:[] }, 셈=attCount();
-  if((att.rows||[]).length){
-    h+='<div class="arow"><span class="k">출근</span><span class="m"><b>'+셈.on+'</b> / '+셈.all+'명</span>'+
-      '<button class="btn sm ghost atoggle" style="margin-left:auto" onclick="todayAtt(this)" aria-expanded="'+(TODAY_OPEN.att?'true':'false')+'">'+
-      (TODAY_OPEN.att? '접기' : '누가')+'</button></div>';
-    if(TODAY_OPEN.att){
-      h+='<div class="aatt">'+att.rows.map(function(a){
-        var on=(a.state==='출근'||a.state==='퇴근');
-        return '<span'+(on||a.leave? '' : ' class="no"')+'>'+esc(a.name)+' '+esc(on? a.time : (a.leave? a.state : (att.linked? '미출근' : '')))+'</span>';
-      }).join('')+'</div>';
-    }
-  } else if(att.linked===false){
-    h+='<div class="arow"><span class="k">출근</span><span class="m">출퇴근앱 미연결</span></div>';
+/** 출근 한 줄 + (펼치면) 명단. 판(#todayBox)과 폰 창(#todaySheet)이 같이 쓴다.
+    창은 제목이 '출근 현황' 이라 줄 머리를 '오늘' 로 — 출근을 두 번 쓰지 않는다. 자료가 없으면 '' (판은 숨긴다) */
+function todayHtml(창){
+  var att=(S.data && S.data.attendance) || {}, rows=att.rows || [];
+  var 머리='<span class="k">'+(창? '오늘' : ic('users')+'출근')+'</span>';
+  if(att.linked===false) return '<div class="arow attrow">'+(창? '' : 머리)+'<span class="m">출퇴근앱 미연결</span></div>';
+  if(!rows.length) return '';
+  var 셈=attCount();
+  var h='<div class="arow attrow">'+머리+'<span class="m"><b>'+셈.on+'</b> / '+셈.all+'명</span>'+
+    '<button class="btn sm ghost atoggle" onclick="todayAtt(this)" aria-expanded="'+(TODAY_OPEN.att?'true':'false')+'"'+
+    ' aria-label="출근 명단 '+(TODAY_OPEN.att? '접기' : '열기')+'">'+(TODAY_OPEN.att? '접기' : '열기')+'</button></div>';
+  if(TODAY_OPEN.att){
+    h+='<div class="aatt">'+rows.map(function(a){
+      var on=(a.state==='출근'||a.state==='퇴근');
+      return '<span'+(on||a.leave? '' : ' class="no"')+'>'+esc(a.name)+' '+esc(on? a.time : (a.leave? a.state : '미출근'))+'</span>';
+    }).join('')+'</div>';
   }
   return h;
 }
 function renderToday(){
   var box=$('todayBox'); if(!box) return;
-  box.innerHTML='<h2>'+ic('cal')+'오늘 · '+esc(dateLabelLong(todayStr()))+'</h2>'+todayHtml()+
-    '<button class="amore" onclick="go(\'cal\')">일정 전체 보기</button>';
+  var h=todayHtml();
+  box.hidden=!h;
+  box.innerHTML=h;
 }
-/** 출근 [누가 / 접기] — 판의 '오늘'(#todayBox)과 열려 있는 '오늘' 창(#todaySheet)을 같이 다시 그린다.
+/** 출근 [열기 / 접기] — 판의 '오늘'(#todayBox)과 열려 있는 '출근 현황' 창(#todaySheet)을 같이 다시 그린다.
     ★ 판만 다시 그리면 열린 창에는 반영되지 않았다 (검수 1차). 누른 단추가 새로 그려지므로 초점을 같은 자리 단추로 돌려준다 */
 function todayAtt(btn){
   TODAY_OPEN.att=!TODAY_OPEN.att;
   var 곳=btn && btn.closest ? btn.closest('#todaySheet, #todayBox') : null;
   renderToday();
-  var 창=$('todaySheet'); if(창) 창.innerHTML=todayHtml();
+  var 창=$('todaySheet'); if(창) 창.innerHTML=todayHtml(true);
   var 새단추=곳 && 곳.isConnected ? 곳.querySelector('.atoggle') : null;
   if(새단추){ try{ 새단추.focus({ preventScroll:true }); }catch(e){} }
 }
-/** 폰 — 출근 칩을 누르면 오늘 한 장 */
+/** 폰 — 출근 칩을 누르면 '출근 현황' 한 장 (명단 펼친 채) */
 function openToday(){
   TODAY_OPEN.att=true;
   renderToday();                  // 판의 '오늘' 도 같은 상태로
   $('modal').innerHTML='<div class="veil"><div class="sheet">'+
-    '<div class="sheethead"><h3 class="tt">오늘 · '+esc(dateLabelLong(todayStr()))+'</h3><button class="btn sm" onclick="closeModal()">닫기</button></div>'+
-    '<div class="apanel" id="todaySheet" style="background:transparent;padding:0">'+todayHtml()+'</div>'+
-    '<div class="actions"><button class="btn" onclick="closeOk();go(\'cal\')">일정 전체 보기</button></div></div></div>';
+    '<div class="sheethead"><h3 class="tt">출근 현황</h3><button class="btn sm" onclick="closeModal()">닫기</button></div>'+
+    '<div id="todaySheet">'+todayHtml(true)+'</div></div></div>';
 }
 
 /* ===================== 추가 (폰 아래 탭 가운데) ===================== */
@@ -8451,8 +8460,7 @@ function calBody(){
 
   var legend = '<p class="callegend">'+
     '<span class="cnt1 lv">'+ic('user')+'휴가 '+monthLeave+'건</span>'+
-    '<span class="cnt1 ev">'+ic('clock')+'일정 '+monthEvent+'건</span>'+
-    '<span class="hint">빨간 날짜는 일요일 · 공휴일</span></p>';
+    '<span class="cnt1 ev">'+ic('clock')+'일정 '+monthEvent+'건</span></p>';
 
   return '<div class="calmain"><div class="caldows" aria-hidden="true">'+dows+'</div>'+
     '<div class="calgrid" role="group" aria-label="'+esc(calTitle())+' 날짜" onkeydown="calKey(event)">'+cells.join('')+'</div>'+
