@@ -1649,6 +1649,126 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 .costv .cvurow .m{color:var(--t3);flex:1 1 220px;min-width:0}
 .costv .cvurow .f{display:flex;gap:6px;align-items:center}
 .costv .cvurow select{height:var(--tap);padding:0 28px 0 10px;width:auto;font-size:var(--wb-fs-meta)}
+
+/* ===================== 구독 관리 (2026-10-01 · 18 지시) =====================
+   [비용 내역] / [구독 관리] 두 탭 · 비용 내역 줄 끝의 행동 칸 · 결제일순 회차 목록. 같은 --wb-* 규칙(글자 16/14) */
+.costv .cvtabs{display:flex;gap:var(--sp-5);margin:0 0 var(--sp-3);border-bottom:1px solid var(--line)}
+.costv .cvtabs button{position:relative;display:inline-flex;align-items:center;gap:6px;min-height:var(--tap);padding:0 2px;
+  border:0;background:transparent;color:var(--t2);font:inherit;font-size:var(--wb-fs-body);font-weight:600;cursor:pointer}
+.costv .cvtabs button:hover{color:var(--t1)}
+.costv .cvtabs button[aria-selected="true"]{color:var(--t1);font-weight:700}
+.costv .cvtabs button[aria-selected="true"]::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:3px;
+  border-radius:3px 3px 0 0;background:var(--t1)}
+.costv .cvtabs .cnt{padding:0 8px;border-radius:99px;background:var(--wn-bg);color:var(--wn);
+  font-size:var(--wb-fs-label);font-weight:700;line-height:1.6}
+.costv .cvbar{margin:0 0 var(--sp-3)}
+.tag.ok{background:var(--soft);color:var(--ok)}
+/* 비용 내역 — 줄(.cvrow)은 그대로 문서를 열고, 옆 칸(.cvact)에 [구독 등록] · [구독 보기] 만. 표의 새 열이 아니다 */
+.costv .cvline{display:flex;align-items:stretch;border-top:1px solid var(--line)}
+.costv .cvline:first-child{border-top:0}
+.costv .cvline > .cvrow{flex:1 1 auto;min-width:0;border-top:0}
+.costv .cvact{flex:0 0 112px;display:flex;align-items:center;justify-content:flex-end;padding:4px 12px 4px 0}
+.costv .cvact .btn{font-size:var(--wb-fs-label);white-space:nowrap;color:var(--t2)}
+.costv .cvact .btn:hover{color:var(--t1);border-color:var(--line2)}
+.costv .cvact .btn .ic{width:16px;height:16px}
+@media (min-width:720px){ .costv .cvhl{background:var(--field)} }
+/* 960px 아래(폰 · 태블릿 세로)는 행동을 줄 아래 오른쪽으로 — 옆에 두면 표의 항목 칸이 좁아져 이름이 잘렸다 */
+@media (max-width:959px){
+  .costv .cvline{flex-wrap:wrap}
+  .costv .cvact{flex:1 1 100%;padding:0 12px 9px}
+  .costv .cvact:empty{display:none}
+}
+@media (max-width:719px){
+  .costv .cvhl{display:none}
+  .costv .cvhl + .cvline{border-top:0}
+}
+/* 구독 관리 — 요약 셋(예정 · 완료 · 확인 필요) */
+.costv .sbsum{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--sp-2);margin:0 0 var(--sp-3)}
+@media (max-width:639px){
+  .costv .sbsum{grid-template-columns:1fr 1fr}
+  .costv .sbsum .sbtile:first-child{grid-column:1 / -1}
+}
+.costv .sbtile{display:flex;flex-direction:column;gap:2px;min-width:0;padding:10px 12px;border:1px solid var(--line);
+  border-radius:var(--wb-radius);background:var(--card)}
+.costv .sbtile .k{font-size:var(--wb-fs-label);font-weight:600;color:var(--t3)}
+.costv .sbtile .v{font-size:var(--wb-fs-body);font-weight:700;color:var(--t1);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.costv .sbtile.warn{border-color:var(--wn-line);background:var(--wn-bg)}
+.costv .sbtile.warn .k,.costv .sbtile.warn .v{color:var(--wn)}
+.costv .sbwarn{display:flex;flex-wrap:wrap;align-items:center;gap:6px var(--sp-2);margin:0 0 var(--sp-3);padding:8px 12px;
+  border:1px solid var(--wn-line);border-radius:var(--wb-radius);background:var(--wn-bg);color:var(--wn);font-size:var(--wb-fs-meta);font-weight:600}
+.costv .sbwarn .chip{min-height:var(--tap);font-size:var(--wb-fs-label)}
+/* 회차 목록 — 폰: 날짜 | 이름 · 금액 · 상태 · 행동 / PC: 한 줄 다섯 칸. 이름은 자르지 않고 꺾는다 */
+.costv .sblist{border:1px solid var(--line);border-radius:var(--wb-radius);overflow:hidden;background:var(--card)}
+.costv .sbrow{display:grid;grid-template-columns:50px minmax(0,1fr) auto;grid-template-areas:"d n n" "d a s" "d b b";
+  align-items:center;gap:4px var(--sp-3);padding:10px 12px;border-top:1px solid var(--line);font-size:var(--wb-fs-meta)}
+.costv .sbrow:first-child{border-top:0}
+.costv .sbrow.hi{background:var(--soft)}
+.costv .sbd{grid-area:d;align-self:start;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  min-height:50px;border-radius:12px;background:var(--field);font-variant-numeric:tabular-nums;line-height:1.25}
+.costv .sbd b{font-size:var(--wb-fs-body);font-weight:700;color:var(--t1)}
+.costv .sbd small{font-size:var(--wb-fs-label);color:var(--t3)}
+.costv .sbrow[data-st="check"] .sbd,.costv .sbrow[data-st="today"] .sbd{background:var(--wn-bg)}
+.costv .sbrow[data-st="check"] .sbd b,.costv .sbrow[data-st="check"] .sbd small,
+.costv .sbrow[data-st="today"] .sbd b,.costv .sbrow[data-st="today"] .sbd small{color:var(--wn)}
+.costv .sbn{grid-area:n;min-width:0;display:flex;flex-direction:column;align-items:flex-start;gap:1px}
+.costv .sbn .linkbtn{font-weight:700;font-size:var(--wb-fs-body);color:var(--t1);text-align:left;overflow-wrap:anywhere;min-height:24px}
+.costv .sbn small,.costv .sba small{font-size:var(--wb-fs-label);color:var(--t3);overflow-wrap:anywhere}
+.costv .sba{grid-area:a;min-width:0;display:flex;flex-direction:column}
+.costv .sba b{font-weight:700;font-size:var(--wb-fs-body);font-variant-numeric:tabular-nums;color:var(--t1)}
+.costv .sbs{grid-area:s;justify-self:end}
+.costv .sbb{grid-area:b;justify-self:end}
+.costv .sbb .btn{white-space:nowrap}
+/* 태블릿(720~959) — 이름 · 금액은 위아래, 상태 · 행동은 오른쪽 (다섯 칸이면 이름 칸이 좁아 세 줄로 꺾였다) */
+@media (min-width:720px) and (max-width:959px){
+  .costv .sbrow{grid-template-columns:56px minmax(0,1fr) auto 150px;grid-template-areas:"d n s b" "d a s b";gap:4px var(--sp-3)}
+  .costv .sbb{justify-self:stretch}
+  .costv .sbb .btn{width:100%}
+}
+@media (min-width:960px){
+  .costv .sbrow{grid-template-columns:56px minmax(0,1fr) 190px 118px 150px;grid-template-areas:"d n a s b";gap:var(--sp-3)}
+  .costv .sba{align-items:flex-end;text-align:right}
+  .costv .sbb{justify-self:stretch}
+  .costv .sbb .btn{width:100%}
+}
+.costv .sbempty{display:flex;flex-direction:column;align-items:center;gap:var(--sp-2);padding:var(--sp-6) var(--sp-4);
+  text-align:center;border:1px dashed var(--line2);border-radius:var(--wb-radius);color:var(--t2)}
+.costv .sbempty .ic{width:28px;height:28px;color:var(--t3)}
+.costv .sbempty b{font-size:var(--wb-fs-body);color:var(--t1)}
+.costv .sbempty p{margin:0 0 var(--sp-2);max-width:440px;font-size:var(--wb-fs-meta)}
+.costv .sball{display:flex;flex-wrap:wrap;align-items:baseline;gap:2px var(--sp-2);width:100%;min-height:var(--tap);padding:9px 0;
+  border:0;border-top:1px solid var(--line);background:transparent;color:var(--t1);font:inherit;text-align:left;cursor:pointer}
+.costv .sball:first-child{border-top:0}
+.costv .sball .n{font-weight:600;font-size:var(--wb-fs-meta)}
+.costv .sball .m{color:var(--t3);font-size:var(--wb-fs-meta)}
+/* 구독 창 (등록 · 회차 결제 · 구독 하나) */
+.sbsheet .sbsrc{display:flex;gap:8px;align-items:flex-start;margin:0 0 var(--sp-2);padding:10px 12px;border-radius:12px;
+  background:var(--field);font-size:var(--wb-fs-meta);color:var(--t2);overflow-wrap:anywhere}
+.sbsheet .sbsrc .ic{flex:none;margin-top:2px}
+.sbsheet .sbsec{margin:var(--sp-4) 0 var(--sp-2);font-size:var(--wb-fs-body);font-weight:700;color:var(--t1)}
+.sbsheet .sbhelp{margin:0 0 var(--sp-2);font-size:var(--wb-fs-meta)}
+.sbsheet .sbok{display:flex;gap:10px;align-items:center;min-height:var(--tap);padding:8px 12px;border:1px solid var(--fieldline);
+  border-radius:12px;font-size:var(--wb-fs-meta);color:var(--t1);cursor:pointer}
+.sbsheet .sbok input{width:20px;height:20px;flex:none;margin:0}
+.sbsheet .sbok span{flex:1;min-width:0}
+.sbsheet .sbnext{margin:var(--sp-2) 0 0;padding:10px 12px;border-radius:12px;background:var(--soft);color:var(--t1);font-size:var(--wb-fs-meta)}
+.sbsheet .sbnext:empty{display:none}
+.sbsheet .sbmsg{margin-top:8px;color:var(--t1);font-weight:600}
+.sbsheet .sbmsg:empty{display:none}
+.sbsheet .sbhist{list-style:none;margin:0;padding:0;display:grid;gap:2px;font-size:var(--wb-fs-meta)}
+.sbsheet .sbhist li{display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;min-height:32px;padding:4px 0;border-bottom:1px solid var(--line)}
+.sbsheet .sbhist li:last-child{border-bottom:0}
+.sbsheet .sbhist .linkbtn{font-weight:600;text-decoration:underline;text-underline-offset:3px;min-height:24px}
+.sbsheet .sbdl{display:grid;grid-template-columns:84px minmax(0,1fr);gap:6px var(--sp-3);margin:0;font-size:var(--wb-fs-meta)}
+.sbsheet .sbdl dt{color:var(--t3)}
+.sbsheet .sbdl dd{margin:0;min-width:0;overflow-wrap:anywhere}
+.sbsheet .sbdl .linkbtn{text-decoration:underline;text-underline-offset:3px}
+.sbsheet .okt{color:var(--ok)}
+.sbsheet .sbacts{flex-wrap:wrap;justify-content:flex-end}
+.sbsheet .sbform{margin-top:var(--sp-2);padding-top:var(--sp-2);border-top:1px solid var(--line)}
+.sbsheet #sbMode{margin-bottom:var(--sp-3)}
+.sbsheet .chks label:focus-visible{outline:2px solid var(--t1);outline-offset:2px}
+@media (max-width:519px){ .sbsheet .grid3{grid-template-columns:1fr 1fr} }
+@media (max-width:379px){ .sbsheet .grid3{grid-template-columns:1fr} }
 /* 문서 상세의 분류 바꾸기 */
 .catedit{margin:var(--sp-2) 0 var(--sp-3);padding:var(--sp-3);border-radius:var(--wb-radius);background:var(--field)}
 .catedit .catrow{display:flex;align-items:center;gap:var(--sp-2);padding:4px 0}
@@ -4207,6 +4327,7 @@ function saveSnap(){
              docsByTask:d.docsByTask, settle:d.settle, docs:d.docs, docPack:d.docPack,
              docBox:d.docBox,            // 종류별 보기를 볼 수 있는 사람인가 (2026-09-17)
              costItems:d.costItems,      // 마케팅·구독·채용비 재료 (2026-09-22) — docs 와 같은 권한 범위
+             subs:d.subs,                // 구독 관리 (2026-10-01) — 같은 사람에게만 서버가 보낸다
              notices:d.notices, commentsByTask:d.commentsByTask, commentCount:d.commentCount,
              cmtDot:d.cmtDot,     // 안 읽은 댓글 배지 (서버 판정, v44)
              vers:d.vers }        // 분야별 번호표도 같이 (다음 접속 때 캐시 판정에 쓴다)
@@ -9697,7 +9818,7 @@ function paintDocs(r){
      '중복 의심' 표시만 붙입니다 (합계에는 둘 다 들어 있습니다).
    ★ 자료는 이미 받은 것(board_ 의 costItems · docs)입니다. 달을 넘기든 분류를 바꾸든 **서버 왕복 0회**.
      볼 수 있는 사람은 종류별 보기와 같습니다 (서버가 docBox 로 정해 보냅니다). */
-var COSTV={ on:false, ym:'', all:false, cat:'' };
+var COSTV={ on:false, ym:'', all:false, cat:'', tab:'cost' };    // tab — 'cost' 비용 내역 · 'sub' 구독 관리 (2026-10-01)
 var COST_FORM_CODES={ EXP:true, PUR:true };
 /* 서버가 기준정보(meta.costCats · costView)로 보내 줍니다. 못 받으면 이 값으로 버팁니다 (옛 서버) */
 var COST_CATS_FALLBACK=['광고·홍보','AI·소프트웨어','채용광고','일반비용'];
@@ -9772,6 +9893,11 @@ function costDupMark(rows){
 function paintCost(){
   var box=$('docLists'); if(!box) return;
   if(!COSTV.ym) COSTV.ym=monthNow();
+  /* ★ [구독 관리] 탭 — 서버가 구독 자료(subs)를 보낸 사람에게만 (대표·전무·관리자) */
+  if(COSTV.tab==='sub'){
+    if(subData()){ paintSubs(box); return; }
+    COSTV.tab='cost';
+  }
   var VIEW=costView();
   var 기간=costRowsAll().filter(costInPeriod);
   var 고른=COSTV.cat ? [COSTV.cat] : VIEW;
@@ -9798,9 +9924,8 @@ function paintCost(){
   var 중복=costDupMark(목록);
   var 미분류=기간.filter(function(x){ return !x.it.cat; });
 
-  var h='<div class="costv">';
-  h+='<div class="cvhead"><h4 class="cvt">마케팅·구독·채용비</h4>'+
-     '<div class="cvper">'+
+  var h='<div class="costv">'+costHead('cost');
+  h+='<div class="cvbar"><div class="cvper">'+
        '<button class="btn sm" onclick="costMove(-1)" aria-label="이전 달">'+ic('chev-l')+'</button>'+
        '<span class="ym">'+(COSTV.all? '전체 기간' : esc(COSTV.ym))+'</span>'+
        '<button class="btn sm" onclick="costMove(1)" aria-label="다음 달">'+ic('chev')+'</button>'+
@@ -9829,15 +9954,20 @@ function paintCost(){
   if(!목록.length){
     h+='<p class="none cvnone">해당 기간에 등록된 비용이 없습니다</p>';
   } else {
+    /* ★ 구독 등록은 표의 새 열이 아니라 **줄 끝의 행동 하나**입니다 (2026-10-01 · 18 지시).
+       줄(.cvrow)은 그대로 결재 문서를 열고, 그 옆 칸(.cvact)에 [구독 등록] · [구독 보기] 만 둡니다 */
+    var 구독칸=!!subData();
     h+='<div class="cvlist">'+
-       '<div class="cvrow cvhdr" aria-hidden="true"><span class="n">항목</span>'+
+       '<div class="cvline cvhl"><div class="cvrow cvhdr" aria-hidden="true"><span class="n">항목</span>'+
        '<span class="meta"><span class="c">분류</span><span class="d">기준일</span><span class="w">신청자</span></span>'+
-       '<span class="s">상태</span><span class="a">금액</span></div>';
+       '<span class="s">상태</span><span class="a">금액</span></div>'+(구독칸? '<span class="cvact" aria-hidden="true"></span>' : '')+'</div>';
     목록.forEach(function(x, i){
       var 이름=x.name;
       var 문서=(x.d.title && x.d.title!==이름)? x.d.title : '';
-      h+='<button class="cvrow" onclick="openDoc(\''+esc(x.d.no)+'\')">'+
+      var 연결=구독칸? subLinkOf(x.d.no, x.it.seq) : null;
+      h+='<div class="cvline"><button class="cvrow" onclick="openDoc(\''+esc(x.d.no)+'\')">'+
          '<span class="n"><b>'+esc(이름)+'</b>'+
+           (연결? ' <span class="tag ok">구독</span>' : '')+
            (중복.표[i]? ' <span class="tag wn">중복 의심</span>' : '')+
            (문서? '<em>'+esc(문서)+'</em>' : '')+'</span>'+
          '<span class="meta"><span class="c">'+esc(x.it.cat)+'</span>'+
@@ -9845,7 +9975,7 @@ function paintCost(){
            '<span class="w">'+esc(x.d.who||'')+'</span></span>'+
          '<span class="s">'+docBadge(x.st)+'</span>'+
          '<span class="a">'+(x.it.amt==null? '<i>금액 없음</i>' : won(x.it.amt)+'원')+'</span>'+
-         '</button>';
+         '</button>'+(구독칸? costSubAct(x, 연결) : '')+'</div>';
     });
     h+='</div>';
   }
@@ -9936,6 +10066,671 @@ function saveCostCat(no){
     var 상세=S.docCache[no] || (S.data && S.data.docPack && S.data.docPack[no]);
     if(그창 && 상세) $('ddBody').innerHTML=docDetailBody(상세);
     if(S.view==='doc') renderDocs();
+  });
+}
+
+/* ===================== 정기 구독 결제 관리 (2026-10-01 · 18 지시) =====================
+   「마케팅·구독·채용비」 안에 [비용 내역] / [구독 관리] 두 탭. 메인 메뉴는 늘리지 않습니다.
+
+   ★★ 결재 승인 ≠ 실제 결제. 결재 자료에는 돈이 실제로 나갔는지가 없습니다.
+     그래서 비용 내역의 품목에서 [구독 등록] 을 누른 사람이 **실제 결제일 · 금액 · 통화를 직접 넣고 확인 표시**를 해야
+     구독이 됩니다. 승인일 · 사용일 · 기안일을 결제일로 채워 넣지 않습니다.
+   ★★ '예정' 과 '결제 완료' 는 따로입니다. 날짜가 지나도 저절로 완료하지 않고 '결제 확인 필요' 로 둡니다.
+   ★ 금액은 통화마다 따로 셉니다(환율로 합치지 않는다). 연 구독은 결제하는 달에만 나옵니다.
+   ★ 결제일 계산(subDue)은 서버 subDue_ 와 **같은 규칙**입니다 — 구독시험 ③ 이 둘을 견줍니다.
+   ★ 저장은 서버가 확인한 뒤에 반영합니다(낙관 처리 안 함 — 돈 기록). 실패하면 창과 입력을 그대로 두고 다시 누르게 합니다.
+     같은 창에서 다시 누르면 같은 요청 번호(reqId)라 서버가 한 번만 남깁니다. */
+var SUBV={ ym:'', hi:'' };
+var SUB_CUR_NAME={ KRW:'원 (KRW)', USD:'달러 (USD)', EUR:'유로 (EUR)', JPY:'엔 (JPY)', CNY:'위안 (CNY)', GBP:'파운드 (GBP)' };
+var SUB_CUR_SIGN={ USD:'US$', EUR:'€', JPY:'¥', CNY:'CN¥', GBP:'£' };
+
+/** 서버가 보낸 구독 자료 — 모양이 어긋난 줄(빈 줄 · 조건 없음)은 걸러서 화면이 멈추지 않게 */
+function subData(){
+  var d=S.data && S.data.subs;
+  if(!d || !Array.isArray(d.list)) return null;
+  if(!d.__ok){
+    d.list=d.list.filter(function(s){ return s && typeof s==='object' && s.id; });
+    d.list.forEach(function(s){
+      s.id=String(s.id); s.name=String(s.name==null? '' : s.name);
+      if(!Array.isArray(s.terms)) s.terms=[];
+      if(!s.pays || typeof s.pays!=='object') s.pays={};
+      for(var k in s.pays){ if(!Array.isArray(s.pays[k])) delete s.pays[k]; }
+    });
+    d.__ok=true;
+  }
+  return d;
+}
+function subFind(id){ var d=subData(); return d ? d.list.filter(function(s){ return s.id===id; })[0] || null : null; }
+function subCurs(){ var d=subData(); return (d && d.curs && d.curs.length) ? d.curs : ['KRW','USD','EUR','JPY','CNY','GBP']; }
+function escA(s){ return esc(s).replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
+function subReqId(){ return 'R'+Date.now().toString(36)+Math.random().toString(36).slice(2,8); }
+
+function costHead(tab){
+  var 확인=subData()? subOverdue().length : 0;
+  return '<div class="cvhead"><h4 class="cvt">마케팅·구독·채용비</h4></div>'+
+    (subData()
+      ? '<div class="cvtabs" role="tablist" aria-label="마케팅·구독·채용비 보기">'+
+          '<button role="tab" aria-selected="'+(tab==='cost')+'" onclick="costTab(\'cost\')">비용 내역</button>'+
+          '<button role="tab" aria-selected="'+(tab==='sub')+'" onclick="costTab(\'sub\')">구독 관리'+
+            (확인? ' <span class="cnt" title="결제 확인이 필요한 회차">확인 '+확인+'</span>' : '')+'</button>'+
+        '</div>'
+      : '');
+}
+function costTab(t){
+  COSTV.tab=(t==='sub' && subData())? 'sub' : 'cost';
+  if(COSTV.tab==='sub' && !SUBV.ym) SUBV.ym=monthNow();
+  paintCost();
+}
+function subMove(n){ SUBV.ym = n? ymShift(SUBV.ym||monthNow(), n) : monthNow(); SUBV.hi=''; paintCost(); }
+function subGo(ym, id){ SUBV.ym=ym; SUBV.hi=id||''; COSTV.tab='sub'; paintCost(); }
+
+/* ── 결제일 계산 — 서버 subDue_ 와 같은 규칙 ── */
+function subLastDay(ym){
+  return new Date(Date.UTC(Number(ym.substring(0,4)), Number(ym.substring(5,7)), 0)).getUTCDate();
+}
+function subTermAt(terms, ym){
+  var best=null;
+  (terms||[]).forEach(function(t){ if(t.from && t.from<=ym && (!best || t.from>=best.from)) best=t; });
+  return best;
+}
+function subDue(sub, terms, ym){
+  if(!sub || !ym || !sub.start || ym<sub.start) return '';
+  if(sub.state==='중단' && (!sub.stop || ym>sub.stop)) return '';
+  var t=subTermAt(terms, ym);
+  if(!t) return '';
+  if(t.cycle==='년' && Number(t.month)!==Number(ym.substring(5,7))) return '';
+  var d=Math.min(Number(t.day)||1, subLastDay(ym));
+  return ym+'-'+(d<10? '0'+d : String(d));
+}
+/** 그 회차의 지금 기록 (마지막 줄) · 완료인가 */
+function subLast(s, ym){ var r=(s.pays && s.pays[ym]) || []; return r.length? r[r.length-1] : null; }
+function subPaidRec(rec){ return !!(rec && (rec.act==='완료' || rec.act==='정정')); }
+
+/** 결제가 끝나지 않은 지난 예정 — 날짜가 지났는데 아무도 완료로 체크하지 않은 회차 (최근 24개월) */
+function subOverdue(){
+  var d=subData(); if(!d) return [];
+  var 오늘=todayStr(), 이번=monthNow(), out=[];
+  d.list.forEach(function(s){
+    for(var k=-23;k<=0;k++){
+      var ym=ymShift(이번,k), due=subDue(s, s.terms, ym);
+      if(due && due<오늘 && !subPaidRec(subLast(s, ym))) out.push({ s:s, ym:ym, due:due });
+    }
+  });
+  return out;
+}
+
+/** 원본 품목이 이미 구독에 이어져 있나 */
+function subLinkOf(no, seq){
+  var d=subData(); if(!d) return null;
+  for(var i=0;i<d.list.length;i++){
+    var s=d.list[i];
+    if(s.srcNo===no && Number(s.srcSeq)===Number(seq)) return s;
+    for(var ym in s.pays){
+      if(s.pays[ym].some(function(r){ return r.srcNo===no && Number(r.srcSeq)===Number(seq); })) return s;
+    }
+  }
+  return null;
+}
+
+/** 비용 내역 줄 끝 — 이어진 품목은 [구독 보기], 실제 결제를 확인할 수 있는 품목은 [구독 등록] */
+function costSubAct(x, 연결){
+  if(연결) return '<span class="cvact"><button class="btn sm ghost" onclick="subDetail(\''+escA(연결.id)+'\')" '+
+    'aria-label="'+escA(x.name)+' — 연결된 구독 보기">구독 보기'+ic('chev')+'</button></span>';
+  var 된다 = !x.it.noItem && x.it.amt!=null && x.it.amt>0 && (x.st==='승인완료' || x.st==='진행중');
+  if(!된다) return '<span class="cvact"></span>';
+  return '<span class="cvact"><button class="btn sm ghost" onclick="subRegOpen(\''+escA(x.d.no)+'\','+Number(x.it.seq||0)+')" '+
+    'aria-label="'+escA(x.name)+' — 실제 결제 확인 후 구독으로 등록">'+ic('plus')+'구독 등록</button></span>';
+}
+
+/* ── 돈 ── */
+function subMoney(amt, cur){
+  if(amt==null || amt==='') return '금액 없음';
+  cur=cur||'KRW';
+  if(cur==='KRW') return won(amt)+'원';
+  var n = cur==='JPY' ? Number(amt).toLocaleString('ko-KR')
+                      : Number(amt).toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 });
+  return (SUB_CUR_SIGN[cur]||cur)+' '+n;
+}
+function subAdd(sum, cur, amt){ if(amt==null) return; cur=cur||'KRW'; sum[cur]=Math.round(((sum[cur]||0)+Number(amt))*100)/100; }
+/** 통화마다 따로 — 원화를 앞에 */
+function subSums(sum){
+  var k=Object.keys(sum).sort(function(a,b){ return a==='KRW'? -1 : (b==='KRW'? 1 : (a<b? -1 : 1)); });
+  if(!k.length) return '0원';
+  return k.map(function(c){ return subMoney(sum[c], c); }).join(' · ');
+}
+function subCycleText(t){
+  if(!t) return '';
+  var d=Number(t.day);
+  return t.cycle==='년' ? ('매년 '+Number(t.month)+'월 '+d+'일') : ('매월 '+(d===31? '말일' : d+'일'));
+}
+function subYmText(ym){ return Number(ym.substring(0,4))+'년 '+Number(ym.substring(5,7))+'월'; }
+function subDayText(day){
+  if(!day) return '';
+  return Number(day.substring(5,7))+'월 '+Number(day.substring(8,10))+'일 ('+'일월화수목금토'.charAt(new Date(day+'T00:00:00').getDay())+')';
+}
+
+/* 금액 칸 — 원 · 엔은 정수(쉼표), 그 밖은 소수 둘째 자리까지 */
+function subAmtInput(el){
+  var c=$(el.getAttribute('data-cur')); var cur=c? c.value : 'KRW';
+  if(cur==='KRW' || cur==='JPY'){
+    var raw=String(el.value).replace(/[^0-9]/g,'');
+    el.value = raw? Number(raw).toLocaleString('ko-KR') : '';
+  } else {
+    var t=String(el.value).replace(/[^0-9.]/g,''), i=t.indexOf('.');
+    if(i>=0) t=t.slice(0,i+1)+t.slice(i+1).replace(/\./g,'').slice(0,2);
+    el.value=t;
+  }
+}
+function subAmtVal(id){
+  var el=$(id); if(!el) return null;
+  var t=String(el.value).replace(/,/g,'').trim(), n=Number(t);
+  return t && isFinite(n) ? n : null;
+}
+function subCurSel(id, cur, amtId){
+  return '<select id="'+id+'" onchange="subAmtInput($(\''+amtId+'\'))">'+subCurs().map(function(c){
+    return '<option value="'+c+'"'+(c===(cur||'KRW')?' selected':'')+'>'+esc(SUB_CUR_NAME[c]||c)+'</option>';
+  }).join('')+'</select>';
+}
+function subAmtText(amt, cur){
+  if(amt==null) return '';
+  return (cur==='KRW' || cur==='JPY') ? Number(amt).toLocaleString('ko-KR') : String(amt);
+}
+/* 고르기 칩 — 키보드로도 (Tab 으로 가서 엔터 · 스페이스, 화살표로 옆 칸) · 화면 읽기에는 라디오 (검수 1차) */
+function subOpt(v, text, on, after){
+  return '<label data-v="'+escA(v)+'" class="'+(on?'on':'')+'" role="radio" aria-checked="'+(on?'true':'false')+'" tabindex="0" '+
+    'onclick="subPick(this);'+after+'" onkeydown="subPickKey(event,this)">'+esc(text)+'</label>';
+}
+function subPick(el){
+  pickOne(el);
+  [].forEach.call(el.parentNode.children, function(c){ c.setAttribute('aria-checked', c===el ? 'true' : 'false'); });
+}
+function subPickKey(e, el){
+  var k=e.key;
+  if(k==='Enter' || k===' ' || k==='Spacebar'){ e.preventDefault(); el.click(); return; }
+  if(k==='ArrowRight' || k==='ArrowDown' || k==='ArrowLeft' || k==='ArrowUp'){
+    e.preventDefault();
+    var 칸=[].slice.call(el.parentNode.children), i=칸.indexOf(el);
+    var 옆=칸[(i + ((k==='ArrowRight' || k==='ArrowDown') ? 1 : -1) + 칸.length) % 칸.length];
+    옆.focus(); 옆.click();
+  }
+}
+function subDaySel(id, day){
+  var h='<select id="'+id+'">';
+  for(var d=1; d<=31; d++) h+='<option value="'+d+'"'+(d===Number(day)?' selected':'')+'>'+(d===31? '31일 (말일)' : d+'일')+'</option>';
+  return h+'</select>';
+}
+function subMonSel(id, m){
+  var h='<select id="'+id+'">';
+  for(var k=1; k<=12; k++) h+='<option value="'+k+'"'+(k===Number(m)?' selected':'')+'>'+k+'월</option>';
+  return h+'</select>';
+}
+
+/* ── 구독 관리 탭 ── */
+function subRowsFor(ym){
+  var d=subData(); if(!d) return [];
+  var 오늘=todayStr(), out=[];
+  d.list.forEach(function(s){
+    var due=subDue(s, s.terms, ym), last=subLast(s, ym), paid=subPaidRec(last);
+    if(!due && !paid) return;
+    var t=subTermAt(s.terms, ym) || s.terms[s.terms.length-1] || {};
+    var st = paid ? 'done' : (due<오늘 ? 'check' : (due===오늘 ? 'today' : 'plan'));
+    out.push({ s:s, ym:ym, due:due, last:last, paid:paid, t:t, st:st, key: due || (last && last.date) || ym+'-01' });
+  });
+  out.sort(function(a,b){ return a.key<b.key? -1 : (a.key>b.key? 1 : (a.s.name<b.s.name? -1 : 1)); });
+  return out;
+}
+
+function paintSubs(box){
+  var d=subData();
+  if(!SUBV.ym) SUBV.ym=monthNow();
+  var ym=SUBV.ym, 이번=monthNow();
+  var h='<div class="costv">'+costHead('sub');
+  h+='<div class="cvbar"><div class="cvper">'+
+       '<button class="btn sm" onclick="subMove(-1)" aria-label="이전 달">'+ic('chev-l')+'</button>'+
+       '<span class="ym">'+esc(subYmText(ym))+'</span>'+
+       '<button class="btn sm" onclick="subMove(1)" aria-label="다음 달">'+ic('chev')+'</button>'+
+       (ym!==이번? '<button class="chip" onclick="subMove(0)">이번 달로</button>' : '')+
+     '</div></div>';
+
+  if(!d.list.length){
+    h+='<div class="sbempty">'+ic('cal')+
+         '<b>등록된 구독이 없습니다</b>'+
+         '<p>비용 내역에서 <b>실제로 결제된 품목</b>의 <b>[구독 등록]</b> 을 누르면, 다음 결제일부터 여기서 챙깁니다.</p>'+
+         '<button class="btn pri" onclick="costTab(\'cost\')">비용 내역에서 등록하기</button>'+
+       '</div>';
+    box.innerHTML=h+'</div>';
+    return;
+  }
+
+  var rows=subRowsFor(ym);
+  var 예정={}, 완료={}, n예정=0, n완료=0, n확인=0;
+  rows.forEach(function(r){
+    if(r.paid){ n완료++; subAdd(완료, r.last.cur || r.t.cur, r.last.amt); }
+    else { n예정++; if(r.st==='check') n확인++; subAdd(예정, r.t.cur, r.t.amt); }
+  });
+
+  /* 다른 달에 밀린 확인 — 날짜가 지났는데 체크되지 않은 회차 */
+  var 밀린=subOverdue().filter(function(x){ return x.ym!==ym; });
+  if(밀린.length){
+    h+='<div class="sbwarn" role="note">'+ic('alert')+'<span>다른 달에 결제 확인이 필요한 회차 '+밀린.length+'건</span>'+
+       밀린.slice(0,4).map(function(x){
+         return '<button class="chip" onclick="subGo(\''+x.ym+'\',\''+escA(x.s.id)+'\')">'+
+                esc(Number(x.ym.substring(5,7))+'월 · '+x.s.name)+'</button>';
+       }).join('')+'</div>';
+  }
+
+  var 달이름 = ym===이번 ? '이번 달' : Number(ym.substring(5,7))+'월';
+  h+='<div class="sbsum">'+
+     '<div class="sbtile"><span class="k">'+달이름+' 예정 '+n예정+'건</span><span class="v">'+esc(subSums(예정))+'</span></div>'+
+     '<div class="sbtile ok"><span class="k">결제 완료 '+n완료+'건</span><span class="v">'+esc(subSums(완료))+'</span></div>'+
+     '<div class="sbtile'+(n확인?' warn':'')+'"><span class="k">'+달이름+' 확인 필요</span><span class="v">'+n확인+'건</span></div>'+
+     '</div>';
+
+  if(!rows.length){
+    h+='<p class="none cvnone">'+esc(subYmText(ym))+'에 결제할 구독이 없습니다</p>';
+  } else {
+    h+='<div class="sblist">'+rows.map(subRowHtml).join('')+'</div>';
+  }
+
+  h+=foldBox('sub:all', '구독 전체 <span class="n">'+d.list.length+'</span>', subAllHtml());
+  h+='<p class="note cvbasis">결제 완료는 사람이 실제 결제를 확인해 체크한 회차만입니다 — 날짜가 지나도 저절로 완료되지 않습니다 · '+
+     '금액은 통화마다 따로 셉니다 · 비용 내역의 승인 금액 합계와는 따로입니다</p>';
+  box.innerHTML=h+'</div>';
+  if(SUBV.hi){
+    var 줄=box.querySelector('.sbrow.hi');
+    if(줄 && 줄.scrollIntoView) 줄.scrollIntoView({ block:'nearest' });
+  }
+}
+
+function subRowHtml(r){
+  var s=r.s, 날=r.paid ? (r.last.date || r.due) : r.due;
+  var 금액=r.paid ? subMoney(r.last.amt, r.last.cur) : subMoney(r.t.amt, r.t.cur);
+  var 표=r.paid ? '<span class="tag ok">결제 완료</span>'
+         : (r.st==='check' ? '<span class="tag wn">결제 확인 필요</span>'
+         : (r.st==='today' ? '<span class="tag wn">오늘 결제</span>' : '<span class="tag gy">예정</span>'));
+  var 보조=r.paid
+    ? ('실제 '+shortDate(r.last.date)+' 결제 · '+(r.last.by||'')+' 확인'+(r.last.act==='정정'? ' · 정정됨' : ''))
+    : (r.st==='check' ? '예정일 '+shortDate(r.due)+' 지남' : '예정 금액');
+  var 단추=r.paid
+    ? '<button class="btn sm" onclick="subPayOpen(\''+escA(s.id)+'\',\''+r.ym+'\')" aria-label="'+escA(s.name)+' '+r.ym+' 결제 기록 · 정정">기록 · 정정</button>'
+    : '<button class="btn sm'+(r.st==='plan'?'':' pri')+'" onclick="subPayOpen(\''+escA(s.id)+'\',\''+r.ym+'\')" '+
+      'aria-label="'+escA(s.name)+' '+r.ym+' 결제 완료 체크">결제 완료 체크</button>';
+  return '<div class="sbrow'+(SUBV.hi===s.id?' hi':'')+'" data-st="'+r.st+'">'+
+    '<span class="sbd"><b>'+(날? Number(날.substring(5,7))+'/'+Number(날.substring(8,10)) : '')+'</b>'+
+      '<small>'+(날? '일월화수목금토'.charAt(new Date(날+'T00:00:00').getDay()) : '')+'</small></span>'+
+    '<span class="sbn"><button class="linkbtn" onclick="subDetail(\''+escA(s.id)+'\')">'+esc(s.name)+'</button>'+
+      '<small>'+esc([subCycleText(r.t), s.cat, s.method].filter(Boolean).join(' · '))+'</small></span>'+
+    '<span class="sba"><b>'+esc(금액)+'</b><small>'+esc(보조)+'</small></span>'+
+    '<span class="sbs">'+표+'</span>'+
+    '<span class="sbb">'+단추+'</span>'+
+  '</div>';
+}
+
+function subAllHtml(){
+  var d=subData(), 이번=monthNow();
+  var 줄=d.list.slice().sort(function(a,b){
+    if(a.state!==b.state) return a.state==='사용'? -1 : 1;
+    return a.name<b.name? -1 : 1;
+  }).map(function(s){
+    var t=subTermAt(s.terms, 이번) || s.terms[s.terms.length-1] || null;
+    return '<button class="sball" onclick="subDetail(\''+escA(s.id)+'\')">'+
+      '<span class="n">'+esc(s.name)+(s.state==='중단'? ' <span class="tag gy">중단 · '+esc(s.stop)+'까지</span>' : '')+'</span>'+
+      '<span class="m">'+esc([subCycleText(t), t? subMoney(t.amt, t.cur) : '', s.cat].filter(Boolean).join(' · '))+'</span>'+
+    '</button>';
+  }).join('');
+  return 줄 || '<p class="none">구독이 없습니다</p>';
+}
+
+/** 저장이 끝나면 — 서버가 돌려준 구독 자료로 바꾸고 화면을 다시 그린다 (다시 받지 않는다) */
+function subApply(r){
+  if(r && r.subs && S.data){ S.data.subs=r.subs; saveSnap(); }
+  if(S.view==='doc' && COSTV.on) paintCost();
+}
+/** 저장 실패 — 창과 입력은 그대로, 다시 누를 수 있게 */
+function subFail(btn, msgId, r){
+  if(btn) btn.disabled=false;
+  var m=$(msgId);
+  var 글=(r && r.msg) || '저장하지 못했습니다.';
+  if(m) m.textContent=글+(r && r.net ? ' — 입력은 그대로 있으니 다시 눌러 주세요.' : '');
+}
+
+/* ── 등록 (비용 내역의 품목에서) ── */
+var SUBREG=null;
+function subRegOpen(no, seq){
+  var x=costRowsAll().filter(function(r){ return r.d.no===no && Number(r.it.seq||0)===Number(seq); })[0];
+  if(!x){ toast('품목을 찾지 못했습니다. 새로 고친 뒤 다시 눌러 주세요.'); return; }
+  var d=subData();
+  var 쓰는=(d? d.list : []).filter(function(s){ return s.state==='사용'; });
+  SUBREG={ no:no, seq:Number(seq), req:subReqId(), dayTouched:false, link:false, x:x };
+  var 금액=x.it.amt;
+  $('modal').innerHTML='<div class="veil"><div class="sheet sbsheet" role="dialog" aria-modal="true" aria-labelledby="sbRegT">'+
+    '<div class="sheethead"><h3 class="tt" id="sbRegT">구독으로 등록</h3></div>'+
+    '<p class="sbsrc">'+ic('doc')+'<span><b>'+esc(x.name)+'</b> · '+esc(x.d.formName||'')+' '+esc(x.d.no)+
+      ' · '+esc(x.st)+' · 승인 금액 '+esc(won(금액))+'원</span></p>'+
+
+    '<h4 class="sbsec">1. 실제 결제 확인</h4>'+
+    '<p class="muted sbhelp">결재 승인과 실제 결제는 다릅니다. 카드 명세서 · 영수증에서 <b>실제로 결제된 날과 금액</b>을 확인해 넣어 주세요.</p>'+
+    '<div class="grid3">'+
+      '<div class="field"><label class="fl req" for="sbPDate">실제 결제일</label>'+
+        '<input type="date" id="sbPDate" max="'+todayStr()+'" oninput="subRegSync()"></div>'+
+      '<div class="field"><label class="fl req" for="sbPAmt">결제 금액</label>'+
+        '<input type="text" id="sbPAmt" inputmode="decimal" data-cur="sbPCur" value="'+escA(subAmtText(금액,'KRW'))+'" oninput="subAmtInput(this);subRegSync()"></div>'+
+      '<div class="field"><label class="fl req" for="sbPCur">통화</label>'+subCurSel('sbPCur','KRW','sbPAmt')+'</div>'+
+    '</div>'+
+    '<p class="muted sbhelp">금액은 승인 금액을 미리 넣어 두었습니다 — 실제 결제 금액 · 통화와 다르면 고쳐 주세요.</p>'+
+    '<label class="sbok"><input type="checkbox" id="sbOk"><span>위 날짜 · 금액으로 <b>실제 결제된 것을 확인</b>했습니다</span></label>'+
+
+    '<h4 class="sbsec">2. 정기 구독</h4>'+
+    (쓰는.length
+      ? '<div class="chks" id="sbMode" role="radiogroup" aria-label="새 구독 또는 기존 구독">'+
+          subOpt('new', '새 구독으로', true, 'subRegMode(false)')+
+          subOpt('link', '기존 구독의 이번 회차로 연결', false, 'subRegMode(true)')+'</div>'+
+        '<div class="field hide" id="sbLinkBox"><label class="fl" for="sbLink">이어 붙일 구독</label>'+
+          '<select id="sbLink" onchange="subRegSync()">'+쓰는.map(function(s){
+            var t=s.terms[s.terms.length-1];
+            return '<option value="'+escA(s.id)+'">'+esc(s.name+' · '+subCycleText(t)+' · '+(t? subMoney(t.amt,t.cur) : ''))+'</option>';
+          }).join('')+'</select></div>'
+      : '')+
+    '<div id="sbNewBox">'+
+      '<div class="field"><label class="fl req" for="sbName">서비스명</label>'+
+        '<input type="text" id="sbName" maxlength="60" value="'+escA(x.name)+'"></div>'+
+      '<div class="grid3">'+
+        '<div class="field"><label class="fl req" id="sbCycleL">주기</label><div class="chks" id="sbCycle" role="radiogroup" aria-labelledby="sbCycleL">'+
+          subOpt('월', '매월', true, 'subRegSync()')+subOpt('년', '매년', false, 'subRegSync()')+'</div></div>'+
+        '<div class="field hide" id="sbMonBox"><label class="fl" for="sbMon">결제하는 달</label>'+subMonSel('sbMon', 1)+'</div>'+
+        '<div class="field"><label class="fl req" for="sbDay">결제일</label>'+subDaySel('sbDay', 1)+'</div>'+
+      '</div>'+
+      '<div class="grid2">'+
+        '<div class="field"><label class="fl req" for="sbAmt">정기 금액</label>'+
+          '<input type="text" id="sbAmt" inputmode="decimal" data-cur="sbCur" value="'+escA(subAmtText(금액,'KRW'))+'" oninput="subAmtInput(this);subRegSync()"></div>'+
+        '<div class="field"><label class="fl req" for="sbCur">통화</label>'+subCurSel('sbCur','KRW','sbAmt')+'</div>'+
+      '</div>'+
+    '</div>'+
+    '<p class="sbnext" id="sbNext" aria-live="polite"></p>'+
+    '<div class="actions"><button class="btn" onclick="closeModal()">취소</button>'+
+      '<button class="btn pri" id="sbRegSave" onclick="subRegSave()">구독 등록</button></div>'+
+    '<p class="muted sbmsg" id="sbRegMsg" role="alert"></p></div></div>';
+  $('sbDay').onchange=function(){ SUBREG.dayTouched=true; subRegSync(); };
+  setTimeout(function(){ var f=$('sbPDate'); if(f) f.focus(); }, 30);
+  $('sbMon').onchange=function(){ SUBREG.dayTouched=true; subRegSync(); };
+  subRegSync();
+}
+function subRegMode(link){
+  SUBREG.link=!!link;
+  $('sbLinkBox').classList.toggle('hide', !link);
+  $('sbNewBox').classList.toggle('hide', !!link);
+  subRegSync();
+}
+/** 결제일을 넣으면 매월/매년 결제일의 처음 값을 그 날로 · 다음 결제일을 계산해 보여 준다 */
+function subRegSync(){
+  if(!SUBREG || !$('sbNext')) return;
+  var pd=$('sbPDate').value, 글='';
+  var 주기=pickedVal('sbCycle')||'월';
+  $('sbMonBox').classList.toggle('hide', 주기!=='년');
+  if(pd && !SUBREG.dayTouched){
+    $('sbDay').value=String(Number(pd.substring(8,10)));
+    $('sbMon').value=String(Number(pd.substring(5,7)));
+  }
+  if(!pd){ $('sbNext').textContent='실제 결제일을 넣으면 다음 결제일을 계산해 보여 드립니다.'; return; }
+  var ym=pd.substring(0,7);
+  if(SUBREG.link){
+    var s=subFind($('sbLink').value);
+    if(s){
+      var due=subDue(s, s.terms, ym), 지금=subLast(s, ym);
+      글 = !due ? '그 구독은 '+subYmText(ym)+'에 결제 예정이 없습니다 — 결제일 · 주기를 확인해 주세요.'
+         : subPaidRec(지금) ? subYmText(ym)+' 회차는 이미 결제 완료로 체크되어 있습니다.'
+         : subYmText(ym)+' 회차(예정 '+subDayText(due)+')를 이 결제로 완료 처리합니다.';
+    }
+  } else {
+    var t={ cycle:주기, day:Number($('sbDay').value), month:Number($('sbMon').value) };
+    var sub={ start:ym, state:'사용', stop:'' }, terms=[{ from:ym, cycle:t.cycle, month:t.month, day:t.day }], next='';
+    for(var k=1;k<=24 && !next;k++) next=subDue(sub, terms, ymShift(ym,k));
+    글=subYmText(ym)+' 결제는 완료로 남고, 다음 결제일은 '+(next? subDayText(next)+(next.substring(0,4)!==ym.substring(0,4)? ' · '+next.substring(0,4)+'년':'') : '없음')+' 입니다.';
+  }
+  $('sbNext').textContent=글;
+}
+function subRegSave(){
+  var btn=$('sbRegSave'); if(!btn || btn.disabled || !SUBREG) return;
+  var msg=$('sbRegMsg'); msg.textContent='';
+  var pd=$('sbPDate').value, pa=subAmtVal('sbPAmt'), pc=$('sbPCur').value;
+  if(!pd){ msg.textContent='실제 결제일을 넣어 주세요.'; $('sbPDate').focus(); return; }
+  if(pd>todayStr()){ msg.textContent='결제일이 오늘보다 뒤입니다. 실제로 결제된 날을 넣어 주세요.'; return; }
+  if(!(pa>0)){ msg.textContent='실제 결제 금액을 넣어 주세요.'; $('sbPAmt').focus(); return; }
+  if(!$('sbOk').checked){ msg.textContent='실제 결제를 확인했다는 표시를 눌러 주세요.'; $('sbOk').focus(); return; }
+  var send={ reqId:SUBREG.req, no:SUBREG.no, seq:SUBREG.seq, confirm:true, paid:{ date:pd, amount:pa, cur:pc } };
+  if(SUBREG.link){
+    send.link=$('sbLink').value;
+  } else {
+    var name=$('sbName').value.trim(), amt=subAmtVal('sbAmt');
+    if(!name){ msg.textContent='서비스명을 넣어 주세요.'; $('sbName').focus(); return; }
+    if(!(amt>0)){ msg.textContent='정기 금액을 넣어 주세요.'; $('sbAmt').focus(); return; }
+    send.name=name;
+    send.term={ cycle:pickedVal('sbCycle')||'월', day:Number($('sbDay').value), month:Number($('sbMon').value), amount:amt, cur:$('sbCur').value };
+  }
+  btn.disabled=true; msg.textContent='저장하는 중입니다…';
+  var 창=$('modal').firstElementChild;
+  call('api_subRegister', S.token, send).then(function(r){
+    var 그창=($('modal').firstElementChild===창);
+    if(!r || !r.ok){
+      if(그창) subFail(btn, 'sbRegMsg', r); else toast('구독을 등록하지 못했습니다: '+((r&&r.msg)||''));
+      return;
+    }
+    if(그창) closeOk();
+    S.data.subs=r.subs; saveSnap();
+    var s=subFind(r.id), 다음='';
+    if(s){ for(var k=1;k<=24 && !다음;k++) 다음=subDue(s, s.terms, ymShift(pd.substring(0,7),k)); }
+    toast(다음? '구독으로 등록했습니다 — 다음 결제 '+subDayText(다음) : '구독으로 등록했습니다', 'ok');
+    if(S.view==='doc' && COSTV.on){ SUBV.hi=r.id; SUBV.ym=다음? 다음.substring(0,7) : monthNow(); COSTV.tab='sub'; paintCost(); }
+  });
+}
+
+/* ── 회차 결제 체크 · 정정 · 해제 ── */
+var SUBPAY=null;
+function subPayOpen(id, ym){
+  var s=subFind(id); if(!s) return;
+  var due=subDue(s, s.terms, ym), t=subTermAt(s.terms, ym) || s.terms[s.terms.length-1] || {};
+  var recs=(s.pays && s.pays[ym]) || [], last=recs.length? recs[recs.length-1] : null, paid=subPaidRec(last);
+  SUBPAY={ id:id, ym:ym, req:subReqId(), mode: paid? 'view' : '완료' };
+  var 오늘=todayStr();
+  var 기본날=paid? last.date : (due && due<=오늘 ? due : 오늘);
+  var 기본금=paid? last.amt : t.amt, 기본통=paid? (last.cur||t.cur) : t.cur;
+  var 기록=recs.length
+    ? '<ol class="sbhist">'+recs.map(function(r){
+        return '<li><b>'+esc(r.act==='해제'? '완료 취소' : r.act)+'</b> '+
+          esc([r.date? shortDate(r.date)+' 결제' : '', r.amt!=null? subMoney(r.amt, r.cur) : '', r.memo].filter(Boolean).join(' · '))+
+          ' <span class="muted">'+esc([r.by, r.at].filter(Boolean).join(' · '))+'</span>'+
+          (r.srcNo? ' <span class="tag gy">원본 '+esc(r.srcNo)+'</span>' : '')+'</li>';
+      }).join('')+'</ol>'
+    : '';
+  $('modal').innerHTML='<div class="veil"><div class="sheet sbsheet" role="dialog" aria-modal="true" aria-labelledby="sbPayT">'+
+    '<div class="sheethead"><h3 class="tt" id="sbPayT">'+esc(s.name)+' · '+esc(subYmText(ym))+'</h3></div>'+
+    '<p class="sbsrc">'+ic('cal')+'<span>'+(due? '예정 '+esc(subDayText(due))+' · '+esc(subMoney(t.amt, t.cur)) : '이 달은 예정이 없는 회차')+
+      (paid? ' · <b class="okt">결제 완료</b>' : '')+'</span></p>'+
+    (기록? '<h4 class="sbsec">이 회차 기록</h4>'+기록 : '')+
+    '<div id="sbPayForm"'+(paid?' class="hide"':'')+'>'+
+      '<h4 class="sbsec" id="sbPayHead">'+(paid? '결제 정정' : '실제 결제 확인')+'</h4>'+
+      '<div class="grid3">'+
+        '<div class="field"><label class="fl req" for="sbYDate">실제 결제일</label>'+
+          '<input type="date" id="sbYDate" max="'+오늘+'" value="'+escA(기본날||'')+'"></div>'+
+        '<div class="field"><label class="fl req" for="sbYAmt">결제 금액</label>'+
+          '<input type="text" id="sbYAmt" inputmode="decimal" data-cur="sbYCur" value="'+escA(subAmtText(기본금, 기본통))+'" oninput="subAmtInput(this)"></div>'+
+        '<div class="field"><label class="fl req" for="sbYCur">통화</label>'+subCurSel('sbYCur', 기본통, 'sbYAmt')+'</div>'+
+      '</div>'+
+      '<div class="field"><label class="fl" for="sbYMemo">메모</label><input type="text" id="sbYMemo" maxlength="200"></div>'+
+    '</div>'+
+    '<div id="sbUndoForm" class="hide">'+
+      '<h4 class="sbsec">완료 취소</h4>'+
+      '<p class="muted sbhelp">완료 기록은 지우지 않고 \'완료 취소\' 한 줄을 더 남깁니다. 원본 결재는 바뀌지 않습니다.</p>'+
+      '<div class="field"><label class="fl" for="sbUMemo">사유</label><input type="text" id="sbUMemo" maxlength="200"></div>'+
+    '</div>'+
+    '<div class="actions" id="sbPayAct">'+
+      (paid
+        ? '<button class="btn" onclick="closeModal()">닫기</button>'+
+          '<button class="btn" onclick="subPayMode(\'해제\')">완료 취소</button>'+
+          '<button class="btn pri" onclick="subPayMode(\'정정\')">정정</button>'
+        : '<button class="btn" onclick="closeModal()">취소</button>'+
+          '<button class="btn pri" id="sbPaySave" onclick="subPaySave()">이 날짜 · 금액으로 결제 완료</button>')+
+    '</div>'+
+    '<p class="muted sbmsg" id="sbPayMsg" role="alert"></p></div></div>';
+  /* 처음 초점 — 아직이면 실제 결제일, 완료된 회차면 [정정] */
+  setTimeout(function(){ var f = paid ? document.querySelector('#sbPayAct .btn.pri') : $('sbYDate'); if(f) f.focus(); }, 30);
+}
+function subPayMode(m){
+  SUBPAY.mode=m;
+  $('sbPayForm').classList.toggle('hide', m!=='정정');
+  $('sbUndoForm').classList.toggle('hide', m!=='해제');
+  $('sbPayAct').innerHTML='<button class="btn" onclick="closeModal()">취소</button>'+
+    '<button class="btn pri" id="sbPaySave" onclick="subPaySave()">'+(m==='해제'? '완료 취소 남기기' : '정정 저장')+'</button>';
+  (m==='해제'? $('sbUMemo') : $('sbYDate')).focus();
+}
+function subPaySave(){
+  var btn=$('sbPaySave'); if(!btn || btn.disabled || !SUBPAY) return;
+  var msg=$('sbPayMsg'); msg.textContent='';
+  var send={ reqId:SUBPAY.req, id:SUBPAY.id, ym:SUBPAY.ym, act:SUBPAY.mode };
+  if(SUBPAY.mode==='해제'){
+    send.memo=$('sbUMemo').value.trim();
+  } else {
+    var pd=$('sbYDate').value, pa=subAmtVal('sbYAmt');
+    if(!pd){ msg.textContent='실제 결제일을 넣어 주세요.'; $('sbYDate').focus(); return; }
+    if(pd>todayStr()){ msg.textContent='결제일이 오늘보다 뒤입니다. 실제로 결제된 날을 넣어 주세요.'; return; }
+    if(!(pa>0)){ msg.textContent='실제 결제 금액을 넣어 주세요.'; $('sbYAmt').focus(); return; }
+    send.date=pd; send.amount=pa; send.cur=$('sbYCur').value; send.memo=$('sbYMemo').value.trim();
+  }
+  btn.disabled=true; msg.textContent='저장하는 중입니다…';
+  var 창=$('modal').firstElementChild;
+  call('api_subPay', S.token, send).then(function(r){
+    var 그창=($('modal').firstElementChild===창);
+    if(!r || !r.ok){
+      if(r && (r.code==='DONE' || r.code==='NOTDONE')) softRefresh();     // 다른 기기에서 먼저 바뀌었다 — 판을 새로 받는다
+      if(그창) subFail(btn, 'sbPayMsg', r); else toast('결제를 저장하지 못했습니다: '+((r&&r.msg)||''));
+      return;
+    }
+    if(그창) closeOk();
+    toast(send.act==='완료'? '결제 완료로 체크했습니다' : (send.act==='정정'? '정정했습니다' : '완료를 취소했습니다'), 'ok');
+    SUBV.hi=send.id;
+    subApply(r);
+  });
+}
+
+/* ── 구독 하나 — 조건 · 최근 회차 · 바꾸기 · 중단 ── */
+function subDetail(id){
+  var s=subFind(id); if(!s){ toast('구독을 찾지 못했습니다'); return; }
+  var 이번=monthNow(), t=subTermAt(s.terms, 이번) || s.terms[s.terms.length-1] || null;
+  var 줄=[];
+  for(var k=1;k>=-11;k--){
+    var ym=ymShift(이번,k);
+    if(ym<s.start) continue;
+    var due=subDue(s, s.terms, ym), last=subLast(s, ym);
+    if(!due && !last) continue;
+    var paid=subPaidRec(last), tt=subTermAt(s.terms, ym) || t || {};
+    var 상태=paid? '<span class="tag ok">결제 완료</span>'
+      : (due && due<todayStr()? '<span class="tag wn">결제 확인 필요</span>' : (due? '<span class="tag gy">예정</span>' : '<span class="tag gy">완료 취소</span>'));
+    줄.push('<li><button class="linkbtn" onclick="subPayOpen(\''+escA(s.id)+'\',\''+ym+'\')">'+esc(subYmText(ym))+'</button> '+상태+' '+
+      esc(paid? shortDate(last.date)+' · '+subMoney(last.amt, last.cur) : (due? '예정 '+shortDate(due)+' · '+subMoney(tt.amt, tt.cur) : ''))+'</li>');
+  }
+  var 조건=s.terms.slice().reverse().map(function(x){
+    return '<li><b>'+esc(subYmText(x.from))+'부터</b> '+esc(subCycleText(x)+' · '+subMoney(x.amt, x.cur))+
+           ' <span class="muted">'+esc([x.by, x.at].filter(Boolean).join(' · '))+'</span></li>';
+  }).join('');
+  var 다음달=ymShift(이번,1);
+  $('modal').innerHTML='<div class="veil"><div class="sheet sbsheet" role="dialog" aria-modal="true" aria-labelledby="sbDetT">'+
+    '<div class="sheethead"><h3 class="tt" id="sbDetT">'+esc(s.name)+'</h3>'+
+      (s.state==='중단'? '<span class="tag gy">중단 · '+esc(s.stop)+' 회차까지</span>' : '<span class="tag ok">사용 중</span>')+'</div>'+
+    '<dl class="sbdl">'+
+      '<dt>지금 조건</dt><dd>'+esc(t? subCycleText(t)+' · '+subMoney(t.amt, t.cur) : '')+'</dd>'+
+      '<dt>시작</dt><dd>'+esc(subYmText(s.start))+' 회차 · '+esc([s.by, s.at].filter(Boolean).join(' '))+'</dd>'+
+      (s.method? '<dt>결제수단</dt><dd>'+esc(s.method)+' (원본 결재에 적힌 것)</dd>' : '')+
+      (s.cat? '<dt>분류</dt><dd>'+esc(s.cat)+'</dd>' : '')+
+      '<dt>원본</dt><dd><button class="linkbtn" onclick="openDoc(\''+escA(s.srcNo)+'\')">'+esc(s.srcNo)+' 결재 보기</button></dd>'+
+    '</dl>'+
+    '<h4 class="sbsec">회차</h4><ol class="sbhist">'+(줄.join('')||'<li class="muted">최근 회차가 없습니다</li>')+'</ol>'+
+    '<h4 class="sbsec">조건 바뀐 기록</h4><ol class="sbhist">'+조건+'</ol>'+
+
+    '<div id="sbTermForm" class="hide sbform">'+
+      '<h4 class="sbsec">금액 · 결제일 바꾸기</h4>'+
+      '<p class="muted sbhelp">고른 회차부터 바뀝니다. 그 앞 회차와 이미 완료된 기록은 그대로입니다.</p>'+
+      '<div class="grid3">'+
+        '<div class="field"><label class="fl req" for="sbTFrom">적용 회차</label><select id="sbTFrom">'+
+          [0,1,2,3,4,5,6,7,8,9,10,11,12].map(function(k){ var y=ymShift(이번,k); return y<s.start? '' :
+            '<option value="'+y+'"'+(y===다음달?' selected':'')+'>'+esc(subYmText(y))+'부터</option>'; }).join('')+
+        '</select></div>'+
+        '<div class="field"><label class="fl req" id="sbTCycleL">주기</label><div class="chks" id="sbTCycle" role="radiogroup" aria-labelledby="sbTCycleL">'+
+          subOpt('월', '매월', !t || t.cycle==='월', 'subTSync()')+subOpt('년', '매년', !!(t && t.cycle==='년'), 'subTSync()')+'</div></div>'+
+        '<div class="field" id="sbTMonBox"><label class="fl" for="sbTMon">결제하는 달</label>'+subMonSel('sbTMon', t? (t.month||1) : 1)+'</div>'+
+      '</div>'+
+      '<div class="grid3">'+
+        '<div class="field"><label class="fl req" for="sbTDay">결제일</label>'+subDaySel('sbTDay', t? t.day : 1)+'</div>'+
+        '<div class="field"><label class="fl req" for="sbTAmt">금액</label>'+
+          '<input type="text" id="sbTAmt" inputmode="decimal" data-cur="sbTCur" value="'+escA(t? subAmtText(t.amt, t.cur) : '')+'" oninput="subAmtInput(this)"></div>'+
+        '<div class="field"><label class="fl req" for="sbTCur">통화</label>'+subCurSel('sbTCur', t? t.cur : 'KRW', 'sbTAmt')+'</div>'+
+      '</div>'+
+      '<div class="actions"><button class="btn" onclick="subDetail(\''+escA(s.id)+'\')">취소</button>'+
+        '<button class="btn pri" id="sbTSave" onclick="subTermSave(\''+escA(s.id)+'\')">바꾸기</button></div>'+
+    '</div>'+
+
+    '<div id="sbStopForm" class="hide sbform">'+
+      '<h4 class="sbsec">구독 중단</h4>'+
+      '<p class="muted sbhelp">마지막으로 결제하는 회차까지만 예정이 나옵니다. 지난 기록은 그대로 남습니다.</p>'+
+      '<div class="field"><label class="fl req" for="sbStopLast">마지막 결제 회차</label><select id="sbStopLast">'+
+        [-1,0,1,2,3].map(function(k){ var y=ymShift(이번,k); return y<s.start? '' :
+          '<option value="'+y+'"'+(k===0?' selected':'')+'>'+esc(subYmText(y))+'까지</option>'; }).join('')+
+      '</select></div>'+
+      '<div class="actions"><button class="btn" onclick="subDetail(\''+escA(s.id)+'\')">취소</button>'+
+        '<button class="btn pri" id="sbStopSave" onclick="subStateSave(\''+escA(s.id)+'\',\'중단\')">중단</button></div>'+
+    '</div>'+
+
+    '<div id="sbNameForm" class="hide sbform">'+
+      '<div class="field"><label class="fl req" for="sbNewName">서비스명</label><input type="text" id="sbNewName" maxlength="60" value="'+escA(s.name)+'"></div>'+
+      '<div class="actions"><button class="btn" onclick="subDetail(\''+escA(s.id)+'\')">취소</button>'+
+        '<button class="btn pri" id="sbNameSave" onclick="subStateSave(\''+escA(s.id)+'\',\'이름\')">이름 바꾸기</button></div>'+
+    '</div>'+
+
+    '<div class="actions sbacts" id="sbDetAct">'+
+      '<button class="btn" onclick="closeModal()">닫기</button>'+
+      '<button class="btn" onclick="subDetMode(\'sbNameForm\')">이름 바꾸기</button>'+
+      (s.state==='중단'
+        ? '<button class="btn" id="sbResume" onclick="subStateSave(\''+escA(s.id)+'\',\'재개\')">다시 쓰기</button>'
+        : '<button class="btn" onclick="subDetMode(\'sbStopForm\')">중단</button>'+
+          '<button class="btn pri" onclick="subDetMode(\'sbTermForm\')">금액 · 결제일 바꾸기</button>')+
+    '</div>'+
+    '<p class="muted sbmsg" id="sbDetMsg" role="alert"></p></div></div>';
+  SUBPAY={ id:id, req:subReqId() };
+  if($('sbTMonBox')) $('sbTMonBox').classList.toggle('hide', !(t && t.cycle==='년'));
+}
+function subDetMode(formId){
+  ['sbTermForm','sbStopForm','sbNameForm'].forEach(function(f){ if($(f)) $(f).classList.toggle('hide', f!==formId); });
+  $('sbDetAct').classList.add('hide');
+  var 첫=$(formId).querySelector('select,input'); if(첫) 첫.focus();
+}
+function subTSync(){ $('sbTMonBox').classList.toggle('hide', (pickedVal('sbTCycle')||'월')!=='년'); }
+function subTermSave(id){
+  var btn=$('sbTSave'); if(!btn || btn.disabled) return;
+  var msg=$('sbDetMsg'); msg.textContent='';
+  var amt=subAmtVal('sbTAmt');
+  if(!(amt>0)){ msg.textContent='금액을 넣어 주세요.'; $('sbTAmt').focus(); return; }
+  var send={ reqId:SUBPAY.req, id:id, from:$('sbTFrom').value,
+             term:{ cycle:pickedVal('sbTCycle')||'월', day:Number($('sbTDay').value), month:Number($('sbTMon').value), amount:amt, cur:$('sbTCur').value } };
+  btn.disabled=true; msg.textContent='저장하는 중입니다…';
+  call('api_subTerms', S.token, send).then(function(r){
+    if(!r || !r.ok){ subFail(btn, 'sbDetMsg', r); return; }
+    subApply(r); toast(subYmText(send.from)+'부터 바꿨습니다', 'ok');
+    if($('sbDetT')) subDetail(id);
+  });
+}
+function subStateSave(id, act){
+  var btn=$(act==='중단'? 'sbStopSave' : (act==='이름'? 'sbNameSave' : 'sbResume'));
+  if(btn && btn.disabled) return;
+  var msg=$('sbDetMsg'); msg.textContent='';
+  var send={ id:id, act:act };
+  if(act==='중단') send.last=$('sbStopLast').value;
+  if(act==='이름'){ send.name=$('sbNewName').value.trim(); if(!send.name){ msg.textContent='서비스명을 넣어 주세요.'; return; } }
+  if(btn) btn.disabled=true;
+  msg.textContent='저장하는 중입니다…';
+  call('api_subState', S.token, send).then(function(r){
+    if(!r || !r.ok){ subFail(btn, 'sbDetMsg', r); return; }
+    subApply(r);
+    toast(act==='중단'? '구독을 중단했습니다 — 기록은 그대로 남습니다' : (act==='재개'? '다시 쓰기로 바꿨습니다' : '이름을 바꿨습니다'), 'ok');
+    if($('sbDetT')) subDetail(id);
   });
 }
 
