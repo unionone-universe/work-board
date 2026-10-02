@@ -12488,8 +12488,74 @@ function openStaff(phone){
     /* PIN 초기화는 드문 일이라 작은 글자 링크로 맨 아래에 */
     (t.hasPin
       ? '<p class="note t2"><button class="linkbtn" onclick="resetPin(\''+phone+'\',\''+esc(t.name)+'\')">PIN 초기화 (등록된 기기도 모두 해제)</button></p>'
-      : '')+
+      /* ★ 한 번도 앱에 들어온 적 없는 자리만 — 본인이 자기 번호로 가입했을 때 (2026-10-02).
+         PIN 을 초기화한 직원은 PIN 이 비어도 `seen` 이라 안 보인다. 판정은 서버(api_mergeStaff)가 다시 한다 */
+      : (!t.seen? '<p class="note t2"><button class="linkbtn" onclick="openMerge(\''+phone+'\')">가입한 사람에게 이 자리 넘기기</button></p>' : ''))+
     '</div></div>';
+}
+
+/* ---- 자리 넘기기 (관리자만, 2026-10-02) ----
+   미리 만들어 둔 자리(PIN 미설정 — 한 번도 로그인 안 한 줄)를 본인이 자기 번호로 가입한 뒤 그 사람에게 넘기고
+   자리 줄은 지웁니다. 결재 · 업무 · 일정 · 휴가 · 대리인에 적힌 번호를 옮기는 것과
+   '로그인한 적 없는 줄만' 이라는 판정은 전부 서버(api_mergeStaff)가 합니다. 화면은 고를 사람만 보여 줍니다. */
+function openMerge(phone){
+  var list=S.staffCache||[];
+  var t=null; list.forEach(function(s){ if(s.phone===phone) t=s; });
+  if(!t || t.hasPin || t.seen) return;
+  var 후보=list.filter(function(s){ return s.phone!==phone && s.state==='재직' && s.hasPin; });
+  $('modal').innerHTML='<div class="veil"><div class="sheet">'+
+    '<div class="sheethead"><h3 class="tt">자리 넘기기</h3></div>'+
+    '<p class="mk"><b>'+esc(t.name)+(t.rank?' '+esc(t.rank):'')+'</b> 자리('+esc(t.phone)+')를 실제로 가입한 사람에게 넘기고, 이 줄은 직원 목록에서 지웁니다.</p>'+
+    (후보.length
+      ? '<div class="field"><label class="fl" for="mgTo">받을 사람</label><select id="mgTo" onchange="paintMerge(\''+phone+'\')">'+
+          '<option value="">고르세요</option>'+
+          후보.map(function(s){
+            return '<option value="'+s.phone+'">'+esc(s.name)+(s.rank?' '+esc(s.rank):'')+' · '+esc(s.phone)+'</option>';
+          }).join('')+
+        '</select></div>'+
+        '<div id="mgWhat"></div>'
+      : '<p class="muted">넘겨받을 사람이 없습니다. 그 사람이 먼저 가입하고 승인받아야 합니다.</p>')+
+    '<div class="actions"><button class="btn" onclick="openStaff(\''+phone+'\')">취소</button>'+
+    (후보.length? '<button class="btn dg" id="mgSave" disabled onclick="mergeStaff(\''+phone+'\')">넘기고 지우기</button>' : '')+
+    '</div>'+
+    '<p class="muted" id="mgMsg" style="margin-top:8px"></p>'+
+    '</div></div>';
+}
+
+/* 받을 사람을 고르면 무엇이 바뀌는지 그 사람 이름으로 보여 줍니다 */
+function paintMerge(phone){
+  var list=S.staffCache||[], sel=$('mgTo'), box=$('mgWhat'), btn=$('mgSave');
+  if(!sel||!box||sel.disabled) return;     // 보내는 중에는 고르기를 잠가 둔다
+  var t=null, to=null;
+  list.forEach(function(s){ if(s.phone===phone) t=s; if(s.phone===sel.value) to=s; });
+  if(btn) btn.disabled=!to;
+  if(!t||!to){ box.innerHTML=''; return; }
+  var 새이름=(t.name||to.name), 새직급=(t.rank||to.rank);
+  box.innerHTML='<ul class="mk">'+
+    '<li>결재 · 업무 · 일정 · 휴가 · 대리인에 적힌 '+esc(t.phone)+' 이 <b>'+esc(to.phone)+'</b> 로 바뀝니다</li>'+
+    '<li>'+esc(to.name)+' → <b>'+esc(새이름)+(새직급?' '+esc(새직급):'')+'</b> 로 표시됩니다 · 등급('+gradeName(to.grade)+') · PIN · 기기는 그대로</li>'+
+    '<li>'+esc(t.name)+' 줄은 지워지고 <b>되돌릴 수 없습니다</b></li>'+
+  '</ul>';
+}
+
+function mergeStaff(phone){
+  var btn=$('mgSave'), msg=$('mgMsg'), sel=$('mgTo');
+  if(!btn || btn.disabled || !sel || !sel.value) return;
+  /* ★ 답을 기다리는 동안 받을 사람도 잠근다 — 고르기를 바꾸면 단추가 다시 켜져 다른 사람으로 한 번 더 보낼 수 있었다 (검수 1차) */
+  btn.disabled=true; sel.disabled=true; msg.textContent='넘기는 중입니다...';
+  call('api_mergeStaff', S.token, phone, sel.value).then(function(r){
+    if(!r.ok){
+      msg.textContent=r.msg||'넘기지 못했습니다';
+      /* 답을 못 받고 다시 누른 경우 — 이미 끝났으면 창을 닫고 목록을 새로 받습니다 */
+      if(r.gone){ closeOk(); toast(r.msg); S.setCache=null; renderSettings(); softRefresh(); return; }
+      sel.disabled=false; btn.disabled=false;
+      return;
+    }
+    closeOk(); toast(r.msg);
+    S.setCache=null;
+    renderSettings();
+    softRefresh();          // 판의 담당자 이름 · 명부도 새 이름으로
+  });
 }
 
 function saveStaff(phone){
