@@ -1017,6 +1017,14 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .crow .tag::before{content:"";flex:none;width:14px;height:14px;background:currentColor;
   -webkit-mask:var(--mask-alert) center/contain no-repeat;mask:var(--mask-alert) center/contain no-repeat}
 .crow .cnew{color:var(--t1);font-weight:700;white-space:nowrap}
+/* ★ 긴 경고 (2026-10-02 · 19 지시) — 작은 줄 · 큰 줄에서는 줄 폭 안에서 두 줄까지 꺾고 넘으면 말줄임.
+   전문은 업무 상세(.tdkind — 키보드 · 터치로 여는 곳)에서 꺾어서 다 보인다. 짧은 경고는 예전처럼 한 줄(밀도 그대로) */
+.crow .cx > .tag,.trow .ctop > .tag{max-width:100%;align-items:flex-start;white-space:normal}
+.crow .tag::before,.trow .tag::before{margin-top:3px}
+.crow .tag .tgt,.trow .tag .tgt{min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+  overflow-wrap:anywhere}
+.tdkind .tag{max-width:100%;white-space:normal;overflow-wrap:anywhere;text-align:left}
+.tdkind .tag .tgt{min-width:0}
 .crow .cdot{position:relative;margin:0;width:9px;height:9px}
 .spanel .sfoot{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-top:4px}
 .spanel .sfoot .dsum{font-size:var(--fs-sm)}
@@ -5786,7 +5794,7 @@ function rowTop(t, opt){
   if(t.ownerName && !ownScope() && !(opt && opt.noWho))
     parts.push('<span class="twho"><span class="sronly">담당 </span>'+ownerChip(t)+'</span>');
   var f=topFlag(t);
-  if(f) parts.push('<span class="tag '+(f.lv==='danger'?'dg':'wn')+'">'+esc(f.t)+'</span>');
+  if(f) parts.push('<span class="tag '+(f.lv==='danger'?'dg':'wn')+'"><span class="tgt">'+esc(f.t)+'</span></span>');
   if(hasNewComment(t.id)) parts.push('<span class="cnew"><span class="cdot" aria-hidden="true"></span>새 댓글</span>');
   return parts.length? '<p class="ctop">'+parts.join('')+'</p>' : '';
 }
@@ -5825,7 +5833,7 @@ function compactRow(t){
   var 아래=[], 표시=[], f=topFlag(t);
   if(t.ownerName && !ownScope()) 아래.push(esc(t.ownerName));
   if(w) 아래.push('<span class="'+(w.cls||'')+'">'+esc(w.tx)+'</span>');
-  if(f) 표시.push('<span class="tag '+(f.lv==='danger'?'dg':'wn')+'">'+esc(f.t)+'</span>');
+  if(f) 표시.push('<span class="tag '+(f.lv==='danger'?'dg':'wn')+'"><span class="tgt">'+esc(f.t)+'</span></span>');   // 긴 경고는 두 줄까지 (2026-10-02)
   if(hasNewComment(t.id)) 표시.push('<span class="cnew"><span class="cdot" aria-hidden="true"></span>새 댓글</span>');
   return '<button type="button" class="crow'+(hot?' hot':'')+'" data-cid="'+esc(t.id)+'" onclick="openTask(\''+t.id+'\')">'+
     '<span class="ct">'+esc(t.title)+'</span>'+(아래.length? '<span class="cm">'+아래.join(' · ')+'</span>' : '')+
@@ -6358,7 +6366,7 @@ function taskSheetHtml(t, r){
   if(!isFinite(pct)) pct=0;
   var 유형=[t.typeName||'', manyCorps()? (t.corpName||'') : ''].filter(Boolean).map(esc).join(' · ');
   var 표시=((t.flags)||[]).filter(function(f){ return f && !isDueFlag(f); }).map(function(f){
-    return '<span class="tag '+(f.lv==='danger'?'dg':'wn')+'">'+esc(f.t)+'</span>';
+    return '<span class="tag '+(f.lv==='danger'?'dg':'wn')+'"><span class="tgt">'+esc(f.t)+'</span></span>';
   }).join('');
   var 상태 = (t.status==='완료')
     ? '<span class="tdst done">'+esc(t.done? '완료 '+krDate(t.done) : '완료')+'</span>'
