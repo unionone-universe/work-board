@@ -1074,6 +1074,25 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 /* 직원 정보 창 — 자리 넘기기가 안 되는 이유 한 줄 (22 지시) */
 .mwhy{display:flex;align-items:flex-start;gap:6px;overflow-wrap:anywhere}
 .mwhy .ic{flex:none;width:16px;height:16px;margin-top:2px;color:var(--wn)}
+/* 번호 변경 이관 창 (23 지시) — 옛 번호 → 새 번호 두 칸, 이을 것 · 둘 것, 같은 사람 확인 */
+.ncpair{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:stretch;gap:10px;margin:0 0 var(--sp-4)}
+.ncp{display:flex;flex-direction:column;gap:4px;min-width:0;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card)}
+.ncp .k{font-size:var(--fs-sm);color:var(--t3)}
+.ncp b{font-size:var(--fs-body);font-weight:600;color:var(--t1);overflow-wrap:anywhere}
+.ncp > span:not(.k),.ncp .ncsel span{font-size:var(--fs-sm);color:var(--t2);overflow-wrap:anywhere}
+.ncp .ncsel{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+.ncp select{margin-top:2px}
+.ncarrow{display:flex;align-items:center;color:var(--t3)}
+.ncarrow .ic{width:20px;height:20px}
+.ncwhat li{margin:4px 0}
+.ncsame{display:flex;align-items:flex-start;gap:10px;margin:var(--sp-4) 0 0;padding:12px 14px;border:1px solid var(--line2);border-radius:var(--r-md);
+  background:var(--panel);font-size:var(--fs-body);line-height:1.5;cursor:pointer}
+.ncsame[hidden]{display:none}
+.ncsame input{flex:none;width:20px;height:20px;min-height:0;margin:2px 0 0;padding:0;accent-color:var(--pri)}
+@media (max-width:599px){
+  .ncpair{grid-template-columns:minmax(0,1fr)}
+  .ncarrow{justify-content:center;transform:rotate(90deg)}
+}
 .clog .tx{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 보조 한 줄 — 담당 딱지 · 마감 · 가장 중요한 표시 하나 · 새 댓글 (모두 14px · 보통 굵기) */
 .trow .ctop{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;margin:2px 0 0;min-width:0;font-size:var(--fs-sm);color:var(--t3)}
@@ -6916,10 +6935,16 @@ function taskFlow_(r){
 /** 흐름 한 줄. 기록이든 댓글이든 같은 모양으로 그린다.
  *  ★ 2026-09-22 — 날짜 기둥을 없애고 '누가 · 언제 · 진행률' 을 한 줄에 모았습니다.
  *    지우기(×)는 늘 떠 있지 않고 그 줄의 ⋯ 안에 있습니다. */
+/** 이 번호가 '나' 인가 — 지금 번호, 또는 번호 변경 이관으로 나에게 이어진 옛 번호(서버가 보낸 S.me.prev).
+    고치기 · 지우기 단추를 보일지 정할 때만 — 실제 판정은 서버(내것_)가 다시 한다 (23 지시) */
+function myPhone(ph){
+  if(!S.me || !ph) return false;
+  return ph===S.me.phone || (Array.isArray(S.me.prev) && S.me.prev.indexOf(ph)>=0);
+}
 function flowRow(it, taskId){
   var o=it.o, isLog=(it.kind==='log');
   var mine = S.me && (S.me.grade>=9 ||
-             (isLog ? o.who===S.me.name : o.phone===S.me.phone));
+             (isLog ? o.who===S.me.name : myPhone(o.phone)));
   var day  = shortDate(String(it.at).substring(0,10));
   var time = String(it.at).substring(10).trim();
 
@@ -9408,7 +9433,7 @@ function drawPost(no, src){
   var r=src||S.postCache;
   var p=null; (r.posts||[]).forEach(function(x){ if(x.no===no) p=x; });
   if(!p){ toast('글을 찾을 수 없습니다'); openBoard(); return; }
-  var mine = S.me && (S.me.grade>=9 || p.phone===S.me.phone);
+  var mine = S.me && (S.me.grade>=9 || myPhone(p.phone));
 
   /* ★ 수정·삭제는 ⋯ 안에 (2026-09-09). 본문과 댓글 사이에 단추 줄이 늘 있어서
      글쓴이와 남이 보는 첫 화면이 달랐습니다. 업무 상세와 같은 방식입니다. */
@@ -9699,7 +9724,7 @@ function cmTree(list){
 }
 
 function commentRow(c){
-  var mine = S.me && (S.me.grade>=9 || c.phone===S.me.phone);
+  var mine = S.me && (S.me.grade>=9 || myPhone(c.phone));
   var 답글인가 = !!c.__답글 || !!c.parent;
   /* 답글은 붙일 곳이 원 댓글이다 (답글에 답글을 달아도 같은 줄기로) */
   var 붙일곳 = 답글인가 ? (c.parent||c.id) : c.id;
@@ -12436,6 +12461,17 @@ function paintAdmin(r){
     /* ★ 직원 한 줄에 버튼은 **하나** (2026-09-09). 예전에는 [권한] [대리인] [초기화] × 6명 = 18개였고,
        급여를 넣으려면 `권한` 을 눌러야 한다는 것을 알 수 없었습니다.
        부서·직급·급여·등급·재직·대리인·PIN 초기화가 전부 `정보` 창 하나에 있습니다. */
+    /* ★ 끝나지 않은 번호 변경 이관 (23 지시 · 검수 1차) — 옛 직원 줄이 이미 지워진 뒤 멈췄어도 여기서 이어서 한다 */
+    S.numMoves=Array.isArray(r.numMoves)? r.numMoves : [];
+    if(S.numMoves.length){
+      top+='<h4 class="sech hot">끝나지 않은 번호 변경 이관 '+S.numMoves.length+'건</h4>';
+      S.numMoves.forEach(function(m){
+        top+='<div class="lrow plain">'+
+           '<div class="m"><p class="t">'+esc(m.name||'')+' '+esc(phoneFmt(m.old))+' → '+esc(phoneFmt(m.to))+'</p>'+
+           '<p class="b">중간에 멈췄습니다 · 옛 번호는 막혀 있습니다</p></div>'+
+           '<div class="r"><button class="btn pri sm" onclick="openMove(\''+esc(m.old)+'\')">이어서 하기</button></div></div>';
+      });
+    }
     var members=r.staff.filter(function(s){ return s.state!=='승인대기'; });
     top+='<h4 class="sech">직원 '+members.length+'명</h4>';
     members.forEach(function(s){
@@ -12603,7 +12639,126 @@ function openStaff(phone){
           ? '<p class="note t2"><button class="linkbtn" onclick="openMerge(\''+phone+'\')">가입한 사람에게 이 자리 넘기기</button></p>'
           : (t.merge && t.merge.why
               ? '<p class="note t2 mwhy">'+ic('alert')+'<span>자리 넘기기 안 됨 — '+esc(t.merge.why)+'</span></p>' : '')))+
+    /* ★ 번호 변경 이관 (23 지시) — 쓴 흔적이 있는 PIN 없는 옛 계정(같은 사람이 번호를 바꾼 경우). 판정은 서버(move) */
+    (!t.hasPin && t.move && t.move.ok
+      ? '<p class="note t2"><button class="linkbtn" onclick="openMove(\''+phone+'\')">'+
+          (t.move.resume? '번호 변경 이관 이어서 하기' : '같은 사람이 번호를 바꿨으면 — 번호 변경 이관')+'</button></p>'
+      : (!t.hasPin && t.move && t.move.why ? '<p class="note t2 mwhy">'+ic('alert')+'<span>번호 변경 이관 안 됨 — '+esc(t.move.why)+'</span></p>' : ''))+
     '</div></div>';
+}
+
+/* ---- 번호 변경 이관 (관리자만, 2026-10-06 · 23 지시) ----
+   같은 사람이 전화번호만 바꿔 새로 가입했을 때 — 옛 번호로 앱을 쓴 적이 있는 계정을 새 계정으로 잇고 옛 번호는 막는다.
+   ★ 판정 · 옮기기 · 막기는 전부 서버(api_changeNumberPreview · api_changeNumber). 화면은 보여 주고 확인만 받는다.
+   ★ 요청 번호(NC.req)는 창을 열 때 하나 — 답을 못 받고 다시 눌러도 서버가 두 번 하지 않는다. 진행 중이던 것은 그 번호로 이어서 */
+var NC={ old:'', to:'', req:'', pre:null, busy:false, seq:0, sameFor:'' };
+function ncReqId(){ return 'NC'+Date.now().toString(36)+Math.random().toString(36).substring(2,8); }
+function openMove(phone){
+  var list=S.staffCache||[];
+  var t=null; list.forEach(function(s){ if(s.phone===phone) t=s; });
+  /* 옛 줄이 이미 지워진 채 멈춘 이관 — 설정의 '끝나지 않은 번호 변경 이관' 에서 연다 */
+  if(!t) (S.numMoves||[]).forEach(function(m){ if(m.old===phone) t={ phone:m.old, name:m.name, rank:'', grade:0, gone:true, hasPin:false, move:{ ok:true, resume:true, to:m.to } }; });
+  if(!t || t.hasPin || !t.move || !t.move.ok) return;
+  NC={ old:phone, to:'', req:ncReqId(), pre:null, busy:false, seq:0, sameFor:'' };
+  var 정한=(t.move.resume && t.move.to) ? t.move.to : '';
+  var 후보=list.filter(function(s){ return s.phone!==phone && s.state==='재직' && s.hasPin; });
+  $('modal').innerHTML='<div class="veil"><div class="sheet ncsheet">'+
+    '<div class="sheethead"><h3 class="tt">번호 변경 이관</h3></div>'+
+    '<p class="mk">같은 사람이 전화번호를 바꿨을 때 — 옛 번호의 업무 · 결재 연결을 새 번호로 잇고, 옛 번호는 명단에서 빼고 다시 들어오지 못하게 막습니다. 지난 기록은 지우지 않습니다.</p>'+
+    '<div class="ncpair">'+
+      '<div class="ncp"><span class="k">옛 번호</span><b>'+esc(t.name)+(t.rank?' '+esc(t.rank):'')+'</b><span>'+esc(phoneFmt(t.phone))+(t.gone? ' · 명단에서 이미 빠짐' : ' · '+gradeName(t.grade))+'</span></div>'+
+      '<span class="ncarrow" aria-hidden="true">'+ic('chev')+'</span>'+
+      '<div class="ncp" id="ncNew"><span class="k">새 번호</span>'+
+        '<label class="sronly" for="ncTo">새 번호 계정</label>'+
+        '<select id="ncTo" onchange="loadMovePreview()"'+(정한?' disabled':'')+'><option value="">새 번호 계정을 고르세요</option>'+
+        후보.map(function(s){ return '<option value="'+s.phone+'"'+(s.phone===정한?' selected':'')+'>'+esc(s.name)+(s.rank?' '+esc(s.rank):'')+' · '+esc(phoneFmt(s.phone))+'</option>'; }).join('')+
+        '</select></div>'+
+    '</div>'+
+    '<div id="ncWhat"></div>'+
+    '<label class="ncsame" id="ncSameBox" hidden><input type="checkbox" id="ncSame" onchange="NC.sameFor=this.checked? NC.to : \'\';paintMove()"><span id="ncSameTx"></span></label>'+
+    /* [취소] — 명부에 있는 옛 계정이면 그 [정보] 창으로, 옛 줄이 이미 지워진 채 멈춘 이관이면 창을 닫고 설정으로 (검수 4차) */
+    '<div class="actions"><button class="btn" onclick="'+(t.gone? 'closeModal()' : 'openStaff(\''+phone+'\')')+'">취소</button>'+
+    '<button class="btn dg" id="ncGo" disabled onclick="runMove()">'+(정한? '이어서 하기' : '번호 변경 이관')+'</button></div>'+
+    '<p class="muted" id="ncMsg" style="margin-top:8px" role="status"></p>'+
+    '</div></div>';
+  if(!후보.length) $('ncWhat').innerHTML='<p class="note t2 mwhy">'+ic('alert')+'<span>새 번호 계정이 없습니다 — 본인이 새 번호로 가입하고 승인받아 로그인해야 합니다.</span></p>';
+  if(정한) loadMovePreview();
+}
+/** 새 번호를 고르면 서버에 미리보기를 묻는다 (바꾸지 않는다) — 늦게 온 답은 버린다 */
+function loadMovePreview(){
+  var sel=$('ncTo'); if(!sel) return;
+  var to=sel.value, tk=++NC.seq;
+  /* ★ 대상이 바뀌면 '같은 사람' 확인을 풀고 다시 받는다 (검수 1차 — 확인 문구만 바뀌고 체크 · 단추가 그대로 남았다) */
+  var same=$('ncSame'); if(same) same.checked=false;
+  NC.sameFor='';
+  NC.to=to; NC.pre=null; paintMove();
+  if(!to){ $('ncWhat').innerHTML=''; return; }
+  $('ncWhat').innerHTML='<p class="muted">확인하는 중입니다...</p>';
+  call('api_changeNumberPreview', S.token, NC.old, to).then(function(r){
+    if(tk!==NC.seq || !$('ncWhat')) return;
+    if(!r || !r.ok){ $('ncWhat').innerHTML='<p class="note t2 mwhy">'+ic('alert')+'<span>'+esc((r && r.msg) || '확인하지 못했습니다')+'</span></p>'; return; }
+    if(r.done){ $('ncWhat').innerHTML='<p class="note t2">'+esc(r.msg||'이미 옮긴 번호입니다')+'</p>'; return; }
+    NC.pre=r;
+    if(r.resume && r.id) NC.req=r.id;            // 진행 중이던 것 — 그 요청 번호로 이어서
+    paintMove();
+  });
+}
+/** 미리보기 결과 — 누구를 누구로 · 이을 것 · 그대로 둘 것 · 막는 것. 확인란을 체크해야 단추가 켜진다 */
+function paintMove(){
+  var btn=$('ncGo'), box=$('ncWhat'), same=$('ncSame'), sb=$('ncSameBox'), p=NC.pre;
+  if(!btn || !box) return;
+  if(!p){ btn.disabled=true; if(sb) sb.hidden=true; return; }
+  var o=p.old||{}, n=p.new||{}, c=p.counts||{};
+  var nb=$('ncNew');
+  if(nb && !nb.querySelector('.ncsel')){
+    var 고른=document.createElement('span'); 고른.className='ncsel';
+    nb.appendChild(고른);
+  }
+  var 고른칸=nb && nb.querySelector('.ncsel');
+  if(고른칸) 고른칸.innerHTML='<b>'+esc(n.name||'')+(n.rank?' '+esc(n.rank):'')+'</b><span>'+esc(phoneFmt(n.phone||''))+' · '+gradeName(n.grade)+'</span>';
+  var 조각=function(a){ return a.filter(function(x){ return x; }).join(' · '); };
+  var 잇기=조각([
+    (c.task||c.co)? '업무 담당 '+(c.task||0)+' · 협업 '+(c.co||0) : '',
+    (c.lineWait||c.lineDone||c.lineDrop)? '결재 대기 '+(c.lineWait||0)+' · 지난 결재 '+(c.lineDone||0)+(c.lineDrop? ' (겹친 대기 '+c.lineDrop+'건은 하나로)' : '') : '',
+    c.draft? '기안 '+c.draft : '', c.event? '일정 '+c.event : '', c.leave? '휴가 '+c.leave : '',
+    c.form? '결재 양식 기본 승인 · 열람 '+c.form : '', c.deputy? '다른 직원의 대리인 '+c.deputy : '' ]);
+  var 이름바뀜=(o.name && n.name && o.name!==n.name);
+  var 직급다름=(o.rank && n.rank && o.rank!==n.rank);
+  box.innerHTML='<ul class="mk ncwhat">'+
+    '<li><b>새 번호로 잇는 것</b> — '+esc(잇기 || '이을 연결이 없습니다')+'</li>'+
+    '<li><b>그대로 두는 것</b> — '+esc((p.keep||[]).length? p.keep.join(' · ')+' (지우지 않고 옛 번호 그대로 · 이름은 그대로 보입니다)' : '지난 작성 기록 없음')+'</li>'+
+    '<li><b>새 계정</b> — '+(이름바뀜? esc(n.name)+' → <b>'+esc(o.name)+'</b> 로 표시 · ' : '')+'등급('+gradeName(n.grade)+') · PIN · 기기는 그대로</li>'+
+    '<li><b>옛 번호 '+esc(phoneFmt(o.phone||NC.old))+'</b> — 명단에서 빠지고 로그인 · PIN 설정 · 사용 신청이 막힙니다</li>'+
+    (p.resume? '<li><b>이어서 하기</b> — 지난번에 멈춘 곳: '+esc(p.step||'')+' (남은 것만 이어서 합니다)</li>' : '')+
+  '</ul>'+
+  (직급다름? '<p class="note t2 mwhy">'+ic('alert')+'<span>직급이 다릅니다 (옛 '+esc(o.rank)+' · 새 '+esc(n.rank)+') — 같은 사람이 맞는지 다시 확인해 주세요</span></p>' : '')+
+  (!p.can? '<p class="note t2 mwhy">'+ic('alert')+'<span>'+esc(p.why||'옮길 수 없습니다')+'</span></p>' : '');
+  if(sb){
+    sb.hidden=!p.can;
+    $('ncSameTx').innerHTML='<b>'+esc(o.name||'')+'</b>('+esc(phoneFmt(o.phone||NC.old))+') 와 <b>'+esc(n.name||'')+'</b>('+esc(phoneFmt(n.phone||''))+') 는 <b>같은 사람</b>이고 전화번호만 바뀌었습니다';
+  }
+  /* 확인은 지금 고른 대상에 대해 한 것이어야 한다 */
+  btn.disabled = NC.busy || !p.can || !(same && same.checked) || NC.sameFor!==NC.to;
+}
+function runMove(){
+  var btn=$('ncGo'), msg=$('ncMsg'), same=$('ncSame'), sel=$('ncTo'), p=NC.pre;
+  if(!btn || btn.disabled || NC.busy || !p || !p.can || !same || !same.checked || NC.sameFor!==NC.to) return;
+  NC.busy=true; btn.disabled=true; same.disabled=true; if(sel) sel.disabled=true;
+  msg.textContent='옮기는 중입니다... (몇 초 걸립니다)';
+  call('api_changeNumber', S.token, { reqId:NC.req, old:NC.old, 'new':NC.to, confirm:true,
+    seenOld:{ name:(p.old||{}).name||'', rank:(p.old||{}).rank||'' }, seenNew:{ name:(p.new||{}).name||'', rank:(p.new||{}).rank||'' } }).then(function(r){
+    if(r && r.ok){
+      closeOk(); toast(r.msg||'옮겼습니다');
+      S.setCache=null; renderSettings(); softRefresh();
+      return;
+    }
+    NC.busy=false; same.disabled=false;
+    if(sel && !(p.resume)) sel.disabled=false;
+    msg.textContent=(r && r.msg) || '옮기지 못했습니다';
+    if(r && r.stuck){ btn.textContent='이어서 하기'; }
+    if(r && r.stale){ same.checked=false; loadMovePreview(); return; }
+    paintMove();
+  });
 }
 /** 자리 넘기기를 할 수 있는 줄인가 — 서버가 보낸 판정(merge)을 그대로. 옛 서버면 PIN · 최근 접속이 없을 때만 */
 function mergeOk(t){
