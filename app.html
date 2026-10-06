@@ -971,8 +971,11 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
   .fsel{flex:1 1 200px}
   .fsel select{flex:1 1 auto;max-width:none;width:100%;font-size:var(--fs-body)}
   .fsum{order:21}
-  .lbar .stabs{flex:1 1 0}
-  .lbar .stabs button{flex:1 1 auto;padding:0 8px}   /* 글자 길이만큼 — '진행 중 N' 이 좁은 칸에 끼지 않게 */
+  /* ★ 탭은 글자 · 건수 폭 아래로 줄지 않는다(flex-shrink 0) — 모자라면 [거르기] · 새로고침이 다음 줄로 (22 지시).
+       예전 flex:1 1 0 + min-width:0 은 글자를 키우거나(CSS 확대 · 큰 글씨 설정) 좁은 폰에서 '진행 중' · '대기' · '완료' 가 겹쳤다.
+       그래도 모자라면(아주 좁고 크게) 탭 자체가 두 줄로 — 겹치거나 잘리지 않는다 */
+  .lbar .stabs{flex:1 1 auto;flex-wrap:wrap;max-width:100%}
+  .lbar .stabs button{flex:1 0 auto;padding:0 8px}
 }
 /* 폰 — [거르기] 는 글자로(깔때기 아이콘만으로는 뜻이 모호하다 · 15 지시), 새로고침은 아이콘 + 숨은 이름 */
 @media (max-width:479px){
@@ -1067,6 +1070,10 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 /* 최근 기록 — 날짜를 앞에 밝혀, 오래된 기록이 지금 상황처럼 보이지 않게. 한 줄(넘으면 줄임표) */
 .trow .clog{display:flex;align-items:baseline;gap:8px;margin:0;min-width:0;font-size:15px;line-height:1.45;color:var(--t2)}
 .clog .cd{flex:none;font-size:var(--fs-sm);color:var(--t3);font-variant-numeric:tabular-nums}
+.clog .cd.bad{color:var(--wn);font-weight:600}   /* 있을 수 없는 날짜 — '날짜 확인 필요' (원문은 title) */
+/* 직원 정보 창 — 자리 넘기기가 안 되는 이유 한 줄 (22 지시) */
+.mwhy{display:flex;align-items:flex-start;gap:6px;overflow-wrap:anywhere}
+.mwhy .ic{flex:none;width:16px;height:16px;margin-top:2px;color:var(--wn)}
 .clog .tx{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* 보조 한 줄 — 담당 딱지 · 마감 · 가장 중요한 표시 하나 · 새 댓글 (모두 14px · 보통 굵기) */
 .trow .ctop{display:flex;align-items:center;flex-wrap:wrap;gap:4px 14px;margin:2px 0 0;min-width:0;font-size:var(--fs-sm);color:var(--t3)}
@@ -1199,7 +1206,7 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
   .achips:empty{display:none}
 }
 @media (max-width:719px){ .achips{margin:0 0 12px} }
-.aentry{display:flex;align-items:center;gap:10px;flex:1 1 220px;min-width:0;min-height:var(--tap-main);padding:0 12px 0 14px;
+.aentry{display:flex;align-items:center;flex-wrap:wrap;gap:4px 10px;flex:1 1 220px;min-width:0;min-height:var(--tap-main);padding:6px 12px 6px 14px;
   border:1px solid var(--line);border-radius:var(--r-lg);background:var(--card);color:var(--t1);font:inherit;text-align:left;cursor:pointer}
 .aentry:hover{border-color:var(--line2)}
 .aentry .ai{display:inline-flex;align-items:center;justify-content:center;flex:none;color:var(--t3)}
@@ -1208,7 +1215,7 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .aentry .al b{font-weight:700}
 .aentry .ahot{flex:none;padding:2px 8px;border-radius:var(--r-sm);background:var(--dg-bg);color:var(--dg);font-size:var(--fs-sm);font-weight:600;white-space:nowrap}
 .aentry .ach{flex:none;margin-left:auto;width:18px;height:18px;color:var(--t3)}
-@media (max-width:419px){ .aentry{gap:8px;padding:0 10px 0 12px} .aentry .ach{display:none} }   /* 좁은 폰 — 화살표 자리를 글자에 (상자 밖으로 삐져나왔다) */
+@media (max-width:419px){ .aentry{gap:4px 8px;padding:6px 10px 6px 12px} .aentry .ach{display:none} }   /* 좁은 폰 — 화살표 자리를 글자에 (상자 밖으로 삐져나왔다) · 모자라면 '급한 일' 이 아래 줄로 */
 .achips .achip{min-height:var(--tap-main)}
 .achip{display:inline-flex;align-items:center;gap:6px;flex:none;min-height:var(--tap);padding:0 14px;border:1px solid var(--line);border-radius:var(--r-lg);
   background:var(--card);color:var(--t2);font:inherit;font-size:var(--fs-sm);font-weight:500;white-space:nowrap;cursor:pointer}
@@ -5867,10 +5874,25 @@ function rowLog(t){
   var m=s.match(/^(\d{4}-\d{2}-\d{2})\s*([\s\S]*)$/);
   var 날=m? m[1] : '', 글=plainLine(m? m[2] : s);
   if(!글) return '';
-  return '<p class="clog">'+(날? '<span class="cd">'+esc(logDay(날))+'</span>' : '')+'<span class="tx">'+esc(글)+'</span></p>';
+  /* ★ 있을 수 없는 날짜(2026-99-99 · 2026-02-30)는 '오늘' 로 바꿔 말하지 않는다 (22 지시) — '날짜 확인 필요' + 원문은 title.
+       기록 글 · 원본 날짜 자료는 그대로 */
+  var 진짜=날? realDate(날) : false;
+  var 머리=!날? '' : 진짜? '<span class="cd">'+esc(logDay(날))+'</span>'
+                    : '<span class="cd bad" title="'+esc('기록 날짜 '+날)+'">날짜 확인 필요</span>';
+  return '<p class="clog">'+머리+'<span class="tx">'+esc(글)+'</span></p>';
 }
-/** 기록 날짜를 한 마디로 — 오늘 · 어제 · M월 D일 (올해가 아니면 연도까지) */
+/** 'YYYY-MM-DD' 가 달력에 실제로 있는 날인가 (13월 · 2월 30일 · 평년 2월 29일은 아니다) */
+function realDate(s){
+  var m=String(s==null?'':s).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(!m) return false;
+  var y=Number(m[1]), mo=Number(m[2]), d=Number(m[3]);
+  if(mo<1 || mo>12 || d<1) return false;
+  var x=new Date(Date.UTC(y, mo-1, d));
+  return x.getUTCFullYear()===y && x.getUTCMonth()===mo-1 && x.getUTCDate()===d;
+}
+/** 기록 날짜를 한 마디로 — 오늘 · 어제 · M월 D일 (올해가 아니면 연도까지). 실제 날짜만 받는다(realDate 를 거친 뒤) */
 function logDay(d){
+  if(!realDate(d)) return '날짜 확인 필요';
   var n=daysBetweenStr(d, todayStr());
   if(n===0) return '오늘';
   if(n===1) return '어제';
@@ -12574,10 +12596,20 @@ function openStaff(phone){
     /* PIN 초기화는 드문 일이라 작은 글자 링크로 맨 아래에 */
     (t.hasPin
       ? '<p class="note t2"><button class="linkbtn" onclick="resetPin(\''+phone+'\',\''+esc(t.name)+'\')">PIN 초기화 (등록된 기기도 모두 해제)</button></p>'
-      /* ★ 한 번도 앱에 들어온 적 없는 자리만 — 본인이 자기 번호로 가입했을 때 (2026-10-02).
-         PIN 을 초기화한 직원은 PIN 이 비어도 `seen` 이라 안 보인다. 판정은 서버(api_mergeStaff)가 다시 한다 */
-      : (!t.seen? '<p class="note t2"><button class="linkbtn" onclick="openMerge(\''+phone+'\')">가입한 사람에게 이 자리 넘기기</button></p>' : ''))+
+      /* ★ 자리 넘기기 — 서버 판정(merge: api_mergeStaff 와 같은 기준 · 쓴흔적_)대로 (22 지시).
+           넘길 수 있으면 링크, 아니면 **왜 안 되는지** 한 줄 (예전에는 링크가 말없이 사라져 관리자가 이유를 몰랐다).
+           옛 서버(merge 없음)이면 예전처럼 최근 접속(seen)으로만 */
+      : (mergeOk(t)
+          ? '<p class="note t2"><button class="linkbtn" onclick="openMerge(\''+phone+'\')">가입한 사람에게 이 자리 넘기기</button></p>'
+          : (t.merge && t.merge.why
+              ? '<p class="note t2 mwhy">'+ic('alert')+'<span>자리 넘기기 안 됨 — '+esc(t.merge.why)+'</span></p>' : '')))+
     '</div></div>';
+}
+/** 자리 넘기기를 할 수 있는 줄인가 — 서버가 보낸 판정(merge)을 그대로. 옛 서버면 PIN · 최근 접속이 없을 때만 */
+function mergeOk(t){
+  if(!t || t.hasPin) return false;
+  if(t.merge && typeof t.merge==='object') return t.merge.ok===true;
+  return !t.seen;
 }
 
 /* ---- 자리 넘기기 (관리자만, 2026-10-02) ----
@@ -12587,7 +12619,7 @@ function openStaff(phone){
 function openMerge(phone){
   var list=S.staffCache||[];
   var t=null; list.forEach(function(s){ if(s.phone===phone) t=s; });
-  if(!t || t.hasPin || t.seen) return;
+  if(!mergeOk(t)) return;
   var 후보=list.filter(function(s){ return s.phone!==phone && s.state==='재직' && s.hasPin; });
   $('modal').innerHTML='<div class="veil"><div class="sheet">'+
     '<div class="sheethead"><h3 class="tt">자리 넘기기</h3></div>'+
