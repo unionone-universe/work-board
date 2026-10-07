@@ -57,6 +57,8 @@ class CollectorTest(unittest.TestCase):
   self.assertEqual(len(c.edition(s,c.now())['items']),350)
  def test_html_script_not_evidence(self):
   self.assertNotIn('IGNORE ALL',c.text_of(c.soup_of('<div>지원 대상 기업<script>IGNORE ALL</script></div>'.encode())))
+ def test_malformed_input_does_not_erase_notice(self):
+  self.assertIn('지원 대상',c.text_of(c.soup_of('<form><input><div>지원 대상 기업입니다.</div></input></form>'.encode())))
  def test_missing_body_fails_instead_of_silent_success(self):
   class Web:
    def get(self,u):return b'<html>error</html>',{},u
@@ -64,7 +66,7 @@ class CollectorTest(unittest.TestCase):
  def test_change_and_attachment_failure(self):
   html='<div class="notice"><p>지원 대상: 대구 기업</p><p>신청기간 2026.10.01 ~ 2026.10.30</p><p>지원내용: 컨설팅 지원입니다.</p><a href="/x.pdf">공고.pdf</a></div>'
   class Web:
-   def get(self,u):
+   def get(self,u,**kwargs):
     if u.endswith('.pdf'):raise TimeoutError('기관 장애')
     return html.encode(),{},u
   src={'body':'.notice','name':'기관','kind':'test'};e={'url':'https://example.com/a','title':'컨설팅 지원','sourceId':'a'}

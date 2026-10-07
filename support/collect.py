@@ -69,7 +69,7 @@ class Web:
    seconds=min(seconds,max(1,(current.replace(hour=8,minute=0,second=0,microsecond=0)-current).total_seconds()-45))
   self.end=time.monotonic()+seconds;self.locks={};self.guard=threading.Lock();self.robots={};self.local=threading.local()
  def expired(self): return time.monotonic()>self.end
- def get(self,url,limit=24*1024*1024,robots=True):
+ def get(self,url,limit=24*1024*1024,robots=True,referer=''):
   if self.expired(): raise TimeoutError('조사 실행 시간 종료 — 다음 실행에서 계속')
   if not hasattr(self.local,'session'):self.local.session=requests.Session()
   for redirect in range(6):
@@ -87,7 +87,7 @@ class Web:
     time.sleep(.2)
     for attempt in range(3):
      try:
-      with self.local.session.get(url,headers={'User-Agent':AGENT},timeout=(8,30),stream=True,allow_redirects=False) as r:
+      with self.local.session.get(url,headers={'User-Agent':AGENT,**({'Referer':referer} if referer else {})},timeout=(8,30),stream=True,allow_redirects=False) as r:
        if r.is_redirect:
         url=up.urljoin(url,r.headers.get('Location',''));break
        if r.status_code in (429,500,502,503,504) and attempt<2:
@@ -111,7 +111,9 @@ def soup_of(data):
 
 def text_of(node):
  clone=BeautifulSoup(str(node),'html.parser')
- for e in clone.select('script,style,nav,footer,header,form input,button,.boardPN,.boardBottom'):e.decompose()
+ for e in clone.select('script,style,nav,footer,header,button,.boardPN,.boardBottom'):e.decompose()
+ # Some institutions wrap content in a malformed <input>; discard the tag, not its children.
+ for e in clone.select('input'):e.unwrap()
  # Inline formatting must not split Korean words; block boundaries still delimit facts.
  for e in clone.find_all(['p','li','tr','div','dt','dd','h1','h2','h3','h4','br']):e.append('\n')
  return '\n'.join(tidy(x) for x in clone.get_text(' ').splitlines() if tidy(x))
@@ -173,6 +175,7 @@ def extract_binary(data,name,ocr=True,depth=0):
       doc=pdfium.PdfDocument(data);page=doc[i];bmp=page.render(scale=2)
       t=pytesseract.image_to_string(bmp.to_pil(),lang='kor+eng',timeout=45)
       bmp.close();page.close();doc.close()
+      issues.append(f'PDF {i+1}쪽 OCR 추출 — 이미지 원문 대조 필요')
      except Exception:t=''
     if len(re.sub(r'\s','',t))<20:issues.append(f'PDF {i+1}쪽 문자 확인 불가')
    texts.append(t)
@@ -210,10 +213,11 @@ def extract_binary(data,name,ocr=True,depth=0):
     elif re.search(r'\.(pdf|hwp|hwpx|zip)$',f.filename,re.I):
      t,w=extract_binary(z.read(f),f.filename,ocr,depth+1);texts.append(t);issues.extend(f.filename+': '+x for x in w)
     else:issues.append(f.filename+': 읽지 못한 형식')
- elif re.search(r'\.(png|jpe?g|tiff?)$',name,re.I) and ocr and shutil.which('tesseract'):
+ elif (data.startswith((b'\x89PNG',b'\xff\xd8\xff')) or re.search(r'\.(png|jpe?g|tiff?)\b',name,re.I)) and ocr and shutil.which('tesseract'):
   import pytesseract
   from PIL import Image
   texts.append(pytesseract.image_to_string(Image.open(io.BytesIO(data)),lang='kor+eng',timeout=45))
+  issues.append('이미지 OCR 추출 — 원문 대조 필요')
  else:issues.append('읽지 못한 형식 — 원문 확인 필요')
  text='\n'.join(texts);text=re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]',' ',text)
  if not text.strip() and not issues:issues.append('문자 추출 결과 없음')
@@ -228,10 +232,15 @@ def attachments(node,base):
    h='/cmm/fileDown.do?fileId='+up.quote(m[1])+'&fileSn='+up.quote(m[2])
   if (m:=re.search(r"fn_egov_downFile\('([^']+)',\s*'([^']+)'\)",js)):
    code=node.select_one('[id="encodeFileId'+m[1]+'"]')
-   if code:h='/icms/cmm/fms/FileDownForBoard.do?'+up.urlencode({'atchFileId':m[1],'fileSn':m[2],'encodeFileId':code.get('value','')})
+   if code:h='/icms/cmm/fms/FileDownForBoard.do?'+up.urlencode({'atchFileId':m[1],'fileSn':m[2],'encodeFileId':up.unquote(code.get('value',''))})
   if re.search(r'\.(pdf|hwp|hwpx|zip|xlsx?|docx?|png|jpg)(?:$|\?)|fileDown|filedown|download|atchFile',h,re.I):
    if h.startswith(('javascript:','#')):continue
    u=up.urljoin(base,h);found[u]={'url':u,'name':label}
+ # Notices are sometimes a poster embedded in the body, with no download link.
+ for img in node.select('img[src]'):
+  h=img['src']
+  if re.search(r'\.(png|jpe?g)(?:$|\?)',h,re.I) and re.search(r'upload|/data/|/file|attach',h,re.I) and not re.search(r'logo|icon|banner',h,re.I):
+   u=up.urljoin(base,h);found.setdefault(u,{'url':u,'name':img.get('alt') or '본문 이미지'})
  return list(found.values())
 
 def detail(web,src,entry,old):
@@ -239,7 +248,7 @@ def detail(web,src,entry,old):
  candidates=s.select(src['body']);body=max(candidates,key=lambda x:len(x.get_text()),default=None)
  if not body:raise ValueError('공고 본문 영역을 찾지 못함')
  bodycopy=BeautifulSoup(str(body),'html.parser')
- for e in bodycopy.select('.viewInfo,.viewNav,.bbsView_info,.boardPN,.snsTop,.snsBottom,.sns_wrap'):e.decompose()
+ for e in bodycopy.select('.viewInfo,.viewNav,.bbsView_info,.boardPN,.snsTop,.snsBottom,.sns_wrap,[aria-label="조회수"]'):e.decompose()
  for e in bodycopy.find_all(['li','tr']):
   if re.search(r'조회\s*수',e.get_text()) and len(e.get_text())<100:e.decompose()
  for e in bodycopy.select('.board-read-table__column3--item'):
@@ -288,7 +297,9 @@ def detail(web,src,entry,old):
   seen.add(doc['url'])
   d=dict(doc)
   try:
-   b,headers,_=web.get(doc['url']);d['hash']=digest(b)
+   b,headers,_=web.get(doc['url'],referer=url)
+   if re.search(br'<(?:!doctype\s+html|html)\b',b[:500],re.I):raise ValueError('첨부 대신 안내/오류 페이지가 도착함')
+   d['hash']=digest(b)
    name=up.unquote(headers.get('Content-Disposition',''))+' '+doc['name']+' '+up.unquote(doc['url'])
    t,w=extract_binary(b,name);d.update(status='확인' if not w else '일부 미확인',issues=w)
    alltext+='\n'+t
@@ -377,7 +388,7 @@ def edition(state,finished):
  sources=list(state['sources'].values())
  return {'publishedOn':publish.date().isoformat(),'publishAt':publish.isoformat(),'researchedAt':finished.isoformat(timespec='seconds'),
   'items':items,'sources':sources,'pending':len(state['pending']),
-  'partial':bool(state['pending']) or any(x.get('status')!='목록 확인' for x in sources),
+  'partial':bool(state['pending']) or any(x.get('status')!='목록 확인' or x.get('unreadAttachments',0) for x in sources),
   'method':'공식 본문·첨부의 규칙 기반 추출. 신청 자격 확정/법률 판단이 아닙니다. 미확인 항목은 원문 확인이 필요합니다.'}
 
 def run(args):
@@ -401,6 +412,7 @@ def run(args):
     if not links:
      if page==1:raise ValueError('목록 구조 변경 또는 빈 응답 — 새 공고 없음으로 판단하지 않음')
      health.update(cursor=1,cycleCompletedAt=stamp());break
+    if page==1:health['firstPageCount']=len(links)
     sig=digest('|'.join(x['url'] for x in links))
     if sig in signatures:
      health.update(cursor=1,cycleCompletedAt=stamp());break
@@ -425,7 +437,14 @@ def run(args):
  queues={sid:[] for sid in sources}
  for e in state['pending'].values():
   if e['sourceId'] in queues:queues[e['sourceId']].append(e)
- for q in queues.values():q.sort(key=lambda e:(e.get('listedAt')!=started,e.get('listRank',999999)))
+ for sid,q in queues.items():
+  def queue_key(e):
+   old=state['notices'].get(e['url'],{})
+   latest=e.get('listedAt')==started and e.get('listRank',999999)<state['sources'][sid].get('firstPageCount',15)
+   # The latest page is always checked. Then advance unseen notices before re-reading today's completed backlog.
+   priority=0 if latest else 1 if not old else 2 if old.get('checkedAt','')[:10]<started[:10] else 3
+   return priority,old.get('checkedAt',''),e.get('listRank',999999)
+  q.sort(key=queue_key)
  jobs=[]
  for i in range(max((len(q) for q in queues.values()),default=0)):
   jobs.extend(q[i] for q in queues.values() if len(q)>i)
