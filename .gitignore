@@ -22,3 +22,8 @@ appsscript.json
 
 # Claude 작업 도구 폴더 (리뷰 훅·기록) — 공개 저장소에 올리지 않습니다 (2026-09-28)
 .claude/
+# 공개 공고 수집 실행 자료는 별도 support-data 브랜치에만 저장
+support-state/
+support-data/
+__pycache__/
+*.pyc

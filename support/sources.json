@@ -1,0 +1,10 @@
+[
+  {"id":"bizinfo","name":"기업마당","url":"https://www.bizinfo.go.kr/sii/siia/selectSIIA200View.do?schEndAt=N&rows=100&cpage={page}","kind":"bizinfo","scope":"전국·지역 지원사업 통합 공고 (접수 중·예정)","body":".view_cont","container":".support_project_detail"},
+  {"id":"kstartup","name":"K-Startup","url":"https://www.k-startup.go.kr/web/contents/bizpbanc-ongoing.do?page={page}","kind":"kstartup","scope":"창업·사업화·시설·교육","body":".app_notice_details-wrap","title":"#scrTitle h3"},
+  {"id":"gokams","name":"예술경영지원센터","url":"https://www.gokams.or.kr/02_apply/introduction.aspx?page={page}","kind":"gokams","scope":"예술기업·융자·보증·공연·유통","body":".boardView","category":"문화·예술"},
+  {"id":"dgfca","name":"대구문화예술진흥원","url":"https://www.dgfca.or.kr/article/NOTICE/list?pageIndex={page}","kind":"dgfca","scope":"대구 문화예술·대관·예술인","body":".board_detail","category":"문화·예술"},
+  {"id":"arko","name":"한국문화예술위원회","url":"https://www.arko.or.kr/board/list/4013?bid=463&page={page}","kind":"arko","scope":"문예진흥기금·공연·예술활동","body":".boardView, .sub-content","title":".viewHead .subject|.info-tit .ti","category":"문화·예술"},
+  {"id":"dpis","name":"대구테크노파크","url":"https://dpis.or.kr/page/businessList.do?pageIndex={page}","kind":"dpis","scope":"대구 기업지원·스마트도시·사업화","body":".bbsView","title":".bbsView_tit strong"},
+  {"id":"dash","name":"대구창업허브 DASH","url":"https://startup.daegu.go.kr/index.do?menu_id=00002552&pageIndex={page}","kind":"dash","scope":"대구 창업·시설·보증·사업화","body":".support_view","title":".top_tit2"},
+  {"id":"dip","name":"대구디지털혁신진흥원","url":"https://www.dip.or.kr/home/notice/businessbbs/boardList.ubs?fboardcd=business&sfpage={page}","kind":"dip","scope":"대구 소프트웨어·플랫폼·콘텐츠","body":".subcontents__detail","title":".read__title h3","category":"앱·플랫폼"}
+]

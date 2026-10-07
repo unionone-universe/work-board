@@ -17,3 +17,7 @@ node_modules/**
 
 # Project-local Astra review infrastructure
 .claude/**
+support/**
+support-state/**
+support-data/**
+.github/**
