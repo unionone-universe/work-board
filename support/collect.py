@@ -76,6 +76,7 @@ class Web:
    url=safe_url(url);host=up.urlsplit(url).netloc
    with self.guard: lock=self.locks.setdefault(host,threading.RLock())
    with lock:
+    if self.expired():raise TimeoutError('조사 시간 종료 — 다음 실행에서 계속')
     if robots:
      root=up.urlunsplit((*up.urlsplit(url)[:2],'/robots.txt','',''))
      if root not in self.robots:
@@ -86,6 +87,7 @@ class Web:
      if rp and not rp.can_fetch(AGENT,url): raise ValueError('기관 robots 규칙으로 자동 열람 제한')
     time.sleep(.2)
     for attempt in range(3):
+     if self.expired():raise TimeoutError('조사 시간 종료 — 다음 실행에서 계속')
      try:
       with self.local.session.get(url,headers={'User-Agent':AGENT,**({'Referer':referer} if referer else {})},timeout=(8,30),stream=True,allow_redirects=False) as r:
        if r.is_redirect:
@@ -116,7 +118,8 @@ def text_of(node):
  for e in clone.select('input'):e.unwrap()
  # Inline formatting must not split Korean words; block boundaries still delimit facts.
  for e in clone.find_all(['p','li','tr','div','dt','dd','h1','h2','h3','h4','br']):e.append('\n')
- return '\n'.join(tidy(x) for x in clone.get_text(' ').splitlines() if tidy(x))
+ text='\n'.join(tidy(x) for x in clone.get_text(' ').splitlines() if tidy(x))
+ return re.sub(r'(조회\s*수|조회|스크랩|추천)\s*[:：]?\s*\d+',r'\1',text)
 
 def list_links(src, soup, base):
  result={};kind=src['kind']
@@ -159,21 +162,26 @@ def snippets(text,pattern,max_chars=650):
  result='\n'.join(hits)
  return result if len(result)<=max_chars else result[:max_chars]+'… (발췌 · 나머지 조건은 원문 확인)'
 
-def extract_binary(data,name,ocr=True,depth=0):
+def extract_binary(data,name,ocr=True,depth=0,deadline=None):
  """Return text plus explicit unresolved parts; don't execute documents or macros."""
  issues=[];texts=[]
+ def check_time():
+  if deadline is not None and time.monotonic()>=deadline:raise TimeoutError('문서 조사 시간 종료 — 다음 조사에서 다시 확인')
+ def ocr_timeout():return max(1,min(45,int(deadline-time.monotonic()))) if deadline is not None else 45
+ check_time()
  if data.startswith(b'%PDF'):
   pdf=PdfReader(io.BytesIO(data))
   if pdf.is_encrypted and not pdf.decrypt(''):return '',['암호화 PDF']
   if len(pdf.pages)>200:return '',['PDF 200쪽 초과 — 원문 확인 필요']
   for i,p in enumerate(pdf.pages):
+   check_time()
    t=p.extract_text() or ''
    if len(re.sub(r'\s','',t))<30:
     if ocr and shutil.which('tesseract'):
      try:
       import pypdfium2 as pdfium, pytesseract
       doc=pdfium.PdfDocument(data);page=doc[i];bmp=page.render(scale=2)
-      t=pytesseract.image_to_string(bmp.to_pil(),lang='kor+eng',timeout=45)
+      t=pytesseract.image_to_string(bmp.to_pil(),lang='kor+eng',timeout=ocr_timeout())
       bmp.close();page.close();doc.close()
       issues.append(f'PDF {i+1}쪽 OCR 추출 — 이미지 원문 대조 필요')
      except Exception:t=''
@@ -185,6 +193,7 @@ def extract_binary(data,name,ocr=True,depth=0):
    header=hwp.openstream('FileHeader').read();flags=struct.unpack_from('<I',header,36)[0]
    if flags & 6:return '',['암호화/배포용 HWP']
    for path in sorted(hwp.listdir()):
+    check_time()
     if len(path)==2 and path[0]=='BodyText' and path[1].startswith('Section'):
      chunk=hwp.openstream(path).read()
      if flags&1:
@@ -206,17 +215,18 @@ def extract_binary(data,name,ocr=True,depth=0):
    if sum(i.file_size for i in infos)>64*1024*1024 or len(infos)>400:return '',['압축 해제 크기 제한']
    is_hwpx=any(re.fullmatch(r'Contents/section\d+\.xml',i.filename) for i in infos)
    for f in infos:
+    check_time()
     if f.is_dir():continue
     if is_hwpx:
      if re.fullmatch(r'Contents/section\d+\.xml',f.filename):
       root=ET.fromstring(z.read(f));texts.extend(''.join(x.itertext()) for x in root.iter() if x.tag.endswith('}p'))
     elif re.search(r'\.(pdf|hwp|hwpx|zip)$',f.filename,re.I):
-     t,w=extract_binary(z.read(f),f.filename,ocr,depth+1);texts.append(t);issues.extend(f.filename+': '+x for x in w)
+     t,w=extract_binary(z.read(f),f.filename,ocr,depth+1,deadline);texts.append(t);issues.extend(f.filename+': '+x for x in w)
     else:issues.append(f.filename+': 읽지 못한 형식')
  elif (data.startswith((b'\x89PNG',b'\xff\xd8\xff')) or re.search(r'\.(png|jpe?g|tiff?)\b',name,re.I)) and ocr and shutil.which('tesseract'):
   import pytesseract
   from PIL import Image
-  texts.append(pytesseract.image_to_string(Image.open(io.BytesIO(data)),lang='kor+eng',timeout=45))
+  texts.append(pytesseract.image_to_string(Image.open(io.BytesIO(data)),lang='kor+eng',timeout=ocr_timeout()))
   issues.append('이미지 OCR 추출 — 원문 대조 필요')
  else:issues.append('읽지 못한 형식 — 원문 확인 필요')
  text='\n'.join(texts);text=re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f]',' ',text)
@@ -301,7 +311,7 @@ def detail(web,src,entry,old):
    if re.search(br'<(?:!doctype\s+html|html)\b',b[:500],re.I):raise ValueError('첨부 대신 안내/오류 페이지가 도착함')
    d['hash']=digest(b)
    name=up.unquote(headers.get('Content-Disposition',''))+' '+doc['name']+' '+up.unquote(doc['url'])
-   t,w=extract_binary(b,name);d.update(status='확인' if not w else '일부 미확인',issues=w)
+   t,w=extract_binary(b,name,deadline=getattr(web,'end',None));d.update(status='확인' if not w else '일부 미확인',issues=w)
    alltext+='\n'+t
   except Exception as ex:d.update(status='미확인',issues=[type(ex).__name__+': '+str(ex)[:130]])
   if d['status']!='확인':issues.append('첨부 미확인: '+doc['name'])

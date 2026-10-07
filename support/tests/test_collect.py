@@ -25,6 +25,8 @@ class CollectorTest(unittest.TestCase):
  def test_unsupported_is_not_verified(self):
   t,w=c.extract_binary('<html>접근 실패</html>'.encode(),'공고.pdf',False)
   self.assertFalse(t);self.assertTrue(w)
+ def test_expired_budget_defers_document(self):
+  with self.assertRaises(TimeoutError):c.extract_binary(b'any','notice.pdf',deadline=0)
  def test_archive_unknown_file_remains_unverified(self):
   b=io.BytesIO()
   with zipfile.ZipFile(b,'w') as z:z.writestr('공고.exe',b'do not execute')
@@ -57,6 +59,10 @@ class CollectorTest(unittest.TestCase):
   self.assertEqual(len(c.edition(s,c.now())['items']),350)
  def test_html_script_not_evidence(self):
   self.assertNotIn('IGNORE ALL',c.text_of(c.soup_of('<div>지원 대상 기업<script>IGNORE ALL</script></div>'.encode())))
+ def test_view_count_is_not_a_notice_revision(self):
+  a=c.text_of(c.soup_of('<div>조회수 125 지원대상 기업</div>'.encode()))
+  b=c.text_of(c.soup_of('<div>조회수 129 지원대상 기업</div>'.encode()))
+  self.assertEqual(a,b)
  def test_malformed_input_does_not_erase_notice(self):
   self.assertIn('지원 대상',c.text_of(c.soup_of('<form><input><div>지원 대상 기업입니다.</div></input></form>'.encode())))
  def test_missing_body_fails_instead_of_silent_success(self):
