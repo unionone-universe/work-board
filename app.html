@@ -11914,7 +11914,7 @@ function openDocForm(code, prefill){
   var 항목들='';
   (f.fields||[]).forEach(function(fd,i){
     var id='fd_'+i;
-    항목들+='<div class="field"><label for="'+id+'" class="fl'+(fd.req?' req':'')+'">'+esc(fd.name)+(fd.req?' <span class="sronly">필수</span>':'')+'</label>';
+    항목들+='<div class="field"><label for="'+id+'" class="fl'+(fd.req?' req':'')+'">'+esc(fd.name)+'</label>';
     if(fd.kind==='선택'){
       항목들+='<select id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField">'+
          (fd.req?'':'<option value=""></option>')+
