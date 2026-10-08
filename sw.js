@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v110';  // 2026-10-07 지원사업 소식 · 수집과 예약 게시
+const CACHE = 'unionone-launcher-v111';  // 2026-10-07 지원사업 소식 · 수집과 예약 게시
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;

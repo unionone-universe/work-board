@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v110">
+<meta name="uo-version" content="v111">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
@@ -2163,7 +2163,7 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 
 <!-- ================= 통신이 끊겼을 때 — 끊겨 있는 동안 계속 떠 있습니다 ================= -->
 <div class="offbar hide" id="offBar">인터넷이 끊겼습니다 · 지난번 화면을 보고 계십니다</div>
-<div class="offbar hide" id="serverBar" role="status">서버 연결을 확인하지 못했습니다 · 이전 자료일 수 있습니다. 저장·삭제 결과를 확인해 주세요. <button class="btn sm" onclick="location.reload()">다시 연결</button></div>
+<div class="offbar hide" id="serverBar" role="status"><span id="serverStatusText">최신 자료를 받지 못했습니다.</span> <button id="serverRetry" class="btn sm" onclick="reconnectServer()">다시 연결</button></div>
 
 <div class="wrap" id="wrap">
   <!-- ================= 업무 ================= -->
@@ -3954,6 +3954,8 @@ function call(fn){
   return callWithOptions.apply(null,[{}].concat(Array.prototype.slice.call(arguments)));
 }
 var READ_PENDING=Object.create(null), READ_REV=0;
+var CONNECTION_SEQ=0, CONNECTION_BOARD_OK=0, CONNECTION_FAILED=0;
+var RETRY_READS={api_start:1,api_board:1,api_lastUpdate:1};
 function callWithOptions(options,fn){
   var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1};
   if(!reads[fn]){if(!QUIET_CALLS[fn])READ_REV++;return callTransport.apply(null,args);}
@@ -3964,10 +3966,10 @@ function callWithOptions(options,fn){
 }
 function callTransport(options,fn){
   var args = Array.prototype.slice.call(arguments,2);
-  var t0 = Date.now();
+  var t0 = Date.now(), connectionSeq=++CONNECTION_SEQ, connectionEpoch=S.epoch, connectionToken=S.token, readRev=READ_REV;
   var status=0, readFailure=false, silent=!!(options.quiet || QUIET_CALLS[fn]);
   var controller=new AbortController();
-  var deadline=setTimeout(function(){controller.abort();},45000);
+  var deadline=setTimeout(function(){controller.abort();},RETRY_READS[fn]?22000:45000);
   /* ★★ 이번 요청의 답 번호를 비워 둡니다 (2026-09-03).
      안 비우면 **직전에 성공한 요청의 번호가 그대로 남아**, 서버에 아예 닿지도
      못한 실패가 `HTTP 200` 으로 기록됩니다. 원인을 정반대로 짚게 됩니다. */
@@ -4006,7 +4008,10 @@ function callTransport(options,fn){
     if(r && r.message && !r.msg) r.msg=r.message;
     if(status>=400){ var httpError=new Error('HTTP '+status); httpError.http=true; throw httpError; }
     /* 가벼운 상태 조회 성공만으로 업무 자료 연결까지 복구됐다고 표시하지 않는다. */
-    if(r && r.ok && (fn==='api_board' || fn==='api_start')) setServerUnavailable(false);
+    if(r && r.ok && (fn==='api_board' || fn==='api_start') && connectionEpoch===S.epoch && connectionToken===S.token){
+      CONNECTION_BOARD_OK=Math.max(CONNECTION_BOARD_OK,connectionSeq);
+      if(connectionSeq>=CONNECTION_FAILED) setServerUnavailable(false);
+    }
 
     var ms = Date.now()-t0;
     var server = (r && r.ms) ? r.ms : (r && r.board && r.board.ms ? r.board.ms : null);
@@ -4057,8 +4062,21 @@ function callTransport(options,fn){
     console.log('[속도] '+fn+' 실패 '+((Date.now()-t0)/1000).toFixed(2)+'초', e);
     var offline = (typeof navigator!=='undefined' && navigator.onLine===false);
     var 읽기실패 = readFailure;
-    if(offline) setOffline(true);
-    setServerUnavailable(true);
+    var sameConnection=connectionEpoch===S.epoch && connectionToken===S.token;
+    // 조회만 한 번 재시도한다. 서버가 거절한 JSON 응답과 모든 쓰기는 재전송하지 않는다.
+    if(RETRY_READS[fn] && !options.retried && !offline && sameConnection && readRev===READ_REV && connectionSeq>=CONNECTION_BOARD_OK && status!==401 && status!==403){
+      clearTimeout(deadline);
+      return new Promise(function(resolve){setTimeout(resolve,600);}).then(function(){
+        if(connectionEpoch!==S.epoch || connectionToken!==S.token || readRev!==READ_REV)
+          return {ok:false,net:true,stale:true,msg:'화면이 바뀌어 이전 조회를 중단했습니다.'};
+        return callTransport.apply(null,[Object.assign({},options,{retried:true}),fn].concat(args));
+      });
+    }
+    if(sameConnection && connectionSeq>=CONNECTION_BOARD_OK){
+      CONNECTION_FAILED=Math.max(CONNECTION_FAILED,connectionSeq);
+      if(offline) setOffline(true);
+      setServerUnavailable(true);
+    }
 
     if(!읽기실패){
       keepFail({ fn:fn, why:e.name==='AbortError'?'응답 시간 초과':'서버에 닿지 못함', status:status, quiet:silent,
@@ -4538,6 +4556,19 @@ function loadSnap(){
  */
 var OFFLINE = false;
 var SERVER_UNAVAILABLE = false;
+var RECONNECTING=null;
+function reconnectServer(){
+  if(RECONNECTING) return RECONNECTING;
+  var button=$('serverRetry');
+  if(button){button.disabled=true;button.textContent='확인 중…';}
+  // 입력 중인 창과 화면을 보존한다. 새로고침으로 쓰던 내용을 버리지 않는다.
+  var job=Promise.resolve().then(function(){return S.me && S.meta ? refresh(false) : boot();})
+    .finally(function(){
+      if(RECONNECTING===job)RECONNECTING=null;
+      if(button){button.disabled=false;button.textContent='다시 연결';}
+    });
+  RECONNECTING=job;return job;
+}
 function setServerUnavailable(on){
   SERVER_UNAVAILABLE=!!on;
   var bar=$('serverBar'); if(bar) bar.classList.toggle('hide',!on || OFFLINE);
@@ -4612,7 +4643,7 @@ function boot(){
 
   // ② 진짜 데이터는 왕복 한 번으로 받는다
   var seq0=++S.boardSeq, ep0=S.epoch;
-  callWithOptions({quiet:true},'api_start', S.token, S.corp).then(function(r){
+  return callWithOptions({quiet:true},'api_start', S.token, S.corp).then(function(r){
     /* ★ 보낸 뒤 권한이 줄었으면(업무 창에서 거절을 받는 등) 이 답은 옛것이다 (검수 2차).
        판은 다시 받고, 기준정보는 화면을 그릴 재료가 없을 때만 쓰되 현장 목록은 비운다 */
     var 옛답 = !!(r && r.ok && !boardFresh(seq0, ep0));
