@@ -2161,7 +2161,10 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
         <h1><span id="boardTitle" class="hide">내 업무 현황</span><span id="boardAll">전체 업무</span></h1>
         <p class="bsub" id="boardSub"></p>
       </div>
-      <button class="btn pri addtask" id="addTask" onclick="openTaskForm()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>새 업무</button>
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
+        <a class="btn sm" id="customerSheetLink" href="https://docs.google.com/spreadsheets/d/1sFArdatqGV_lCxa7eBKp42hfmB-l1vtAWNjunYZJ4NM/edit?gid=1209240728#gid=1209240728" target="_blank" rel="noopener noreferrer" aria-label="고객 관리시트 새 탭에서 열기">고객 관리 ↗</a>
+        <button class="btn pri addtask" id="addTask" onclick="openTaskForm()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>새 업무</button>
+      </div>
     </header>
     <!-- 폰 · 태블릿 — 지금 확인할 일 (PC 는 오른쪽 칸) -->
     <section id="supportRibbon" class="support-ribbon" aria-label="지원사업 소식" hidden></section>
@@ -2222,6 +2225,7 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
   <!-- ================= 설정 ================= -->
   <div id="view-settings" class="hide page">
     <div class="pagehead"><h3 class="tt">내 정보 · 설정</h3></div>
+    <div class="actions" style="margin:0 0 20px"><a class="btn" id="customerSheetSettings" href="https://docs.google.com/spreadsheets/d/1sFArdatqGV_lCxa7eBKp42hfmB-l1vtAWNjunYZJ4NM/edit?gid=1209240728#gid=1209240728" target="_blank" rel="noopener noreferrer" aria-label="고객 관리시트 새 탭에서 열기">고객 관리시트 ↗</a></div>
     <!-- 2.0 — 내 정보 · PIN · 로그아웃이 맨 위 한 줄 (위 탐색의 '나' 를 누르면 여기) -->
     <section class="mecard" aria-label="내 정보"><div class="meinfo" id="meInfo"></div>
       <div class="tfrow"><button class="btn sm" onclick="openPinChange()">PIN 변경</button>
@@ -6270,6 +6274,28 @@ function dday(due){
 /* ===================== 화면 전환 (워크보드 2.0) =====================
    화면은 넷 — 업무(board) · 일정(cal) · 결재(doc) · 나(settings) (+ 명단에 든 사람만의 기록장 note).
    ★ 옛 '내 업무' 화면은 업무 화면의 담당 '나' 로 합쳤습니다 — go('me') 는 그리로 간다 (옛 링크 · 알림이 끊기지 않게) */
+var NAV_VIEWS=[], NAV_BACK=false;
+function setupAppBack(){
+  var host=window;
+  try { if(window.parent!==window && window.parent.location.origin===location.origin) host=window.parent; } catch(ignore){}
+  try {
+    if(!host.history.state || !host.history.state.uoBackGuard){
+      host.history.replaceState({uoBackBase:true},'');
+      host.history.pushState({uoBackGuard:true},'');
+    }
+    if(host.__uoBackHandler) host.removeEventListener('popstate',host.__uoBackHandler);
+    host.__uoBackHandler=function(){
+      // 닫기 취소·첫 화면에서도 앱 밖으로 넘어가지 않게 한 단계만 유지한다.
+      host.history.pushState({uoBackGuard:true},'');
+      if($('modal') && $('modal').innerHTML){closeModal();return;}
+      var previous=NAV_VIEWS.pop();
+      if(previous){NAV_BACK=true;try{go(previous);}finally{NAV_BACK=false;}return;}
+      if(S.view!=='board'){NAV_BACK=true;try{go('board');}finally{NAV_BACK=false;}return;}
+      toast('첫 화면입니다.');
+    };
+    host.addEventListener('popstate',host.__uoBackHandler);
+  } catch(ignore){}
+}
 function go(v){
   if(v==='me'){
     if(S.me && !ownScope()){ S.owner=S.me.phone; S.anim=true; renderFilters(); }
@@ -6282,6 +6308,7 @@ function go(v){
     closeModal(true);
   }
   var 바뀜 = S.view!==v;
+  if(바뀜 && !NAV_BACK){NAV_VIEWS.push(S.view||'board');if(NAV_VIEWS.length>30)NAV_VIEWS.shift();}
   S.view=v;
   S.anim=true;
   var box=$('view-'+v);
@@ -11818,10 +11845,19 @@ function formList(){
   ((S.meta && S.meta.forms) || []).forEach(function(f){
     var c=String(f.code||'').trim();
     var n=String(f.name||'').trim();
-    if(!c || seenCode[c]) return;
+    if(!c || c==='PUR' || seenCode[c]) return;
     seenCode[c]=true;
     if(n && seenName[n]) return;
     if(n) seenName[n]=true;
+    if(c==='EXP'){
+      f=JSON.parse(JSON.stringify(f));
+      var payment=null, reason=null;
+      (f.fields||[]).forEach(function(fd){if(fd.name==='결제수단')payment=fd;if(fd.name==='구매사유')reason=fd;});
+      f.fields=f.fields||[];
+      if(payment){payment.opts=payment.opts||[];['직원카드','휴대폰결제'].forEach(function(v){if(payment.opts.indexOf(v)<0)payment.opts.push(v);});}
+      if(reason){reason.req=true;reason.kind='여러줄';}
+      else f.fields.push({name:'구매사유',kind:'여러줄',req:true,help:'무엇을 위해 구매했는지 적어주세요.'});
+    }
     out.push(f);
   });
   return out;
@@ -11830,6 +11866,7 @@ function formList(){
 /* prefill — 달력에서 '휴가 신청' 을 누르면 그 날짜를 시작일·종료일로 채워서 연다.
    { 항목명: 값 } 모양. 결재 흐름 자체는 그대로다. */
 function openDocForm(code, prefill){
+  if(code==='PUR'){toast('구매요청서는 더 이상 작성하지 않습니다. 지출결의서를 이용해주세요.');return;}
   var forms=formList();
   if(!forms.length){ toast('문서 양식이 없습니다. 설정에서 기준정보를 새로고침해주세요.'); return; }
   var f=null;
@@ -11877,14 +11914,14 @@ function openDocForm(code, prefill){
   var 항목들='';
   (f.fields||[]).forEach(function(fd,i){
     var id='fd_'+i;
-    항목들+='<div class="field"><label class="fl'+(fd.req?' req':'')+'">'+esc(fd.name)+'</label>';
+    항목들+='<div class="field"><label for="'+id+'" class="fl'+(fd.req?' req':'')+'">'+esc(fd.name)+(fd.req?' <span class="sronly">필수</span>':'')+'</label>';
     if(fd.kind==='선택'){
       항목들+='<select id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField">'+
          (fd.req?'':'<option value=""></option>')+
          fd.opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o)+'</option>'; }).join('')+
          '</select>';
     } else if(fd.kind==='여러줄'){
-      항목들+='<textarea id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField"></textarea>';
+      항목들+='<textarea id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField"'+(fd.req?' required aria-required="true"':'')+' placeholder="'+esc(fd.help||'')+'"></textarea>';
     } else if(fd.kind==='날짜'){
       /* 휴가 시작일을 고르면 종료일이 같이 따라온다 (하루짜리가 대부분) */
       var 따라감 = (f.code==='LEAVE' && fd.name==='시작일') ? ' onchange="leaveSyncEnd()"' : '';
@@ -11989,7 +12026,7 @@ function syncDocTitle(e){
 /** 서버의 docTitle_ 과 같은 규칙. 지출·구매는 품목이 2개 이상이면 '외 N건' 을 붙인다 */
 function autoDocTitle(){
   var code=$('dfCode')? $('dfCode').value : '';
-  var f=null; (S.meta.forms||[]).forEach(function(x){ if(x.code===code) f=x; });
+  var f=null; formList().forEach(function(x){ if(x.code===code) f=x; });
 
   var fields={};
   [].forEach.call(document.querySelectorAll('.dfField'),function(el){
@@ -12078,7 +12115,7 @@ function leaveSyncEnd(){
 
 function saveDoc(){
   var code=$('dfCode').value;
-  var f=null; (S.meta.forms||[]).forEach(function(x){ if(x.code===code) f=x; });
+  var f=null; formList().forEach(function(x){ if(x.code===code) f=x; });
   var msg=$('dfMsg');
 
   /* 사진이 아직 안 담겼으면 막는다. 버튼도 잠그고 있지만 이중으로 본다 */
@@ -13681,6 +13718,7 @@ function gotoNoti(kind, to){
   openDoc(id);
 }
 
+setupAppBack();
 boot();
 
 /* ===================== 별도 기록장 (2026-09-03) =====================
