@@ -11,7 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
 import olefile
-from relevance import POLICY, select
+from relevance import POLICY, select, research_priority
 
 KST = dt.timezone(dt.timedelta(hours=9))
 HERE = pathlib.Path(__file__).resolve().parent
@@ -124,8 +124,8 @@ def text_of(node):
 
 def list_links(src, soup, base):
  result={};kind=src['kind']
- for a in soup.select('a,button'):
-  h=a.get('href','');js=h+' '+a.get('onclick','');title=flat(a.get_text(' ',strip=True));u=''
+ for a in soup.select('a,button,area[href]'):
+  h=a.get('href','');js=h+' '+a.get('onclick','');title=flat(a.get_text(' ',strip=True) or a.get('alt',''));u=''
   if kind=='bizinfo' and 'selectSIIA200Detail' in h:
    q=up.parse_qs(up.urlsplit(h).query);pid=q.get('pblancId',[''])[0]
    if pid:u='https://www.bizinfo.go.kr/sii/siia/selectSIIA200Detail.do?pblancId='+pid
@@ -142,6 +142,7 @@ def list_links(src, soup, base):
    keys=['bid','cid'] if 'cid' in q else list(q)
    u=up.urlunsplit((*up.urlsplit(u)[:3],up.urlencode({k:q[k][0] for k in keys if k in q}),''))
    t=a.select_one('h3,h4,.title,.tit,strong');title=flat(t.get_text(' ',strip=True)) if t else title
+   title=re.sub(r'\s*-\s*20\d{2}.*$','',title).replace(' (바로가기)','')
   elif kind=='dpis' and a.get('data-id','').startswith('NOTICE_'):
    u='https://dpis.or.kr/page/businessDetail.do?menuId=101000000&noticeId='+a['data-id']
    title=a.get('title',title).removesuffix(' 자세히 보기')
@@ -319,6 +320,7 @@ def detail(web,src,entry,old):
   docresults.append(d)
  # Extract contextual source lines, including the attachments. No invented applicant verdict.
  facts={k:snippets(alltext,p) for k,p in FIELDS.items()}
+ facts['discipline']=snippets(alltext,r'지원\s*(분야|장르)|신청\s*(분야|장르)|대상\s*(분야|장르)')
  overview=fields.get('사업개요','');period=fields.get('신청기간','') or facts['period']
  bullets=re.findall(r'☞\s*([^☞]+)',overview)
  if bullets:facts['audience']=tidy(bullets[0])[:650]
@@ -428,6 +430,11 @@ def run(args):
     signatures.add(sig)
     for e in links:entries[e['url']]=e
     if page>=cursor:health['cursor']=page+1
+   for extra in src.get('extraLists',[]):
+    try:
+     eb,_,eu=web.get(extra)
+     for e in list_links(src,soup_of(eb),eu):entries[e['url']]=e
+    except Exception as ex:health['errors'].append('별도 공모 목록: '+str(ex)[:100]);health['status']='일부 확인 실패'
    health['lastSuccess']=stamp()
    if health['cursor']!=1 and not health['cycleCompletedAt']:health['status']='초기 대조 중'
   except Exception as ex:health['status']='조회 실패';health['errors'].append(type(ex).__name__+': '+str(ex)[:160])
@@ -454,6 +461,13 @@ def run(args):
    priority=0 if latest else 1 if not old else 2 if old.get('checkedAt','')[:10]<started[:10] else 3
    return priority,old.get('checkedAt',''),e.get('listRank',999999)
   q.sort(key=queue_key)
+  # 관련 공고 두 건 + 기존 조사 순서 한 건. 첫 화면 반복 조사로 자금 공고가 밀리지 않게 한다.
+  relevant=sorted([e for e in q if research_priority(e)<3],key=lambda e:(research_priority(e),queue_key(e)))
+  remaining=[e for e in q if research_priority(e)==3];ordered=[]
+  while relevant or remaining:
+   ordered.extend(relevant[:2]);del relevant[:2]
+   ordered.extend(remaining[:1]);del remaining[:1]
+  queues[sid]=ordered
  jobs=[]
  for i in range(max((len(q) for q in queues.values()),default=0)):
   jobs.extend(q[i] for q in queues.values() if len(q)>i)
@@ -494,9 +508,14 @@ def run(args):
 def refilter(output):
  """이미 공개된 자료의 선별만 재적용. 새 공고의 예약 시각은 앞당기지 않는다."""
  out=pathlib.Path(output);feed=load(out/'feed.json',{'schema':1,'editions':[]})
+ records=[load(f,{}) for f in (out/'records').glob('*.json')]
  for e in feed['editions']:
+  eligible={n['url']:n for n in records if n.get('url') and n.get('checkedAt') and n['checkedAt']<=e.get('researchedAt','')}
+  eligible.update({n['url']:n for n in e.get('items',[]) if n.get('url')})
   e.setdefault('reviewedCount',len(e.get('items',[])))
-  e['items']=select(e.get('items',[]));e['selectionPolicy']=POLICY
+  candidates=[{k:v for k,v in n.items() if k not in ('hash','history','closed')} for n in eligible.values() if not n.get('closed') and n.get('status')!='결과 발표']
+  e['items']=select(candidates);e['selectionPolicy']=POLICY
+  e['reviewedCount']=max(e['reviewedCount'],len(candidates))
  save(out/'feed.json',feed)
  print(json.dumps({'editions':[{'publishAt':e.get('publishAt'),'selected':len(e['items']),'reviewed':e['reviewedCount']} for e in feed['editions']]},ensure_ascii=False))
  return 0

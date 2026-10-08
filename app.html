@@ -3,6 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
+<meta name="uo-version" content="v109">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
@@ -3954,7 +3955,7 @@ function call(fn){
 }
 var READ_PENDING=Object.create(null), READ_REV=0;
 function callWithOptions(options,fn){
-  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_docDetail:1,api_docDetails:1,api_settings:1};
+  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1};
   if(!reads[fn]){if(!QUIET_CALLS[fn])READ_REV++;return callTransport.apply(null,args);}
   var key=JSON.stringify([fn,args.slice(2),S.epoch,READ_REV]);
   if(READ_PENDING[key])return READ_PENDING[key];
@@ -4330,6 +4331,8 @@ function ownScope(){ return !!(S.data && S.data.scope === 'own'); }
 /** 사람·권한이 바뀌었을 때 이 화면이 들고 있던 것을 전부 버린다 (2026-09-30) */
 function resetUserCaches(){
   S.epoch++;
+  if(SNAP_JOB!==null){clearTimeout(SNAP_JOB);SNAP_JOB=null;}
+  POSTS_LOADING=null;
   S.taskCache={}; S.docCache={}; S.docCacheAt={}; S.postCache=null; S.postCacheAt=null;
   S.readers={}; S.readSent={}; S.setCache=null; S.owner='';
   try{ MON.cache={}; }catch(e){}               // 월별 보고 (임원) — 사람이 바뀌면 버린다
@@ -4444,7 +4447,15 @@ function boardFresh(seq, ep){
   return true;
 }
 
+var SNAP_JOB=null;
+function scheduleSnap(){
+  if(SNAP_JOB!==null) clearTimeout(SNAP_JOB);
+  var ep=S.epoch,token=S.token;
+  SNAP_JOB=setTimeout(function(){SNAP_JOB=null;if(ep===S.epoch && token===S.token)saveSnap();},250);
+}
+window.addEventListener('pagehide',function(){if(SNAP_JOB!==null){clearTimeout(SNAP_JOB);SNAP_JOB=null;saveSnap();}});
 function saveSnap(){
+  if(SNAP_JOB!==null){clearTimeout(SNAP_JOB);SNAP_JOB=null;}
   try{
     if(!S.data) return;
     var d=S.data;
@@ -4589,7 +4600,6 @@ function boot(){
     renderFilters();
     S.anim=true;
     renderBoard();
-    renderNotices();
     $('atTime').textContent=S.data.at||'';
     navCount(); showNoti(S.data.noti);
     markStale(true);
@@ -4621,6 +4631,7 @@ function boot(){
       /* 지난번 화면조차 없으면(이 기기에서 처음 여는 경우) 회색 뼈대를
          영원히 두지 않고 무엇이 문제인지 알려 줍니다. */
       if(!snap) showOffline();
+      else startPolling();
       return;
     }
     if(!r.ok){
@@ -4635,7 +4646,6 @@ function boot(){
     S.anim = !snap;              // 스냅샷을 이미 그렸으면 조용히 갈아끼운다
     applyBoard(r);
     markStale(false);
-    saveSnap();
     startPolling();
   });
 }
@@ -4671,13 +4681,12 @@ function prefetchPosts(){
      예전에는 미리받기와 '공지 열기' 가 따로 불러서 같은 것을 두 번 받았습니다. */
   if(POSTS_LOADING) return POSTS_LOADING;
 
-  var at=areaVer('post');
-  POSTS_LOADING = callWithOptions({quiet:true},'api_posts', S.token).then(function(r){
-    if(r && r.ok){ S.postCache=r; S.postCacheAt=at; }
-    POSTS_LOADING=null;
-  }, function(){ POSTS_LOADING=null; });
-
-  return POSTS_LOADING;
+  var at=areaVer('post'),ep=S.epoch,token=S.token,rev=READ_REV;
+  var job = callWithOptions({quiet:true},'api_posts', S.token).then(function(r){
+    if(r && r.ok && ep===S.epoch && token===S.token && rev===READ_REV){ S.postCache=r; S.postCacheAt=at; }
+  }).finally(function(){if(POSTS_LOADING===job)POSTS_LOADING=null;});
+  POSTS_LOADING=job;
+  return job;
 }
 
 /* 상단바의 로고를 그대로 복제해 로그인 화면 머리를 만든다.
@@ -4877,37 +4886,24 @@ function dayChanged(){
   S.day=t;
   return true;
 }
+var POLL_BUSY=null, POLL_BOUND=false;
+function pollBoard(){
+  if(document.hidden || navigator.onLine===false || !S.me || !S.token || POLL_BUSY || SOFT) return;
+  if($('modal') && $('modal').innerHTML) return;
+  if(Date.now()-(S.lastCheck||0)<20000) return;
+  var ep=S.epoch,token=S.token,rev=READ_REV;
+  S.lastCheck=Date.now();
+  var full=dayChanged() || SERVER_UNAVAILABLE;
+  var job=(full ? refresh(false) : callWithOptions({quiet:true},'api_lastUpdate').then(function(v){
+    if(ep!==S.epoch || token!==S.token || rev!==READ_REV || !v || v.net) return;
+    if(v!==S.lastUpdate) return refresh(false);
+  })).finally(function(){if(POLL_BUSY===job)POLL_BUSY=null;});
+  POLL_BUSY=job;
+}
 function startPolling(){
   if(S.timer) clearInterval(S.timer);
-  /* 왕복 한 번에 고정으로 1초 넘게 든다. 확인 자체가 비용이므로 자주 묻지 않는다.
-     - 화면을 안 보고 있으면 묻지 않는다
-     - 창(모달)을 열어 뭔가 하는 중이면 묻지 않는다 (그 왕복 뒤로 사용자 동작이 밀린다)
-     - 방금 스스로 갱신했으면 건너뛴다 */
-  S.timer = setInterval(function(){
-    if(document.hidden) return;
-    if($('modal') && $('modal').innerHTML) return;
-    if(SOFT) return;
-    if(dayChanged()){ S.lastSync=Date.now(); S.lastCheck=Date.now(); refresh(false); return; }
-    if(Date.now() - (S.lastSync||0) < 50000) return;
-    S.lastSync=Date.now(); S.lastCheck=Date.now();
-    call('api_lastUpdate').then(function(v){
-      if(v && v.net) return;                 // 통신이 안 된 것 — 그냥 넘어간다
-      if(v && v !== S.lastUpdate){ refresh(false); }
-    });
-  }, 60000);
-  /* 앱으로 돌아올 때도 바뀐 게 있을 때만 받아온다 (무조건 board 를 받지 않는다).
-     ★ 휴대폰에서는 앱을 자주 왔다갔다 하므로 20초 안에는 다시 묻지 않는다 (v43).
-       확인 자체가 왕복 한 번이고, 그 왕복이 0.5~1초다. */
-  document.addEventListener('visibilitychange', function(){
-    if(document.hidden) return;
-    if(dayChanged()){ S.lastCheck=Date.now(); S.lastSync=Date.now(); refresh(false); return; }
-    if(Date.now() - (S.lastCheck||0) < 20000) return;
-    S.lastCheck=Date.now();
-    call('api_lastUpdate').then(function(v){
-      if(v && v.net) return;                 // 통신이 안 된 것 — 그냥 넘어간다
-      if(v && v !== S.lastUpdate) refresh(false);
-    });
-  });
+  S.timer=setInterval(pollBoard,60000);
+  if(!POLL_BOUND){document.addEventListener('visibilitychange',pollBoard);POLL_BOUND=true;}
 }
 
 /** 저장 결과를 서버 응답 전에 화면에 먼저 반영 */
@@ -5040,19 +5036,12 @@ function applyBoard(b){
     accessLost(S.openTask, '이 업무를 더 볼 수 없어 창을 닫았습니다.');
   }
   renderBoard();
-  renderNotices();
   $('atTime').textContent=b.at;
   navCount();
   showNoti(b.noti);
-  if(S.view==='doc') renderDocs();     // 결재 목록도 같이 왔으니 바로 갈아끼운다
-  saveSnap();
-
-  /* ★ 공지·댓글이 바뀌었으면 뒤에서 미리 받아 둔다 (2026-09-02).
-     prefetchPosts 안에서 '바뀐 게 없으면 서버에 안 간다' 를 이미 봅니다.
-     그래서 평소에는 왕복이 하나도 늘지 않고, 누가 댓글을 달았을 때만 한 번 받아옵니다.
-     덕분에 공지를 열면 댓글이 기다림 없이 같이 뜹니다.
-     ★ 미루지 않고 바로 시작합니다 — 사람이 공지를 누르기 전에 끝나 있어야 합니다. */
-  prefetchPosts();
+  if(S.view==='doc') renderDocs();
+  scheduleSnap();
+  // 공지 3건과 댓글은 판에 이미 있다. 전체 공지 이력은 공지를 열 때만 받는다.
 
   return true;
 }
@@ -5252,6 +5241,13 @@ function taskRecent(a, b){
   return (a.id<b.id) ? 1 : -1;                    // 같으면 늦게 만든 것이 위
 }
 
+var LIST_HTML=new WeakMap();
+function paintList(id,html){
+  var el=$(id);if(!el)return;
+  var old=LIST_HTML.get(el);
+  if(old && old.source===html && old.rendered===el.innerHTML)return;
+  el.innerHTML=html;LIST_HTML.set(el,{source:html,rendered:el.innerHTML});
+}
 function renderBoard(){
   /* 서버가 이상한 줄을 보내도 화면은 떠야 합니다 — 빈 줄만 걸러 냅니다 */
   if(S.data && S.data.tasks && !Array.isArray(S.data.tasks)) S.data.tasks = [];
@@ -5295,11 +5291,11 @@ function renderBoard(){
 
   /* ★ 맡은 업무가 하나도 없으면 '아직 배정된 업무가 없습니다'. 남의 업무로 빈자리를 채우지 않습니다 */
   var 하나도없음 = 본인만 && !(d.tasks||[]).length;
-  $('listRun').innerHTML  = run.length ? run.map(function(t,i){ return taskRow(t, A?i:-1); }).join('')
-                                       : emptyBoard(하나도없음 ? '아직 배정된 업무가 없습니다' : '진행 중인 업무가 없습니다', true);
-  $('listWait').innerHTML = wait.length? wait.map(function(t,i){ return taskRow(t, A?i:-1); }).join('')
-                                      : emptyBoard(하나도없음 ? '아직 배정된 업무가 없습니다' : '대기 중인 업무 없음');
-  $('listDone').innerHTML = done.length? done.map(function(t,i){ return taskRow(t, A?i:-1); }).join('') : emptyBoard('최근 7일 완료 없음');
+  paintList('listRun', run.length ? run.map(function(t,i){ return taskRow(t, A?i:-1); }).join('')
+                                       : emptyBoard(하나도없음 ? '아직 배정된 업무가 없습니다' : '진행 중인 업무가 없습니다', true));
+  paintList('listWait', wait.length? wait.map(function(t,i){ return taskRow(t, A?i:-1); }).join('')
+                                      : emptyBoard(하나도없음 ? '아직 배정된 업무가 없습니다' : '대기 중인 업무 없음'));
+  paintList('listDone', done.length? done.map(function(t,i){ return taskRow(t, A?i:-1); }).join('') : emptyBoard('최근 7일 완료 없음'));
   /* 완료 머리 (폰 · 태블릿 완료 탭) — 목록과 같은 기간 '최근 7일' 하나로 (21 지시). 이번 달 합계는 완료 전체 보기 창에서 */
   if($('doneSum')) $('doneSum').textContent = '최근 7일 완료 '+done.length+'건';
   renderSideLists(wait, done);   // PC 오른쪽 대기 · 완료 (작게)
@@ -5391,7 +5387,7 @@ function supportNewsPack(){
   var headlineIndices=[];
   items.forEach(function(n,i){if(['마감','결과 발표','종료 안내','예산 소진 공지'].indexOf(n.status)!==-1)return;
     if(headlineIndices.length<5)headlineIndices.push(i);});
-  return {items:items,publishedOn:published,researchedAt:raw?text(raw.researchedAt):'',sources:sources,
+  return {items:items,reviewedCount:Number(raw&&raw.reviewedCount||0),publishedOn:published,researchedAt:raw?text(raw.researchedAt):'',sources:sources,
     error:state.error,partial:partial,stale:stale,pending:Number(health.pending||(raw&&raw.pending)||0),
     available:!!state.data,scheduled:!!(state.data&&!raw&&state.data.editions.some(function(e){return e&&Array.isArray(e.items)&&e.items.length&&Date.parse(e.publishAt)>clock;})),headlineIndices:headlineIndices,method:raw?text(raw.method):''};
 }
@@ -5411,7 +5407,7 @@ function renderSupportNews(){
     '<span class="support-label">'+ic('doc')+'지원사업</span><span id="supportHeadlineText" class="support-headline-text"></span></button>'+
     '<button id="supportRotation" class="support-rotation" onclick="toggleSupportRotation()"></button>'+
     '<button id="supportAll" class="support-all" onclick="openSupportNews()"></button>';
-  $('supportAll').innerHTML='전체 '+pack.items.length+ic('chev');
+  $('supportAll').innerHTML='선별 '+pack.items.length+ic('chev');
   $('supportAll').setAttribute('aria-label','지원사업 소식 '+pack.items.length+'건 전체 보기');
   paintSupportHeadline(false);syncSupportRotation();
 }
@@ -5463,6 +5459,7 @@ function supportHealthHtml(pack){
     (warning?'<p class="support-warning">'+esc(warning)+'</p>':'')+
     '<p>매일 오전 8시 조사 마감 목표 · 오전 8시 30분 게시(한국시간). 기관 장애나 예약 실행 지연 시 이전 자료를 유지합니다.</p>'+
     '<p>공식 본문·첨부에서 조건을 자동 추출합니다. 회사 업종·소재지만으로 신청 가능하다고 판정하지 않습니다. 기관 전체 공고의 완전한 수집을 보장하지 않습니다.</p>'+
+    (pack.reviewedCount?'<p>검토 대상 '+pack.reviewedCount+'건 중 우리 업무 관련 '+pack.items.length+'건을 선별했습니다. 신청 가능 확정 건수가 아닙니다.</p>':'')+
     (pack.pending?'<p>다음 조사에서 다시 확인할 공고 '+pack.pending+'건</p>':'')+
     '<ul>'+pack.sources.filter(function(x){return x&&typeof x==='object';}).map(function(x){return '<li><strong>'+esc(x.name||'기관')+'</strong> · '+esc(x.status||'미확인')+
       '<br>'+esc(x.scope||'')+'<br>마지막 목록 확인 '+esc((x.lastSuccess||'없음').slice(0,16).replace('T',' '))+
@@ -10255,7 +10252,7 @@ function paintDocs(r){
   }
   var 칸 = docBoxesHtml();
   if(!h && !칸) h='<p class="none big">결재할 문서가 없습니다</p>';
-  $('docLists').innerHTML=h+칸;
+  paintList('docLists',h+칸);
 }
 
 /* ===================== 마케팅·구독·채용비 (2026-09-22 전무님 요청) =====================

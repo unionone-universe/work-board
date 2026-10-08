@@ -29,107 +29,52 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v108';  // 2026-10-07 지원사업 소식 · 수집과 예약 게시
+const CACHE = 'unionone-launcher-v109';  // 2026-10-07 지원사업 소식 · 수집과 예약 게시
 
-/* 캐시가 있을 때 네트워크를 기다려주는 시간 */
-const NET_WAIT_MS = 2500;
-
-const SHELL = [
-  './',
-  './index.html',
-  './app.html',
-  './manifest.webmanifest',
-  './icon-192.png',
-  './icon-512.png',
-  './icon-maskable-192.png',
-  './icon-maskable-512.png',
-  './apple-touch-icon.png',
-  './badge-96.png'          /* 상태표시줄 알림 아이콘 — 앱이 꺼져 있어도 그려야 하므로 담아 둔다 */
-];
-
-self.addEventListener('install', (e) => {
-  e.waitUntil(
-    caches.open(CACHE)
-      .then((c) => Promise.all(SHELL.map((u) => c.add(u).catch(() => {}))))
-      .then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
-});
-
-/* 물음표 뒤(?dt=..&v=..)를 떼어낸 주소.
-   이게 없으면 app.html 이 열 때마다 새 칸으로 쌓입니다. */
-function cacheKey(request) {
-  const url = new URL(request.url);
-  return url.origin + url.pathname;
-}
-
-function wait(ms) {
-  return new Promise((resolve) => setTimeout(() => resolve(null), ms));
-}
-
-function keep(cache, request, response) {
-  if (!response || !response.ok || response.redirected) return;
-  try {
-    cache.put(cacheKey(request), response.clone()).catch(() => {});
-  } catch (err) { /* 넣지 못해도 화면에는 영향이 없습니다 */ }
-}
-
-self.addEventListener('fetch', (e) => {
-  const url = new URL(e.request.url);
-  if (url.hostname.indexOf('google') >= 0) return;
-  if (e.request.method !== 'GET') return;
-  if (url.origin !== self.location.origin) return;
-
-  /* 화면 파일(.html)과 스크립트(.js)는 아래에서 '항상 최신 우선' 으로 다룹니다.
-     아이콘 · manifest 는 바뀌는 일이 거의 없는데 열 때마다 서버에 묻느라
-     왕복만 늘어나므로 캐시를 먼저 내주고 뒤에서 갱신합니다.
-     (앞으로 이 저장소에 .js·.css 파일이 생겨도 옛것이 남지 않게
-      확장자를 적어두는 쪽으로 했습니다) */
-  var alwaysFresh = /\.(html|js|css)$/.test(url.pathname) || url.pathname.endsWith('/');
-  if (!alwaysFresh) {
-    e.respondWith(
-      caches.open(CACHE).then((cache) =>
-        cache.match(cacheKey(e.request), { ignoreSearch: true }).then((cached) => {
-          const network = fetch(e.request)
-            .then((res) => { keep(cache, e.request, res); return res; })
-            .catch(() => cached);
-          return cached || network;
-        })
-      )
-    );
-    return;
+const VERSION=CACHE.split('-').pop();
+const NET_WAIT_MS=2500;
+const SHELL=['./','./index.html','./app.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-maskable-192.png','./icon-maskable-512.png','./apple-touch-icon.png','./badge-96.png'];
+function cacheKey(request){const u=new URL(typeof request==='string'?request:request.url,self.location.href);return u.origin+u.pathname;}
+async function keep(cache,request,response){
+  if(!response || !response.ok || response.redirected)return;
+  // 이전 HTTP/CDN 저장본을 새 판으로 잘못 고정하지 않는다.
+  if(new URL(cacheKey(request)).pathname.endsWith('/app.html')){
+    const text=await response.clone().text();
+    if(!text.includes('<meta name="uo-version" content="'+VERSION+'">'))return;
   }
-
-  /* 화면 파일(index.html · app.html) 은 항상 최신 우선 */
-  e.respondWith((async () => {
-    const cache = await caches.open(CACHE);
-    const cached = await cache.match(cacheKey(e.request), { ignoreSearch: true });
-
-    const fromNet = fetch(e.request, { cache: 'no-cache' })
-      .then((res) => {
-        keep(cache, e.request, res);
-        return res && res.ok ? res : null;
-      })
-      .catch(() => null);
-
-    /* 캐시가 있을 때만 시간을 끊습니다.
-       캐시가 없으면(처음 설치) 끝까지 기다려야 화면이 나옵니다. */
-    const fresh = cached
-      ? await Promise.race([fromNet, wait(NET_WAIT_MS)])
-      : await fromNet;
-
-    if (fresh) return fresh;
-    if (cached) return cached;
-
-    const fallback = await cache.match('./index.html', { ignoreSearch: true });
-    return fallback || Response.error();
+  try{await cache.put(cacheKey(request),response.clone());}catch(ignore){}
+}
+self.addEventListener('install',e=>e.waitUntil((async()=>{
+  const cache=await caches.open(CACHE);
+  await Promise.all(SHELL.map(async u=>{try{const res=await fetch(new URL(u,self.location.href),{cache:'reload'});await keep(cache,new URL(u,self.location.href).href,res);}catch(ignore){}}));
+  await self.skipWaiting();
+})()));
+self.addEventListener('activate',e=>e.waitUntil((async()=>{
+  const keys=await caches.keys();
+  await Promise.all(keys.filter(k=>k.startsWith('unionone-launcher-')&&k!==CACHE).map(k=>caches.delete(k)));
+  await self.clients.claim();
+})()));
+function wait(ms){return new Promise(resolve=>setTimeout(()=>resolve(null),ms));}
+self.addEventListener('fetch',e=>{
+  const url=new URL(e.request.url);
+  if(e.request.method!=='GET'||url.origin!==self.location.origin)return;
+  let finish;const background=new Promise(resolve=>{finish=resolve;});
+  e.waitUntil(background);
+  e.respondWith((async()=>{
+    try{
+      const cache=await caches.open(CACHE),cached=await cache.match(cacheKey(e.request));
+      const isApp=url.pathname.endsWith('/app.html');
+      const isShell=/\.(html|js|css)$/.test(url.pathname)||url.pathname.endsWith('/');
+      // 같은 판 재접속은 기다리지 않는다. 새 판은 항상 네트워크에서 받는다.
+      if(cached&&isApp&&url.searchParams.get('v')===VERSION){finish();return cached;}
+      const network=fetch(e.request,{cache:'no-cache'}).then(async res=>{
+        await keep(cache,e.request,res);return res&&res.ok?res:null;
+      }).catch(()=>null).finally(finish);
+      if(cached&&!isShell)return cached;
+      const fresh=cached?await Promise.race([network,wait(NET_WAIT_MS)]):await network;
+      // 앱 요청에 런처 HTML을 돌려주면 iframe이 재귀적으로 열리므로 금지.
+      return fresh||cached||Response.error();
+    }catch(ignore){finish();return Response.error();}
   })());
 });
 
