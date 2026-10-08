@@ -416,7 +416,8 @@ def run(args):
    'cursor':prev.get('cursor',1),'cycleCompletedAt':prev.get('cycleCompletedAt',''),'discovered':0,'errors':[]}
   entries={};signatures=set();cursor=health['cursor']
   # Always overlap latest pages; remaining pages advance persistently, including the initial backfill.
-  pages=list(dict.fromkeys(list(range(1,min(args.pages,25)+1))+list(range(cursor,cursor+args.pages))))
+  page_budget=min(args.pages,max(1,args.seconds//120),5)
+  pages=list(dict.fromkeys(list(range(1,page_budget+1))+list(range(cursor,cursor+page_budget))))
   try:
    for page in pages:
     b,_,u=web.get(src['url'].format(page=page));s=soup_of(b);links=list_links(src,s,u)

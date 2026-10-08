@@ -11,12 +11,12 @@ def classify(item):
  evidence = core+' '+str(item.get('summary',''))+' '+str(item.get('benefit',''))
  def has(pattern, text=evidence): return bool(re.search(pattern,text,re.I))
  # 단어가 본문 메뉴/기관 이름에 우연히 등장한 것을 관련 근거로 쓰지 않는다.
- if has(r'선정.{0,12}(결과|발표)|선발.{0,12}결과|합격자|심의.{0,12}결과|채용\s*(공고|시험)|입찰\s*공고|결과\s*(안내|공고)|교육생|특강|어워즈|통합\s*공고|ACADEMY|아카데미|설명회|세미나',title):
+ if has(r'선정.{0,12}(결과|발표)|선발.{0,12}결과|합격자|심의.{0,12}결과|채용\s*(공고|시험)|입찰\s*공고|결과\s*(안내|공고|보고)|대상자\s*발표|심사\s*결과|교육생|훈련.*컨설팅|특강|어워즈|통합\s*공고|ACADEMY|아카데미|설명회|세미나',title):
   return {'policy':POLICY,'eligible':False,'reason':'지원 신청 공고 아님','categories':[],'score':0}
- unrelated = r'의료|헬스케어|바이오|의약|병원|의료기기|반도체|이차전지|배터리|자동차|모빌리티|농업|농식품|농산|수산|축산|조선|항공|우주|게임|웹툰|애니메이션|음악|음반|오케스트라|성악|합창|미술|갤러리|문학|출판|공예|패션|섬유|뷰티|화장품|푸드테크|식품|핀테크|FINTECH|원자력|국방|방산|로봇|재난안전|기술거래|입점|팝업스토어|창업제품|수출|도로교통|도로공사|자율주행|드론|스마트물류|트레일'
+ unrelated = r'의료|헬스케어|바이오|의약|병원|의료기기|반도체|이차전지|배터리|자동차|모빌리티|농업|농식품|농산|수산|축산|조선|항공|우주|게임|웹툰|애니메이션|음악|음반|오케스트라|성악|합창|미술|갤러리|문학|출판|공예|패션|섬유|뷰티|화장품|푸드테크|식품|핀테크|FINTECH|원자력|국방|방산|로봇|재난안전|기술거래|입점|팝업스토어|창업제품|수출|도로교통|도로공사|자율주행|드론|스마트물류|트레일|레시피|디자인출원|벤처나라'
  if has(unrelated,title) and not has(r'철거|인테리어|현대\s*무용|컨템포러리|프롭테크|부동산',title):
   return {'policy':POLICY,'eligible':False,'reason':'다른 업종 전용 공고','categories':[],'score':0}
- if has(r'(주관기관|운영기관|수행기관).{0,10}모집',title):
+ if has(r'(주관기관|운영기관|수행기관).{0,10}모집|액셀러레이터.*\(보육사\).*공모|보육사.*공모',title):
   return {'policy':POLICY,'eligible':False,'reason':'지원받을 기업 모집 아님','categories':[],'score':0}
  categories=[];reasons=[];score=0
  if has(r'철거|해체공사|인테리어|리모델링|실내건축',core):
@@ -42,7 +42,7 @@ def classify(item):
  region=re.match(r'^\s*\[([^\]]+)\]',title)
  if region and has(r'서울|부산|인천|광주|대전|울산|세종|경기|강원|충북|충남|전북|전남|경북|경남|제주|충청|전라',region[1]) and not has(r'대구',region[1]) and not has(r'전국|지역\s*무관',audience):
   return {'policy':POLICY,'eligible':False,'reason':'다른 지역 지정 공고','categories':[],'score':0}
- if has(r'서초|강남|구미|대전광역시|\[대구\].{0,3}(수성구|북구|서구|중구|남구|달서구|달성군|군위군)',title) and not has(r'전국|지역\s*무관',audience):
+ if has(r'서초|서대문구|강남|구미|대전광역시|\[대구\].{0,3}(수성구|북구|서구|중구|남구|달서구|달성군|군위군)',title) and not has(r'전국|지역\s*무관',audience):
   return {'policy':POLICY,'eligible':False,'reason':'다른 지역 지정 공고','categories':[],'score':0}
  if has(r'대구|전국|지역\s*무관',core):score+=15
  return {'policy':POLICY,'eligible':bool(categories),'reason':' · '.join(reasons) if categories else '업무 관련 근거 부족', 'categories':categories,'score':score}
@@ -53,6 +53,7 @@ def select(items):
  for record in items:
   if record.get('deadline') and record['deadline']<today.isoformat() and not record.get('changedAt'):continue
   title=record.get('title','');year=re.search(r'20\d{2}',title);end=re.search(r'[~∼～]\s*(\d{1,2})[./월]\s*(\d{1,2})',title)
+  if year and int(year[0])<today.year and not (record.get('deadline','')>=today.isoformat()):continue
   if year and end and not record.get('changedAt'):
    try:
     if dt.date(int(year[0]),int(end[1]),int(end[2]))<today:continue
@@ -67,7 +68,10 @@ def select(items):
 def research_priority(entry):
  """조사 순서만 정한다. 낮은 순위도 원본/대기열에서 삭제하지 않는다."""
  title=str(entry.get('title',''))
+ year=re.search(r'20\d{2}',title)
+ if year and int(year[0])<dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).year:return 3
  fit=classify({'title':title})
  if fit['eligible']:return 0 if '대구' in title or re.search(r'현대무용|철거|프롭테크|부동산',title) else 1
+ if fit['reason'] in ('지원 신청 공고 아님','지원받을 기업 모집 아님','다른 지역 지정 공고','다른 업종 전용 공고'):return 3
  if re.search(r'공연예술|문예진흥|예술산업보증|창작대관|국제협업',title):return 2
  return 3

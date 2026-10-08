@@ -29,3 +29,10 @@ class PriorityTest(unittest.TestCase):
    c.save(p/'feed.json',{'schema':1,'editions':[{'items':[],'researchedAt':cut,'publishAt':'2026-10-08T08:30:00+09:00'}]})
    c.refilter(p);e=c.load(p/'feed.json',{})['editions'][0]
    self.assertEqual([x['url'] for x in e['items']],[old['url']]);self.assertEqual(e['publishAt'],'2026-10-08T08:30:00+09:00');self.assertEqual(e['researchedAt'],cut)
+
+ def test_old_results_and_unrelated_programs(self):
+  for title in ['2026년 무용분야 심의 대상자 발표','2024 예술분야 액셀러레이터 심사결과보고','2026년 서대문구 경영컨설팅 신청 기업 모집','중소기업 AI훈련 맞춤컨설팅 지원','[대구] 소상공인 레시피특허 지원','[대구] 소상공인 디자인출원 지원']:
+   self.assertFalse(classify({'title':title})['eligible'],title)
+   self.assertEqual(research_priority({'title':title}),3,title)
+  self.assertEqual(c.select([{'title':'2024년 창업기업 사업화 지원'}]),[])
+  self.assertTrue(c.select([{'title':'2027년 현대무용 창작지원','deadline':'2099-11-05'}]))

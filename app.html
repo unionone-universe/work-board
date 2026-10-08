@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v109">
+<meta name="uo-version" content="v110">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
@@ -3973,7 +3973,9 @@ function callTransport(options,fn){
      못한 실패가 `HTTP 200` 으로 기록됩니다. 원인을 정반대로 짚게 됩니다. */
   LAST_STATUS = 0;
 
-  return fetch(API_URL, {
+  // 구글 응답 이동 주소의 저장본을 재사용하지 않는다. 인증은 기존 POST 본문 그대로.
+  var requestUrl=API_URL+'?request='+Date.now().toString(36)+Math.random().toString(36).slice(2,10);
+  return fetch(requestUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ fn: fn, args: args, key: LAUNCH_TOKEN }),
