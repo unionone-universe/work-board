@@ -9,6 +9,10 @@ on:
         description: '최대 조사 시간(분, 5~35)'
         default: '30'
         required: false
+      refilter_only:
+        description: '기존 공개 자료 선별만 다시 적용'
+        type: boolean
+        default: false
 permissions:
   contents: write
 concurrency:
@@ -45,9 +49,14 @@ jobs:
         id: research
         env:
           MINUTES: ${{ inputs.minutes || '30' }}
+          REFILTER_ONLY: ${{ inputs.refilter_only || 'false' }}
         run: |
           python -c "import os; m=int(os.environ['MINUTES']); assert 5 <= m <= 35"
-          python support/collect.py --output support-state --seconds "$((MINUTES * 60))" --pages 25
+          if [ "$REFILTER_ONLY" = "true" ]; then
+            python support/collect.py --output support-state --refilter-only
+          else
+            python support/collect.py --output support-state --seconds "$((MINUTES * 60))" --pages 25
+          fi
       - name: 결과 저장 (기관 실패와 재시도 목록 포함)
         if: always() && steps.research.outcome != 'skipped'
         env:

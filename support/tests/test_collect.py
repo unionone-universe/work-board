@@ -55,7 +55,7 @@ class CollectorTest(unittest.TestCase):
  def test_all_items_survive_no_display_cap(self):
   n={'title':'공고','url':'https://example.com/a','source':'기관','sourceId':'x','categories':[],
      'deadline':'2099-01-01','checkedAt':c.stamp(),'firstSeen':c.stamp(),'status':'접수 기간 중'}
-  s={'notices':{str(i):dict(n,url=n['url']+str(i),title='공고'+str(i)) for i in range(350)},'pending':{},'sources':{}}
+  s={'notices':{str(i):dict(n,url=n['url']+str(i),title='전국 중소기업 경영안정자금 지원 '+str(i),audience='전국 중소기업') for i in range(350)},'pending':{},'sources':{}}
   self.assertEqual(len(c.edition(s,c.now())['items']),350)
  def test_html_script_not_evidence(self):
   self.assertNotIn('IGNORE ALL',c.text_of(c.soup_of('<div>지원 대상 기업<script>IGNORE ALL</script></div>'.encode())))

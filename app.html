@@ -442,10 +442,10 @@ label.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;fon
   100%{box-shadow:inset 0 0 0 2px rgba(35,90,66,0)}
 }
 
-.in{animation:riseIn .46s cubic-bezier(.16,.9,.28,1) both}
+.in{animation:riseIn .16s cubic-bezier(.16,.9,.28,1) both}
 .viewin{animation:fadeIn .26s ease-out both}
 .veil{animation:veilIn .2s ease-out}
-.sheet{animation:sheetUp .38s cubic-bezier(.16,.9,.28,1)}
+.sheet{animation:sheetUp .16s cubic-bezier(.16,.9,.28,1)}
 .bar > i{transform-origin:left center;animation:growX .95s cubic-bezier(.16,.9,.28,1) both}
 .toast{animation:toastUp .2s ease-out}
 .trow.justnow{animation:flash 1.1s ease-out}
@@ -1177,6 +1177,18 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 @media(prefers-reduced-motion:reduce){.support-headline-text.switching{animation:none}.support-rotation{display:none}}
 
 .support-search{display:grid;gap:6px;margin:0 0 12px;font-size:var(--fs-sm);color:var(--t2)}
+.doc-compact{max-width:680px}
+.doc-compact .by{margin-bottom:12px}
+.doc-compact .lrow.plain{padding:10px 0;min-height:0}
+.doc-fold{border-top:1px solid var(--line);margin-top:0;padding-top:0}
+.doc-fold>summary{display:flex;align-items:center;gap:8px;min-height:44px;cursor:pointer;color:var(--t2);font-size:var(--fs-sm);list-style:none}
+.doc-fold>summary::after{content:'+';margin-left:auto;font-size:20px}
+.doc-fold[open]>summary::after{content:'−'}
+.doc-fold>summary span{color:var(--t3);font-weight:400}
+.doc-actions{position:sticky;bottom:-24px;background:var(--card);padding:12px 0 16px;margin-top:14px;border-top:1px solid var(--line);z-index:2}
+.doc-actions>p{font-size:var(--fs-sm);margin:0 0 8px}
+.sheet.doc-compact .doc-actions .actions{margin-top:0}
+.doc-actions #dcActionMsg:empty{display:none}
 .support-search input{width:100%;min-height:44px;padding:10px 12px;border:1px solid var(--line2);border-radius:var(--r-sm);background:var(--card);color:var(--t1);font:inherit}
 .support-health{margin:0 0 14px;padding:10px 12px;background:var(--soft);border-radius:var(--r-sm);font-size:var(--fs-sm);color:var(--t2);line-height:1.6;overflow-wrap:anywhere}
 .support-health summary{min-height:44px;line-height:44px;cursor:pointer;color:var(--t1)}
@@ -1363,7 +1375,7 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
    ★ 결재 · 공지 상세도 .tdico · .tdmenu · .tdwrite · .tdsep 을 같이 쓴다 — 이름을 바꾸지 마세요. */
 .veil.tdveil{top:var(--nav-h);z-index:35;align-items:stretch;justify-content:stretch;padding:0;background:var(--bg);animation:fadeIn .16s ease-out}
 .sheet.tdsheet{width:100%;max-width:none;height:auto;max-height:none;border-radius:0;box-shadow:none;background:var(--bg);
-  padding:0 28px 48px;animation:tdIn .24s cubic-bezier(.16,.9,.28,1)}
+  padding:0 28px 48px;animation:tdIn .16s cubic-bezier(.16,.9,.28,1)}
 @keyframes tdIn{from{opacity:.3;transform:translate3d(0,10px,0)}to{opacity:1;transform:none}}
 .tdwrap{max-width:1280px;margin:0 auto}
 @media (max-width:719px){
@@ -3940,7 +3952,16 @@ var PERF=[];
 function call(fn){
   return callWithOptions.apply(null,[{}].concat(Array.prototype.slice.call(arguments)));
 }
+var READ_PENDING=Object.create(null), READ_REV=0;
 function callWithOptions(options,fn){
+  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_docDetail:1,api_docDetails:1,api_settings:1};
+  if(!reads[fn]){if(!QUIET_CALLS[fn])READ_REV++;return callTransport.apply(null,args);}
+  var key=JSON.stringify([fn,args.slice(2),S.epoch,READ_REV]);
+  if(READ_PENDING[key])return READ_PENDING[key];
+  var job=callTransport.apply(null,args).finally(function(){if(READ_PENDING[key]===job)delete READ_PENDING[key];});
+  READ_PENDING[key]=job;return job;
+}
+function callTransport(options,fn){
   var args = Array.prototype.slice.call(arguments,2);
   var t0 = Date.now();
   var status=0, readFailure=false, silent=!!(options.quiet || QUIET_CALLS[fn]);
@@ -5305,7 +5326,7 @@ function renderBoard(){
 /* 공개 지원사업 자료는 support-data/feed.json의 예약 게시본을 사용한다.
    기존 board.supportNews 입력도 화면 시험과 이전 응답 호환을 위해 지원한다.
    업무 자료·로그인 정보는 외부 수집기에 보내지 않는다. */
-var SUPPORT_CATEGORIES=['부동산·건설','앱·플랫폼','법인·경영','문화·예술'];
+var SUPPORT_CATEGORIES=['철거·인테리어','부동산·경영 컨설팅','현대무용·공연기획','부동산 앱·플랫폼'];
 var SUPPORT_VIEW=null;
 var SUPPORT_FEED={data:null,error:'',busy:false,lastAttempt:0,offset:0};
 var SUPPORT_FEED_URL='https://raw.githubusercontent.com/unionone-universe/work-board/support-data/feed.json';
@@ -5350,9 +5371,11 @@ function supportNewsPack(){
   var sources=Array.isArray(health.sources)?health.sources:(raw&&Array.isArray(raw.sources)?raw.sources:[]);
   if(raw&&Array.isArray(raw.items))raw.items.forEach(function(r){
     if(!r||typeof r!=='object')return;
+    if(!r.relevance || r.relevance.policy!==2 || !r.relevance.eligible)return;
     var title=text(r.title),url=supportSafeLink(text(r.url));
     if(!title||!url||!text(r.source)||seen[url])return;seen[url]=true;
     var n={title:title,url:url,source:text(r.source),categories:SUPPORT_CATEGORIES.filter(function(c){return Array.isArray(r.categories)&&r.categories.indexOf(c)!==-1;})};
+    n.relevanceReason=text(r.relevance.reason);
     ['summary','audience','benefit','exclusions','copay','period','status','firstSeen','checkedAt','changedAt','lastError'].forEach(function(k){n[k]=text(r[k]);});
     n.deadline=realDate(text(r.deadline))?text(r.deadline):'';
     if(n.deadline&&n.deadline<today&&['접수 기간 중','접수 예정'].indexOf(n.status)!==-1)n.status='마감';
@@ -5365,10 +5388,9 @@ function supportNewsPack(){
   });
   var published=raw&&realDate(text(raw.publishedOn))?text(raw.publishedOn):'';
   var partial=!!(raw&&raw.partial)||sources.some(function(x){return x&&(x.status!=='목록 확인'||x.unreadAttachments>0);}), stale=!!published&&published<today;
-  var newsSince=raw&&raw.publishAt?Date.parse(raw.publishAt)-25*3600000:0;
   var headlineIndices=[];
   items.forEach(function(n,i){if(['마감','결과 발표','종료 안내','예산 소진 공지'].indexOf(n.status)!==-1)return;
-    if(!newsSince||!n.firstSeen||Date.parse(n.changedAt||n.firstSeen)>=newsSince)headlineIndices.push(i);});
+    if(headlineIndices.length<5)headlineIndices.push(i);});
   return {items:items,publishedOn:published,researchedAt:raw?text(raw.researchedAt):'',sources:sources,
     error:state.error,partial:partial,stale:stale,pending:Number(health.pending||(raw&&raw.pending)||0),
     available:!!state.data,scheduled:!!(state.data&&!raw&&state.data.editions.some(function(e){return e&&Array.isArray(e.items)&&e.items.length&&Date.parse(e.publishAt)>clock;})),headlineIndices:headlineIndices,method:raw?text(raw.method):''};
@@ -5421,13 +5443,13 @@ function syncSupportRotation(){
 function toggleSupportRotation(){SUPPORT_TICKER.paused=!SUPPORT_TICKER.paused;syncSupportRotation();}
 if(SUPPORT_MOTION.addEventListener)SUPPORT_MOTION.addEventListener('change',syncSupportRotation);
 function supportCard(n,i){
-  var fields=[['신청 대상',n.audience],['지원 내용',n.benefit],['제외 조건',n.exclusions],['자부담·금리',n.copay],['접수 기간·시각',n.period]];
+  var fields=[['지원 유형',n.types.join(' · ')],['신청 대상',n.audience],['지원 내용',n.benefit],['제외 조건',n.exclusions],['자부담·금리',n.copay],['접수 기간·시각',n.period]];
   return '<article class="support-card" id="supportCard'+i+'" tabindex="-1">'+
-    '<div class="support-tags">'+n.categories.concat(n.types).map(function(c){return '<span>'+esc(c)+'</span>';}).join('')+'</div>'+
-    '<h4>'+esc(n.title)+'</h4>'+(n.summary?'<p>'+esc(n.summary)+'</p>':'')+
+    '<div class="support-tags">'+n.categories.map(function(c){return '<span>'+esc(c)+'</span>';}).join('')+'</div>'+
+    '<h4>'+esc(n.title)+'</h4>'+(n.relevanceReason?'<p>'+esc(n.relevanceReason)+'</p>':'')+
     '<p class="support-deadline">'+esc(n.status||supportDeadline(n))+(n.changedAt?' · 변경 감지':'')+'</p>'+
     (n.lastError?'<p class="support-warning">최근 재확인 실패 · 이전 조사 자료</p>':'')+
-    '<details><summary tabindex="0">신청 정보·확인 근거'+ic('chev')+'</summary><dl>'+
+    '<details><summary tabindex="0">신청 정보·확인 근거'+ic('chev')+'</summary>'+(n.summary?'<p>'+esc(n.summary)+'</p>':'')+'<dl>'+
     fields.map(function(f){return '<dt>'+f[0]+'</dt><dd>'+esc(f[1]||'자동 확인 못함 · 원문 확인 필요')+'</dd>';}).join('')+'</dl>'+
     (n.issues.length?'<p class="support-warning">'+n.issues.map(esc).join('<br>')+'</p>':'')+
     (n.attachments.length?'<div class="support-evidence">'+n.attachments.map(function(d){return '<a href="'+esc(d.url)+'" target="_blank" rel="noopener noreferrer">'+esc(d.name)+' · '+esc(d.status)+'</a>';}).join('')+'</div>':'<p>첨부파일 확인 자료 없음</p>')+
@@ -5448,15 +5470,15 @@ function supportHealthHtml(pack){
 }
 function openSupportNews(index){
   var pack=supportNewsPack(); if(!pack.items.length&&!pack.available&&!pack.error)return;
-  SUPPORT_VIEW={pack:pack,category:'',query:'',limit:24};
+  SUPPORT_VIEW={pack:pack,category:'',query:'',limit:12};
   $('modal').innerHTML='<div class="veil" onclick="if(event.target===this)closeModal()"><div class="sheet support-sheet">'+
     '<div class="sheethead"><h3 class="tt">지원사업 소식</h3><button class="btn sm" onclick="closeModal()">닫기</button></div>'+
-    '<p class="support-sub">'+(pack.publishedOn?esc(krDate(pack.publishedOn))+' 게시 · ':'')+'공식 공고를 분야별로 모았습니다. 신청 전 원문 조건을 확인해 주세요.</p>'+
+    '<p class="support-sub">'+(pack.publishedOn?esc(krDate(pack.publishedOn))+' 게시 · ':'')+'우리 업무에 관련된 지원만 추렸습니다. 신청 자격은 원문 확인이 필요합니다.</p>'+
     '<label class="support-search">공고 찾기<input id="supportSearch" type="search" placeholder="공고명·지역·신청 대상 검색" oninput="searchSupportNews(this.value)"></label>'+
     '<div id="supportFilters" class="support-filters" role="group" aria-label="지원사업 분야"></div>'+supportHealthHtml(pack)+
     '<p id="supportCount" class="support-sub" role="status" aria-live="polite"></p><div id="supportCards" class="support-cards"></div>'+
     '<button class="btn support-more" id="supportMore" onclick="moreSupportNews()">더 보기</button></div></div>';
-  if(Number.isInteger(index)&&index>=0&&index<pack.items.length)SUPPORT_VIEW.limit=Math.max(24,index+1);
+  if(Number.isInteger(index)&&index>=0&&index<pack.items.length)SUPPORT_VIEW.limit=Math.max(12,index+1);
   renderSupportCards();
   if(Number.isInteger(index)&&index>=0&&index<pack.items.length){setTimeout(function(){var el=$('supportCard'+index);if(el){el.scrollIntoView({block:'nearest'});el.focus({preventScroll:true});}},60);}
 }
@@ -5478,10 +5500,10 @@ function renderSupportCards(){
 function filterSupportNews(index){
   if(!SUPPORT_VIEW)return;
   var cats=[''].concat(SUPPORT_CATEGORIES.filter(function(c){return SUPPORT_VIEW.pack.items.some(function(n){return n.categories.indexOf(c)!==-1;});}));
-  SUPPORT_VIEW.category=cats[index]||'';SUPPORT_VIEW.limit=24;renderSupportCards();
+  SUPPORT_VIEW.category=cats[index]||'';SUPPORT_VIEW.limit=12;renderSupportCards();
 }
-function searchSupportNews(value){if(SUPPORT_VIEW){SUPPORT_VIEW.query=value;SUPPORT_VIEW.limit=24;renderSupportCards();}}
-function moreSupportNews(){if(SUPPORT_VIEW){var count=$('supportCards').children.length;SUPPORT_VIEW.limit+=24;renderSupportCards();var first=$('supportCards').children[count];if(first)first.focus({preventScroll:true});}}
+function searchSupportNews(value){if(SUPPORT_VIEW){SUPPORT_VIEW.query=value;SUPPORT_VIEW.limit=12;renderSupportCards();}}
+function moreSupportNews(){if(SUPPORT_VIEW){var count=$('supportCards').children.length;SUPPORT_VIEW.limit+=12;renderSupportCards();var first=$('supportCards').children[count];if(first)first.focus({preventScroll:true});}}
 
 /** PC 오른쪽 대기 · 완료 칸 (15 지시 — 진행 중은 넓게, 대기 · 완료는 작게).
     ★ 21 지시 — 세 줄까지, 나머지는 [N건 더 보기](실제 남은 수). 0건이면 머리 한 줄로 접는다(빈 칸을 크게 두지 않는다).
@@ -11416,18 +11438,19 @@ function findDocBrief(no){
  * 여기서는 거기에 안 담긴 오래된 문서만 뒤에서 채운다.
  */
 function prefetchDocs(){
+  if(document.hidden || S.view!=='doc')return;
   var src=docSource(); if(!src) return;
   var nos=[];
   ['toAct','drafts','others'].forEach(function(k){
     (src[k]||[]).forEach(function(d){
-      if(nos.length>=10) return;
+      if(nos.length>=2) return;
       if(!S.docCache[d.no]) nos.push(d.no);
     });
   });
   if(!nos.length) return;
-  var at=areaVer('doc');
+  var at=areaVer('doc'),ep=S.epoch,token=S.token,rev=READ_REV;
   callWithOptions({quiet:true},'api_docDetails', S.token, nos).then(function(r){
-    if(!r || !r.ok) return;
+    if(!r || !r.ok || ep!==S.epoch || token!==S.token || rev!==READ_REV) return;
     Object.keys(r.docs||{}).forEach(function(k){
       S.docCache[k]=r.docs[k]; S.docCacheAt[k]=at;
     });
@@ -11443,24 +11466,28 @@ function openDoc(no){
     $('modal').innerHTML=docSheetHtml(cached.doc, cached);
     if(S.docCacheAt[no]===areaVer('doc')) return;   // 결재 쪽이 안 바뀌었으면 다시 받지 않는다
   } else if(b){
-    // 승인 버튼은 board 가 이미 canAct 를 줬으므로 기다리지 않고 바로 그린다
+    // 제목·금액은 즉시 표시하고 처리 버튼은 상세 응답 뒤에 표시한다
     $('modal').innerHTML=docSheetHtml({
       no:b.no, title:b.title, corp:b.corp||'', who:b.who, at:b.at,
       amount:b.amount, status:b.status, canAct:b.canAct, proxy:b.proxy
     }, null);
   }
 
-  var at=areaVer('doc');
+  if(!b && !cached)$('modal').innerHTML=docSheetHtml({no:no,title:'결재 문서'},null);
+  var at=areaVer('doc'), ep=S.epoch, token=S.token;
   call('api_docDetail', S.token, no).then(function(r){
-    if(!r.ok){ if(!b && !cached) toast(r.msg); return; }
+    if(ep!==S.epoch || token!==S.token)return;
+    var body=$('ddBody');
+    if(!r.ok){if(body&&body.dataset.no===no)body.innerHTML='<p class="muted">내역을 불러오지 못했습니다.</p><button class="btn" data-no="'+esc(no)+'" onclick="openDoc(this.dataset.no)">다시 불러오기</button>';return;}
     S.docCache[no]=r; S.docCacheAt[no]=at;
-    if(!$('ddBody')){
-      if(!b && !cached) $('modal').innerHTML=docSheetHtml(r.doc, r);
-      return;
-    }
+    if(!body || body.dataset.no!==no)return;
     var keep=$('dcComment')? $('dcComment').value : '';   // 적던 의견을 잃지 않게
-    $('ddBody').innerHTML=docDetailBody(r);
+    var sheet=body.closest('.sheet'), scroll=sheet?sheet.scrollTop:0;
+    var expanded=Array.from(document.querySelectorAll('#modal details[open]')).map(function(e){return e.id;});
+    $('modal').innerHTML=docSheetHtml(r.doc,r);
+    expanded.forEach(function(id){if(id&&$(id))$(id).open=true;});
     if(keep && $('dcComment')) $('dcComment').value=keep;
+    var next=$('ddBody').closest('.sheet');if(next)next.scrollTop=scroll;
   });
 }
 
@@ -11474,14 +11501,12 @@ function docSheetHtml(d, r){
   if(d.who) head.push(d.who);
   if(d.at) head.push(shortDate(d.at));
   if(d.status) head.push({ t:d.status, hot:(d.status==='반려') });
-  if(d.formName) head.push(d.formName);
-  if(d.corp) head.push(d.corp);
   // 문서번호(EXP-260826-001)는 제목 아래에 쓰지 않는다 — 사람이 읽을 것이 아니다
 
   /* ★ 관리자 삭제는 ⋯ 안에 (2026-09-09). 상세 맨 아래 빨간 단추가 늘 떠 있었습니다.
      업무 상세의 ⋯ 와 같은 방식입니다 — 첫 화면에는 정보만 남깁니다. */
   var 관리자 = S.me && S.me.grade>=9;
-  return '<div class="veil"><div class="sheet">'+
+  return '<div class="veil"><div class="sheet doc-compact">'+
     '<div class="sheethead"><h3 class="tt">'+esc(d.title)+'</h3>'+
     (관리자? '<button class="tdico" onclick="taskMenu()" title="삭제" aria-label="삭제">'+ic('dots')+'</button>' : '')+
     '<button class="btn sm" onclick="closeModal()">닫기</button></div>'+
@@ -11489,24 +11514,14 @@ function docSheetHtml(d, r){
       '<button id="docDeleteBtn" data-no="'+esc(d.no)+'" class="btn sm dg" onclick="deleteDoc(this.dataset.no)"'+(DOC_DELETING[d.no]?' disabled':'')+'>'+(DOC_DELETING[d.no]?'삭제 확인 중…':'삭제')+'</button></div><p id="docDeleteStatus" role="status" class="muted"></p>' : '')+
     byline(head)+
     (d.amount? '<p style="margin:0 0 18px"><b class="num" style="font-size:var(--fs-num-md)">'+
-       won(d.amount)+'원</b> <span class="sub">'+esc(wonKo(d.amount))+'</span></p>' : '')+
-    '<div id="ddBody">'+ (r? docDetailBody(r) : waitingBody(d)) +'</div>'+
+       won(d.amount)+'원</b></p>' : '')+
+    '<div id="ddBody" data-no="'+esc(d.no)+'">'+ (r? docDetailBody(r) : waitingBody(d)) +'</div>'+
     '</div></div>';
 }
 
-/** 내역이 오기 전에 보여줄 것 — 결재할 수 있으면 버튼부터 먼저 */
+/** 상세를 확인하기 전에는 처리 버튼을 노출하지 않는다. */
 function waitingBody(d){
-  var h='';
-  if(d.canAct){
-    h+='<div class="field"><label class="fl">의견</label><input type="text" id="dcComment"></div>'+
-       (d.proxy? '<p class="none wnv">'+
-                 '대리로 처리합니다. 누가 눌렀는지 문서에 남습니다</p>':'')+
-       '<div class="actions">'+
-       '<button class="btn" onclick="actDoc(\''+d.no+'\',\'reject\')">반려</button>'+
-       '<button class="btn pri" onclick="actDoc(\''+d.no+'\',\'approve\')">'+
-         (d.proxy?'대리 승인':'승인')+'</button></div>';
-  }
-  return h+'<p class="muted" style="font-size:var(--fs-sm);margin-top:12px">내역 불러오는 중...</p>';
+  return '<p class="muted" role="status">내역을 불러오는 중입니다…</p>';
 }
 
 function docDetailBody(r){
@@ -11526,19 +11541,28 @@ function docDetailBody(r){
   }
   if(d.memo) 칸.push(row('비고', d.memo));
   if(칸.length) h+='<div class="kv" style="margin-bottom:14px">'+칸.join('')+'</div>';
-  if(r.items.length) h+=sechead(d.itemsTitle||'내역', r.items.length);
+  if(r.items.length>1) h+=sechead(d.itemsTitle||'내역', r.items.length);
   var 비용문서 = !!COST_FORM_CODES[d.form];
   r.items.forEach(function(i){
-    var sub=[shortDate(i.date), i.kind, 비용문서 ? (i.cat||'미분류') : ''].filter(function(x){ return x; }).join(' · ');
+    var sub=[shortDate(i.date), i.kind, 비용문서 ? (i.cat||'') : ''].filter(function(x){ return x; }).join(' · ');
     h+='<div class="lrow plain"><div class="m"><p class="t">'+esc(i.memo)+'</p>'+
        (sub? '<p class="b">'+esc(sub)+'</p>':'')+'</div>'+
-       '<div class="r"><span class="v">'+won(i.amount)+'원</span>'+
-       '<span class="s muted">'+esc(wonKo(i.amount))+'</span></div></div>';
+       (r.items.length>1?'<div class="r"><span class="v">'+won(i.amount)+'원</span></div>':'')+'</div>';
   });
+
+  // 영수증 — 눌러서 원본 크기로 크게 볼 수 있게 (v42)
+  // PDF 는 그림으로 못 그리므로 이름 링크로 (2026-09-11)
+  if(r.files.length){
+    h+='<div style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px">';
+    r.files.forEach(function(f, i2){
+      h+= /\.pdf$/i.test(String(f.name||'')) ? fileChip(f) : receiptThumb(f.url, i2);
+    });
+    h+='</div>';
+  }
 
   /* 비용 분류 바꾸기 — 올린 사람·관리자만 (d.canCat 은 서버 판정, 저장할 때 서버가 다시 봅니다) */
   if(비용문서 && d.canCat && r.items.length){
-    h+='<div class="catedit hide" id="dcCatBox">'+
+    h+='<details class="doc-fold" id="dcCostDetails"><summary>비용 분류</summary><div class="catedit hide" id="dcCatBox">'+
        r.items.map(function(i){
          return '<div class="catrow"><span class="t">'+esc(i.memo||('품목 '+i.seq))+'</span>'+
                 '<select class="dcCat" data-seq="'+Number(i.seq||0)+'" aria-label="비용 분류">'+
@@ -11547,20 +11571,10 @@ function docDetailBody(r){
        '<p class="tfmsg" id="dcCatMsg" role="alert"></p>'+
        '<div class="actions"><button class="btn" onclick="catEditToggle(false)">취소</button>'+
        '<button class="btn pri" id="dcCatSave" onclick="saveCostCat(\''+d.no+'\')">분류 저장</button></div></div>'+
-       '<div class="catbtn" id="dcCatBtnBox"><button class="btn sm" onclick="catEditToggle(true)">비용 분류 바꾸기</button></div>';
+       '<div class="catbtn" id="dcCatBtnBox"><button class="btn sm" onclick="catEditToggle(true)">비용 분류 바꾸기</button></div></details>';
   }
 
-  // 영수증 — 눌러서 원본 크기로 크게 볼 수 있게 (v42)
-  // PDF 는 그림으로 못 그리므로 이름 링크로 (2026-09-11)
-  if(r.files.length){
-    h+='<div style="margin-top:12px;display:flex;flex-wrap:wrap;gap:8px">';
-    r.files.forEach(function(f, i2){
-      h+= /\.pdf$/i.test(String(f.name||'')) ? fileChip(f) : receiptThumb(f.url, i2);
-    });
-    h+='</div>';
-  }
-
-  h+=sechead('결재선');
+  h+='<details class="doc-fold" id="dcRoute"><summary>결재·열람 현황 <span>'+r.lines.length+'명</span></summary>';
   r.lines.forEach(function(l){
     var st=[l.state, l.at? shortDate(l.at):''].filter(function(x){ return x; }).join(' · ');
     h+='<div class="lrow plain"><div class="m"><p class="t">'+esc(l.name)+
@@ -11568,6 +11582,7 @@ function docDetailBody(r){
        (st? '<div class="r"><span class="b">'+esc(st)+'</span></div>':'')+'</div>';
   });
 
+  h+='</details>';
   // 내가 아직 확인하지 않은 열람자라면 큰 버튼을 먼저 보여준다
   var viewers = r.viewers || [];
   var needRead = viewers.some(function(v){ return v.mine && !v.done; });
@@ -11576,7 +11591,7 @@ function docDetailBody(r){
        '<button class="btn pri" style="width:100%;padding:14px;font-size:var(--fs-h1)" '+
        'onclick="readDoc(\''+d.no+'\')">열람 확인</button></div>';
   }
-  if(viewers.length){
+  if(viewers.length && !r.lines.some(function(l){return l.role==='열람';})){
     h+='<p class="sub" style="margin:8px 0 0;font-size:var(--fs-sm)">열람 · '+
        viewers.map(function(v){
          return esc(v.name)+' '+(v.done? ('확인'+(v.at?' '+esc(shortDate(v.at)):'')) : '미확인');
@@ -11601,14 +11616,12 @@ function docDetailBody(r){
 
   // 결재할 수 있는지는 서버가 판정해서 보낸다 (화면에서 이름을 비교하지 않는다)
   if(r.canAct){
-    h+='<div class="field" style="margin-top:14px"><label class="fl">의견</label>'+
-       '<input type="text" id="dcComment"></div>'+
-       (r.proxy? '<p class="none wnv">'+
-                 '대리로 처리합니다. 누가 눌렀는지 문서에 남습니다</p>' : '')+
-       '<div class="actions">'+
+    h+='<details class="doc-fold" id="dcOpinion"><summary>의견 남기기 <span>선택</span></summary><div class="field"><label class="fl" for="dcComment">의견</label>'+
+       '<input type="text" id="dcComment"></div></details>'+
+       '<div class="doc-actions">'+(r.proxy? '<p class="muted">대리 처리 · 처리자가 기록됩니다</p>' : '')+'<div class="actions">'+
        '<button class="btn" onclick="actDoc(\''+d.no+'\',\'reject\')">반려</button>'+
        '<button class="btn pri" onclick="actDoc(\''+d.no+'\',\'approve\')">'+
-         (r.proxy?'대리 승인':'승인')+'</button></div>';
+         (r.proxy?'대리 승인':'승인')+'</button></div><p id="dcActionMsg" class="muted" role="status"></p></div>';
   }
 
   /* 관리자 삭제는 창 머리의 ⋯ 에 있습니다 (docSheetHtml) */
@@ -11657,10 +11670,10 @@ function receiptThumb(url, i){
   var id=driveId(url);
   RCPT[i]=url;
   if(!id) return '<a href="'+esc(url)+'" target="_blank" class="btn sm">영수증 보기</a>';
-  return '<img src="https://drive.google.com/thumbnail?id='+esc(id)+'&sz=w400" '+
+  return '<img loading="lazy" decoding="async" src="https://drive.google.com/thumbnail?id='+esc(id)+'&sz=w400" '+
     'alt="영수증" onclick="openReceipt(\''+esc(id)+'\','+i+')" '+
     'onerror="this.outerHTML=\'<a href=&quot;'+esc(url)+'&quot; target=_blank class=&quot;btn sm&quot;>영수증 보기</a>\'" '+
-    'style="width:104px;height:104px;object-fit:cover;border-radius:var(--r);'+
+    'style="width:72px;height:72px;object-fit:cover;border-radius:var(--r);'+
     'border:1px solid var(--line2);cursor:zoom-in;background:var(--field)">';
 }
 
@@ -11804,30 +11817,29 @@ function markDocLocal(no, patch){
 }
 
 /**
- * 승인·반려 — 화면을 먼저 바꾸고 창을 닫는다.
- * 되돌릴 수 있는 동작이고, 정산 반영·휴가 적립·도장은 서버가 확실히 처리하므로
- * 화면이 기다린다고 더 안전해지지 않는다. 실패하면 되돌리고 크게 알린다.
+ * 승인·반려 — 요청 상태를 즉시 표시하고, 서버가 확인한 뒤 목록에 반영한다.
  */
+var DOC_ACTING=Object.create(null);
 function actDoc(no, action){
+  if(DOC_ACTING[no])return;
   var c=$('dcComment')? $('dcComment').value : '';
   var btns=document.querySelectorAll('.sheet button');
   [].forEach.call(btns,function(b){ b.disabled=true; });   // 두 번 눌리지 않게
 
-  var back=S.data? JSON.parse(JSON.stringify({docs:S.data.docs||null,
-                                              apv:S.data.approvals||[]})) : null;
   var ep=S.epoch;
-  markDocLocal(no, { canAct:false });
-  delete S.docCache[no]; delete S.docCacheAt[no];
-  closeOk();
-  toast(action==='approve'?'승인되었습니다':'반려되었습니다');
+  DOC_ACTING[no]=true;
+  var msg=$('dcActionMsg');if(msg)msg.textContent=action==='approve'?'승인 결과를 확인하는 중입니다…':'반려 결과를 확인하는 중입니다…';
 
   call('api_actDoc', S.token, no, action, c, S.corp).then(function(r){
+    if(!sameAccess(ep))return;
     if(!r.ok){
-      if(back && S.data && sameAccess(ep)){ S.data.docs=back.docs; S.data.approvals=back.apv; }
-      renderBoard(); navCount(); if(S.view==='doc') renderDocs();
-      toast('처리하지 못했습니다: '+r.msg);
+      if(msg&&msg.isConnected)msg.textContent=r.net?'처리 결과를 확인하지 못했습니다. 목록을 새로 확인해 주세요.':r.msg;
       return;
     }
+    markDocLocal(no, { canAct:false });
+    delete S.docCache[no]; delete S.docCacheAt[no];
+    if($('ddBody')&&$('ddBody').dataset.no===no)closeOk();
+    toast(action==='approve'?'승인되었습니다':'반려되었습니다');
     if(r.status) markDocLocal(no, { status:r.status });
     if(r.final && !r.sealed){
       /* 도장이 없는 유니온원철거 문서는 임시 도장이 찍힌다 (서버 tempSeal_ · 2026-09-29) */
@@ -11835,7 +11847,7 @@ function actDoc(no, action){
                       : '승인되었습니다 · 이 법인의 도장이 없어 날인은 되지 않았습니다');
     }
     softRefresh();
-  });
+  }).finally(function(){delete DOC_ACTING[no];[].forEach.call(btns,function(b){if(b.isConnected)b.disabled=false;});});
 }
 
 /** 문서 종류 버튼 목록 — 같은 코드·같은 이름이 두 번 나오지 않게 걸러서 준다.
@@ -11907,8 +11919,9 @@ function openDocForm(code, prefill){
      무슨 지출인지 알 수 없었다. 판단이 틀렸으므로 되돌린다.
      빈칸으로 두지 않고 자동 제목을 미리 채워둔다 — 그대로 두면 그게 저장되고,
      고치면 고친 것이 저장된다. 한 번이라도 직접 건드리면 그때부터 덮어쓰지 않는다. */
-  var 제목칸 = '<div class="field"><label class="fl req">제목</label>'+
-     '<input type="text" id="dfTitle" oninput="DF_TITLE_TOUCHED=1"></div>';
+  var 제목칸 = '<div class="field"><label class="fl req" for="dfTitle">제목</label>'+
+     '<input type="text" id="dfTitle" '+(f.code==='LEAVE'?'readonly aria-describedby="dfTitleHelp"':'oninput="DF_TITLE_TOUCHED=1"')+'>'+
+     (f.code==='LEAVE'?'<p class="muted" id="dfTitleHelp" style="margin-top:6px">휴가 시작일에 맞춰 자동으로 정해집니다.</p>':'')+'</div>';
 
   // 양식별 항목
   var 항목들='';
@@ -12018,7 +12031,7 @@ var DF_TITLE_TOUCHED=0;
 /** 사용자가 제목을 직접 건드렸으면 그때부터 덮어쓰지 않는다 */
 function syncDocTitle(e){
   if(e && e.target && e.target.id==='dfTitle') return;
-  if(DF_TITLE_TOUCHED) return;
+  if(DF_TITLE_TOUCHED && (!$('dfCode') || $('dfCode').value!=='LEAVE')) return;
   var el=$('dfTitle'); if(!el) return;
   el.value=autoDocTitle();
 }
@@ -12062,10 +12075,9 @@ function autoDocTitle(){
   } else if(code==='SEAL'){
     t=join([fields['날인 문서명']||'', '인감 날인'],' ');
   } else if(code==='LEAVE'){
-    var s=String(fields['시작일']||''), e2=String(fields['종료일']||'')||s;
-    var span='';
-    if(s) span=(e2 && e2!==s)? (s.substring(5)+'~'+e2.substring(5)) : s.substring(5);
-    t=join([fields['휴가종류']||'', span],' ');
+    var s=String(fields['시작일']||'');
+    var month=/^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(s)?Number(s.substring(5,7)):0;
+    t=join([month?month+'월':'', fields['휴가종류']||'연차', '신청서'],' ');
   } else {
     t=join([f? f.name:'', money, first],' · ');
   }
@@ -12145,7 +12157,7 @@ function saveDoc(){
   if(code==='LEAVE' && fields['시작일'] && !fields['종료일']) fields['종료일']=fields['시작일'];
 
   var titleEl=$('dfTitle');
-  var title=titleEl? titleEl.value.trim() : '';
+  var title=code==='LEAVE'?autoDocTitle():(titleEl? titleEl.value.trim() : '');
 
   var sealChk=$('dfSeal');
   var p={ formCode:code, corp:$('dfCorp').value, taskId:$('dfTask')?$('dfTask').value:'',
@@ -12211,16 +12223,20 @@ function saveDoc(){
      대신 버튼을 잠가 두 번 눌리지 않게 하고, 서버는 저장까지만 하고 바로 응답한다. */
   var btn=$('dfSave');
   if(btn.disabled) return;
-  btn.disabled=true; btn.textContent='상신 중...'; msg.textContent='';
+  btn.disabled=true; btn.textContent='상신 중…'; msg.textContent='서버에 문서를 전달하고 있습니다…';
+  var ep=S.epoch, token=S.token;
+  var progressTimer=setTimeout(function(){if(msg.isConnected)msg.textContent='서버에서 저장 결과를 확인하는 중입니다. 잠시만 기다려 주세요.';},2500);
 
   if(shots.length+pdfs.length) msg.textContent='첨부 '+(shots.length+pdfs.length)+'개 올리는 중입니다...';
   p.photos = shots;
   p.files = pdfs;
 
   call('api_saveDoc', S.token, p, S.corp).then(function(r){
+    clearTimeout(progressTimer);
     btn.disabled=false; btn.textContent='상신';
-    if(!r.ok){ msg.textContent=r.msg; return; }
-    closeOk();
+    if(ep!==S.epoch||token!==S.token)return;
+    if(!r.ok){ msg.textContent=r.net?'상신 결과를 확인하지 못했습니다. 다시 올리기 전에 결재 목록을 확인해 주세요.':r.msg; return; }
+    if($('dfSave')===btn)closeOk();
     toast(r.sealNo? '상신되었습니다 · 인감 날인 품의서도 같이 올라갔습니다' : '상신되었습니다');
     addDocLocal(r);                       // 결재 목록은 화면이 가진 값으로 먼저 갱신
     if(S.view==='doc') renderDocs();

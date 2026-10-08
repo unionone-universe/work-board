@@ -11,6 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
 import olefile
+from relevance import POLICY, select
 
 KST = dt.timezone(dt.timedelta(hours=9))
 HERE = pathlib.Path(__file__).resolve().parent
@@ -391,13 +392,11 @@ def edition(state,finished):
   if v.get('closed') and last[:10]<(today-dt.timedelta(days=14)).isoformat():continue
   if v.get('deadline') and v['deadline']<today.isoformat() and not v.get('changedAt'):continue
   items.append(item)
- def priority(x):
-  t=x['title']+' '+x.get('audience','')
-  return (12 if '대구' in t else 0)+(8 if re.search(r'철거|부동산|건축|인테리어|소프트웨어|플랫폼|무용|공연|정책자금|경영',t) else 0)
- items.sort(key=lambda x:(x.get('status') in ('마감','결과 발표','종료 안내'),-priority(x),-(int(re.sub(r'\D','', (x.get('changedAt') or x['firstSeen'])[:19])))))
+ collected=len(items)
+ items=select(items)
  sources=list(state['sources'].values())
  return {'publishedOn':publish.date().isoformat(),'publishAt':publish.isoformat(),'researchedAt':finished.isoformat(timespec='seconds'),
-  'items':items,'sources':sources,'pending':len(state['pending']),
+  'items':items,'selectionPolicy':POLICY,'reviewedCount':collected,'sources':sources,'pending':len(state['pending']),
   'partial':bool(state['pending']) or any(x.get('status')!='목록 확인' or x.get('unreadAttachments',0) for x in sources),
   'method':'공식 본문·첨부의 규칙 기반 추출. 신청 자격 확정/법률 판단이 아닙니다. 미확인 항목은 원문 확인이 필요합니다.'}
 
@@ -481,7 +480,7 @@ def run(args):
  feed=load(out/'feed.json',{'schema':1,'editions':[]})
  new=edition(state,finished)
  # An all-source outage does not replace the last useful edition with an empty success.
- if new['items'] and done:
+ if done:
   feed['editions']=[e for e in feed['editions'] if e.get('publishAt')!=new['publishAt']]+[new]
   feed['editions']=sorted(feed['editions'],key=lambda e:e['publishAt'])[-3:]
  feed['health']={'lastAttempt':started,'finishedAt':stamp(),'sources':list(state['sources'].values()),'pending':len(state['pending'])}
@@ -492,8 +491,18 @@ def run(args):
  print(json.dumps(report,ensure_ascii=False))
  return 0 if done or not jobs else 2
 
+def refilter(output):
+ """이미 공개된 자료의 선별만 재적용. 새 공고의 예약 시각은 앞당기지 않는다."""
+ out=pathlib.Path(output);feed=load(out/'feed.json',{'schema':1,'editions':[]})
+ for e in feed['editions']:
+  e.setdefault('reviewedCount',len(e.get('items',[])))
+  e['items']=select(e.get('items',[]));e['selectionPolicy']=POLICY
+ save(out/'feed.json',feed)
+ print(json.dumps({'editions':[{'publishAt':e.get('publishAt'),'selected':len(e['items']),'reviewed':e['reviewedCount']} for e in feed['editions']]},ensure_ascii=False))
+ return 0
+
 if __name__=='__main__':
  sys.stdout.reconfigure(encoding='utf8')
  p=argparse.ArgumentParser();p.add_argument('--output',default='support-data');p.add_argument('--seconds',type=int,default=1800)
- p.add_argument('--pages',type=int,default=12);p.add_argument('--sources',default='')
- sys.exit(run(p.parse_args()))
+ p.add_argument('--pages',type=int,default=12);p.add_argument('--sources',default='');p.add_argument('--refilter-only',action='store_true')
+ args=p.parse_args();sys.exit(refilter(args.output) if args.refilter_only else run(args))
