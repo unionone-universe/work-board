@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v111">
+<meta name="uo-version" content="v112">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
@@ -4031,7 +4031,7 @@ function callTransport(options,fn){
        · 부른 쪽의 .then 보다 **먼저** 한다 — 잊으면 S.epoch 가 오르므로, 부른 쪽의 되돌리기(sameAccess)가
          요청 전에 떠 둔 옛 목록을 되살리지 않는다
        · 그리고 서버에서 판을 다시 받아 확인한다 */
-    if(r && r.denied){
+    if(r && r.denied && connectionEpoch===S.epoch && connectionToken===S.token){
       try{
         var 대상 = deniedTaskOf(fn, args);
         if(대상 !== null){                       // 업무에 딸린 요청만 (null = 업무와 상관없는 요청)
@@ -4939,7 +4939,7 @@ function startPolling(){
   if(!POLL_BOUND){document.addEventListener('visibilitychange',pollBoard);POLL_BOUND=true;}
 }
 
-/** 저장 결과를 서버 응답 전에 화면에 먼저 반영 */
+/** 서버가 확인한 업무를 화면에 반영 */
 function applyTaskLocal(p){
   if(!S.data) return;
   var typeName='', corpName='';
@@ -4951,7 +4951,7 @@ function applyTaskLocal(p){
   var found=null;
   S.data.tasks.forEach(function(t){ if(p.id && t.id===p.id) found=t; });
   var d=new Date();
-  var obj = found || { id:'(저장중)', flags:[], manpower:{g:0,j:0}, waste:0, progress:0,
+  var obj = found || { id:p.id||'(저장중)', flags:[], manpower:{g:0,j:0}, waste:0, progress:0,
                        lastLog:'', next:'', status:'대기', start:'', site:'', area:'',
                        scope:'', addr:'', tel:'', amount:0,
                        at: todayStr()+' '+p2(d.getHours())+':'+p2(d.getMinutes()) };
@@ -7650,6 +7650,7 @@ function modalDirty(){
 /** 사용자가 [닫기]·[취소] 를 누른 경우 — 쓰던 게 있으면 물어본다 */
 function closeModal(force){
   var box=$('modal'); if(!box) return;
+  if(!force && box.querySelector('[data-saving="1"]')){toast('저장 결과를 확인 중입니다. 잠시 기다려 주세요.');return;}
   if(!force && box.innerHTML && modalDirty()){
     if(!confirm('작성 중인 내용이 사라집니다. 닫을까요?')) return;
   }
@@ -8158,6 +8159,49 @@ function syncDemo(){
   var t=pickedVal('tfType');
   $('tfDemo').classList.toggle('hide', t!=='DEMO');
 }
+/* 저장 응답을 받은 뒤에만 완료 처리한다. 입력은 보존하고 쓰기는 재전송하지 않는다. */
+var FORM_WRITES=Object.create(null);
+function writeResultMessage(r){
+  return !r || r.net ? '저장 결과를 확인하지 못했습니다. 입력은 남겨 두었습니다. 다시 저장하기 전에 목록에서 반영 여부를 확인해 주세요.'
+    : (r.msg || '저장하지 못했습니다. 입력 내용을 확인해 주세요.');
+}
+function submitFormSave(buttonId, messageId, key, send, saved, failed){
+  var btn=$(buttonId), msg=$(messageId);
+  if(!btn || btn.disabled) return;
+  if(FORM_WRITES[key]){ toast('같은 항목을 저장 중입니다. 잠시 기다려 주세요.'); return; }
+  var root=btn.closest('.sheet'), epoch=S.epoch, token=S.token;
+  var fields=Array.prototype.map.call(root.querySelectorAll('input,textarea,select,button,[contenteditable]'),function(el){
+    var was={el:el,disabled:el.disabled,editable:el.getAttribute('contenteditable')};
+    if('disabled' in el) el.disabled=true;
+    if(was.editable!==null) el.setAttribute('contenteditable','false');
+    return was;
+  });
+  var stopEdit=function(e){if(e.type==='keydown' && e.key==='Tab')return;e.preventDefault();e.stopImmediatePropagation();};
+  ['click','keydown','beforeinput','paste','drop'].forEach(function(name){root.addEventListener(name,stopEdit,true);});
+  root.dataset.saving='1'; root.setAttribute('aria-busy','true');
+  msg.setAttribute('role','status'); msg.textContent='저장 중입니다. 서버 확인을 기다려 주세요.';
+  var current=function(){return root.isConnected && $(buttonId)===btn;};
+  var same=function(){return epoch===S.epoch && token===S.token;};
+  var unlock=function(){
+    ['click','keydown','beforeinput','paste','drop'].forEach(function(name){root.removeEventListener(name,stopEdit,true);});
+    fields.forEach(function(w){if('disabled' in w.el)w.el.disabled=w.disabled;if(w.editable!==null)w.el.setAttribute('contenteditable',w.editable);});
+    delete root.dataset.saving;root.removeAttribute('aria-busy');
+  };
+  FORM_WRITES[key]=true;
+  var request;try{request=send();}catch(e){request=Promise.reject(e);}
+  return Promise.resolve(request).catch(function(){return {ok:false,net:true};}).then(function(r){
+    unlock();
+    if(!same()) return;
+    if(!r || !r.ok){
+      if(failed)failed(r,current());
+      if(current()){msg.textContent=writeResultMessage(r);msg.setAttribute('role','alert');}
+      else if(!r || !r.denied) toast(writeResultMessage(r));
+      return;
+    }
+    saved(r,current());
+  }).finally(function(){unlock();delete FORM_WRITES[key];});
+}
+
 function saveTask(){
   var type=pickedVal('tfType');
   var demo=(type==='DEMO');
@@ -8186,30 +8230,18 @@ function saveTask(){
      예전에는 '철거' 가 미리 켜져 있어서, 다른 유형인데 그대로 저장되는 일이 있었습니다. */
   if(!type){ tfFail('업무 종류를 골라주세요.', $('tfType')); return; }
   if(!p.title){ tfFail('업무명을 입력해주세요.', $('tfTitle')); return; }
-  var btn=$('tfSave');
-  if(btn.disabled) return;
-  btn.disabled=true;
-
-  // 화면에 먼저 반영하고 창을 닫는다 (기다리지 않음)
-  var backup = S.data ? JSON.parse(JSON.stringify(S.data.tasks)) : null;
-  var ep=S.epoch;
-  applyTaskLocal(p);
-  closeOk();
-  if(p.progress>=100) toast('업무를 완료했습니다 · 수고하셨습니다', 'done'); else toast('저장되었습니다', 'ok');
-
-  call('api_saveTask', S.token, p, S.corp).then(function(r){
-    if(!r.ok){
-      var 같은권한 = sameAccess(ep);
-      if(backup && S.data && 같은권한){ S.data.tasks=backup; renderBoard(); }
-      toast('저장 실패: '+r.msg);
-      /* ★ 쓴 것을 잃지 않게 (2026-09-30) — 창은 이미 닫혔으므로 적은 그대로 다시 열고 이유를 단추 위에 적는다.
-         다른 창을 보고 있으면 덮지 않고 남겨 둔다 (다음에 그 업무 창을 열 때 채워진다).
-         볼 수 없게 된 업무(denied)는 다시 열지 않는다 — 공통 거절 처리가 이미 지웠다 */
-      if(같은권한 && !r.denied) tfKeep(p, r.msg);
-      return;
-    }
+  var token=S.token, corp=S.corp;
+  return submitFormSave('tfSave','tfMsg','task:'+(p.id||'new'),function(){
+    return callWithOptions({quiet:true},'api_saveTask',token,p,corp);
+  },function(r,current){
+    p.id=r.id||p.id;
+    applyTaskLocal(p);
     if(p.id) delete S.taskCache[p.id];
+    if(current){TF_DRAFT=null;closeOk();}
+    toast(p.progress>=100?'업무를 완료했습니다 · 수고하셨습니다':'저장되었습니다',p.progress>=100?'done':'ok');
     softRefresh();
+  },function(r,current){
+    if(!current && !TF_DRAFT && !(r && r.denied))TF_DRAFT={p:p,ep:S.epoch,who:S.me&&S.me.phone};
   });
 }
 
@@ -8448,47 +8480,16 @@ function saveLog(){
   if(!p.text){ msg.textContent='작업내용을 입력해주세요.'; $('lgText').classList.add('err'); return; }
   if(p.next && !p.nextDate){ msg.textContent='다음 할일을 적으셨으면 일정일도 골라주세요.'; $('lgNextDate').classList.add('err'); return; }
 
-  var btn=$('lgSave');
-  if(btn.disabled) return;
-  btn.disabled=true;
-  var seq=LOG_SEQ;                       // 이 창이 들고 온 초안 (다른 창이 열리면 LOG_SEQ 는 바뀐다)
-  /* 사진은 고를 때 이미 줄여서 담아 두었다 (photoAdd) */
-  var shots = photoValues('lgPhoto');
-
-  if(shots.length){
-    // 사진이 있으면 올리는 시간이 필요하니 기다린다
-    msg.textContent = shots.length>1
-      ? ('사진 '+shots.length+'장과 함께 저장 중입니다...')
-      : '사진과 함께 저장 중입니다...';
-    p.photos = shots;
-    call('api_saveLog', S.token, p, S.corp).then(function(r){
-      btn.disabled=false;
-      if(!r.ok){ msg.textContent=r.msg; return; }
-      draftSent(p.taskId, seq);
-      closeOk(); toast(p.progress>=100? '기록을 남기고 업무를 완료했습니다' : '기록이 저장되었습니다', p.progress>=100? 'done' : 'ok');
-      addLogLocal(p.taskId, r.log);
-      softRefresh();
-    });
-    return;
-  }
-
-  // 사진이 없으면 즉시 닫고 뒤에서 보낸다
-  var backup = S.data ? JSON.parse(JSON.stringify(S.data.tasks)) : null;
-  var ep=S.epoch;
-  draftSent(p.taskId, seq);
-  applyLogLocal(p);
-  closeOk();
-  toast(p.progress>=100? '기록을 남기고 업무를 완료했습니다' : '기록이 저장되었습니다', p.progress>=100? 'done' : 'ok');
-  call('api_saveLog', S.token, p, S.corp).then(function(r){
-    if(!r.ok){
-      if(backup && S.data && sameAccess(ep)){ S.data.tasks=backup; renderBoard(); }
-      /* ★ 창은 이미 닫혔습니다. 쓴 글을 잃지 않게 상세의 적는 칸으로 돌려 둡니다 (2026-09-22 Astra 지적).
-         그사이 새로 쓴 초안이 있으면 그것을 덮지 않습니다 */
-      draftBack(p.taskId, p.text);
-      toast('저장 실패: '+r.msg);
-      return;
-    }
-    addLogLocal(p.taskId, r.log);        // 화면이 가진 데이터에 바로 붙인다
+  var seq=LOG_SEQ, token=S.token, corp=S.corp;
+  p.photos=photoValues('lgPhoto');
+  return submitFormSave('lgSave','lgMsg2','log:'+p.taskId,function(){
+    return callWithOptions({quiet:true},'api_saveLog',token,p,corp);
+  },function(r,current){
+    draftSent(p.taskId,seq);
+    applyLogLocal(p);
+    if(r.log) addLogLocal(p.taskId,r.log);
+    if(current) closeOk();
+    toast(p.progress>=100?'기록을 남기고 업무를 완료했습니다':'기록이 저장되었습니다',p.progress>=100?'done':'ok');
     softRefresh();
   });
 }
@@ -9445,6 +9446,7 @@ function timeValue(){
 
 /** 일정 창을 닫고 달력으로 돌아간다. 쓰던 내용이 있으면 한 번 묻는다 */
 function closeEventForm(){
+  if($('modal').querySelector('[data-saving="1"]')){toast('저장 결과를 확인 중입니다. 잠시 기다려 주세요.');return;}
   if(modalDirty() && !confirm('작성 중인 내용이 사라집니다. 닫을까요?')) return;
   drawCal();
 }
@@ -9467,61 +9469,32 @@ function saveEvent(){
   if(!p.time){ $('evMsg').textContent='시각을 골라주세요.'; return; }
   if(!p.title){ $('evMsg').textContent='제목을 입력해주세요.'; $('evTitle').classList.add('err'); return; }
 
-  var btn=$('evSave');
-  if(btn.disabled) return;
-  btn.disabled=true;
-
-  // 화면에 먼저 반영하고 달력으로 돌아간다 (기다리지 않음)
-  var backup = (S.data && S.data.events) ? S.data.events.slice() : [];
-  var ep=S.epoch;
-  var tmpId = p.id || ('TMP-'+Date.now());
-  var whoName = '';
-  ((S.data && S.data.staff) || []).forEach(function(s){ if(s.phone===p.phone) whoName=s.name; });
-
-  applyEventLocal({
-    id: tmpId, from: p.from, to: (p.to || p.from), time: p.time, kind: p.kind,
-    phone: p.phone, name: whoName, title: p.title, body: p.body,
-    by: S.me? S.me.phone : '', byName: S.me? S.me.name : '', canEdit: true
-  });
-  CAL.pick = p.from;
-  CAL.ym = p.from.substring(0,7);
-  drawCal();
-  toast('저장되었습니다');
-
-  call('api_saveEvent', S.token, p, S.corp).then(function(r){
-    if(!r || !r.ok){
-      if(S.data && sameAccess(ep)) S.data.events = backup;
-      calRedraw();
-      toast('저장 실패: '+((r&&r.msg)||'다시 시도해주세요'));
-      return;
-    }
-    dropEventLocal(tmpId);          // 임시로 붙여둔 것을 서버가 준 정확한 값으로 갈아끼운다
-    applyEventLocal(r.event);
-    calRedraw();
-    /* 반복으로 여러 개를 만들었으면 알려 준다. 나머지는 새로고침으로 들어온다 */
-    if(r.made > 1) toast(r.made+'개를 넣었습니다');
+  var token=S.token, corp=S.corp;
+  return submitFormSave('evSave','evMsg','event:'+(p.id||'new'),function(){
+    return callWithOptions({quiet:true},'api_saveEvent',token,p,corp);
+  },function(r,current){
+    if(r.event) applyEventLocal(r.event);
+    if(current){CAL.pick=p.from;CAL.ym=p.from.substring(0,7);drawCal();}
+    toast(r.made>1?r.made+'개를 넣었습니다':'저장되었습니다');
     softRefresh();
   });
 }
 
+/* 삭제도 실제 응답을 기다린다. 실패 때 과거 목록 전체를 되살리지 않는다. */
+var DELETE_WRITES=Object.create(null);
+function confirmedDelete(fn,id,done){
+  var key=fn+':'+id;if(DELETE_WRITES[key])return;
+  var epoch=S.epoch, token=S.token, root=$('modal').firstElementChild;
+  DELETE_WRITES[key]=true;toast('삭제 결과를 확인 중입니다.');
+  return callWithOptions({quiet:true},fn,token,id,S.corp).then(function(r){
+    if(epoch!==S.epoch || token!==S.token)return;
+    if(!r || !r.ok){toast(!r || r.net?'삭제 결과를 확인하지 못했습니다. 다시 삭제하기 전에 목록을 새로 확인해 주세요.':(r.msg||'삭제하지 못했습니다.'));return;}
+    done(root===$('modal').firstElementChild);toast('삭제되었습니다');softRefresh();
+  }).finally(function(){delete DELETE_WRITES[key];});
+}
 function deleteEvent(id){
   if(!confirm('이 일정을 지울까요?')) return;
-
-  var backup = (S.data && S.data.events) ? S.data.events.slice() : [];
-  var ep=S.epoch;
-  dropEventLocal(id);
-  if(!calFill(0)) drawCal();          // 달력 안쪽만 (v50)
-  toast('삭제되었습니다');
-
-  call('api_deleteEvent', S.token, id, S.corp).then(function(r){
-    if(!r || !r.ok){
-      if(S.data && sameAccess(ep)) S.data.events = backup;
-      calRedraw();
-      toast('삭제 실패: '+((r&&r.msg)||'다시 시도해주세요'));
-      return;
-    }
-    softRefresh();
-  });
+  return confirmedDelete('api_deleteEvent',id,function(current){dropEventLocal(id);if(current)calRedraw();});
 }
 
 /**
@@ -9535,20 +9508,9 @@ function deleteEvent(id){
 function deleteLeave(id){
   if(!confirm('이 휴가 기록을 달력에서 지울까요?\n\n승인된 결재 문서는 그대로 남습니다.\n되돌릴 수 없습니다.')) return;
 
-  var backup = (S.data && S.data.leaves) ? S.data.leaves.slice() : [];
-  var ep=S.epoch;
-  if(S.data) S.data.leaves = (S.data.leaves || []).filter(function(v){ return v.id !== id; });
-  if(!calFill(0)) drawCal();
-  toast('삭제되었습니다');
-
-  call('api_deleteLeave', S.token, id, S.corp).then(function(r){
-    if(!r || !r.ok){
-      if(S.data && sameAccess(ep)) S.data.leaves = backup;
-      calRedraw();
-      toast('삭제 실패: '+((r&&r.msg)||'다시 시도해주세요'));
-      return;
-    }
-    softRefresh();
+  return confirmedDelete('api_deleteLeave',id,function(current){
+    if(S.data)S.data.leaves=(S.data.leaves||[]).filter(function(v){return v.id!==id;});
+    if(current)calRedraw();
   });
 }
 
@@ -9848,73 +9810,19 @@ function savePost(no){
   // 전 직원에게 알림이 가므로 한 번 더 묻는다
   if(!confirm('전 직원에게 알림이 갑니다. 올리시겠습니까?')) return;
 
-  var btn=$('pfSave'); if(btn.disabled) return;
-  btn.disabled=true;
-
-  /* 낙관 처리 — 즉시 상단에 반영하고 창을 닫는다. 저장은 뒤에서 */
-  var nowS=todayStr()+' '+nowHM();
-  var tmpNo=no||('_tmp'+Date.now());
-  var np={ no:tmpNo, corp:'', title:title, body:body,
-           who:(S.me&&S.me.name)||'', phone:(S.me&&S.me.phone)||'',
-           at:nowS, edited:no? nowS : '' };
-
-  var backNotice = S.data ? (S.data.notices||[]).slice() : null;
-  var backPosts  = S.postCache ? (S.postCache.posts||[]).slice() : null;
-
-  var send = { no:no||'', corp:'', title:title, body:body, photos:shots };
-
-  /* ★ 사진이 있으면 즉시 닫지 않습니다 (2026-08-31).
-     사진은 올리는 데 시간이 걸리고, 실패하면 되돌릴 것이 사진까지라
-     '저장됐다' 고 먼저 말하면 안 됩니다.
-     사진이 없을 때는 예전처럼 즉시 닫고 뒤에서 보냅니다. */
-  if(shots.length){
-    var btn2=$('pfSave');
-    if(btn2){ btn2.disabled=true; }
-    msg.textContent='사진 '+shots.length+'장과 함께 올리는 중입니다...';
-    /* ★ 앞서 올린 것이 아직 저장 중이면 진짜 번호가 나올 때까지 기다린다 */
-    postRealNo(no).then(function(realNo){
-      send.no = realNo || '';
-      return call('api_savePost', S.token, send, S.corp);
-    }).then(function(r){
-      if(btn2) btn2.disabled=false;
-      if(!r.ok){ msg.textContent = r.msg || '올리지 못했습니다.'; return; }
-      np.no = r.no || tmpNo;
-      np.photos = r.photos || [];
-      putPostLocal(np, no);
-      closeOk();
-      toast(no? '공지가 수정되었습니다' : '공지가 등록되었습니다');
-      softRefresh();
-    });
-    return;
-  }
-
-  putPostLocal(np, no);
-  closeOk();
-  toast(no? '공지가 수정되었습니다' : '공지가 등록되었습니다');
-
-  /* ★ 새 글이면 '이 임시 번호는 곧 진짜 번호가 된다' 고 적어 둔다.
-     그 사이에 수정을 누르면 postRealNo 가 여기서 기다립니다. */
-  var 기다림 = postRealNo(no).then(function(realNo){
-    send.no = realNo || '';
-    return call('api_savePost', S.token, send, S.corp);
-  }).then(function(r){
-    if(!r.ok){
-      // 되돌리고 알린다
-      if(backNotice && S.data){ S.data.notices=backNotice; renderNotices(); }
-      if(backPosts && S.postCache) S.postCache.posts=backPosts;
-      toast('공지 저장 실패: '+r.msg);
-      return '';
-    }
-    // 임시 번호를 진짜 번호로 바꾼다
-    if(!no) renumberPost(tmpNo, r.no, r.at||nowS);
+  var nowS=todayStr()+' '+nowHM(), token=S.token, corp=S.corp;
+  var np={no:no||'',corp:'',title:title,body:body,who:(S.me&&S.me.name)||'',
+    phone:(S.me&&S.me.phone)||'',at:nowS,edited:no?nowS:''};
+  var send={no:no||'',corp:'',title:title,body:body,photos:shots};
+  return submitFormSave('pfSave','pfMsg','post:'+(no||'new'),function(){
+    return callWithOptions({quiet:true},'api_savePost',token,send,corp);
+  },function(r,current){
+    np.no=r.no||no;np.at=r.at||nowS;np.photos=r.photos||[];
+    if(np.no) putPostLocal(np,no);
+    if(current) closeOk();
+    toast(no?'공지가 수정되었습니다':'공지가 등록되었습니다');
     softRefresh();
-    return no || r.no || '';
   });
-
-  if(!no){
-    PENDING_POST[tmpNo] = 기다림;
-    기다림.then(function(){ delete PENDING_POST[tmpNo]; });
-  }
 }
 
 /** 공지를 상단 줄과 게시판 캐시에 즉시 반영 */
@@ -9952,27 +9860,14 @@ function renumberPost(tmpNo, realNo, at){
 
 function deletePost(no){
   if(!confirm('이 글을 지울까요?\n달린 댓글도 함께 지워지고 되돌릴 수 없습니다.')) return;
-  var backN=S.data? (S.data.notices||[]).slice() : null;
-  var backP=S.postCache? (S.postCache.posts||[]).slice() : null;
-
-  dropNoticeLocal(no);
-  if(S.postCache){
-    S.postCache.posts=(S.postCache.posts||[]).filter(function(x){ return x.no!==no; });
-    if(S.postCache.comments) delete S.postCache.comments[no];
-  }
-  toast('삭제되었습니다');
-  openBoard();
-
-  call('api_deletePost', S.token, no, S.corp).then(function(r){
-    if(!r.ok){
-      if(backN && S.data){ S.data.notices=backN; renderNotices(); }
-      if(backP && S.postCache) S.postCache.posts=backP;
-      toast('삭제하지 못했습니다: '+r.msg);
-      openBoard();
-      return;
+  return confirmedDelete('api_deletePost',no,function(current){
+    dropNoticeLocal(no);
+    if(S.postCache){
+      S.postCache.posts=(S.postCache.posts||[]).filter(function(x){return x.no!==no;});
+      if(S.postCache.comments)delete S.postCache.comments[no];
+      S.postCacheAt=areaVer('post');
     }
-    if(S.postCache) S.postCacheAt=areaVer('post');
-    softRefresh();
+    if(current)openBoard();
   });
 }
 
