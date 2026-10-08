@@ -2150,6 +2150,7 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 
 <!-- ================= 통신이 끊겼을 때 — 끊겨 있는 동안 계속 떠 있습니다 ================= -->
 <div class="offbar hide" id="offBar">인터넷이 끊겼습니다 · 지난번 화면을 보고 계십니다</div>
+<div class="offbar hide" id="serverBar" role="status">서버 연결을 확인하지 못했습니다 · 이전 자료일 수 있습니다. 저장·삭제 결과를 확인해 주세요. <button class="btn sm" onclick="location.reload()">다시 연결</button></div>
 
 <div class="wrap" id="wrap">
   <!-- ================= 업무 ================= -->
@@ -3933,8 +3934,14 @@ var PERF=[];
    Content-Type 을 text/plain 으로 보내야 브라우저가 사전확인(OPTIONS)을
    보내지 않는다. application/json 으로 보내면 앱스스크립트에서 전부 실패한다. */
 function call(fn){
-  var args = Array.prototype.slice.call(arguments,1);
+  return callWithOptions.apply(null,[{}].concat(Array.prototype.slice.call(arguments)));
+}
+function callWithOptions(options,fn){
+  var args = Array.prototype.slice.call(arguments,2);
   var t0 = Date.now();
+  var status=0, readFailure=false, silent=!!(options.quiet || QUIET_CALLS[fn]);
+  var controller=new AbortController();
+  var deadline=setTimeout(function(){controller.abort();},45000);
   /* ★★ 이번 요청의 답 번호를 비워 둡니다 (2026-09-03).
      안 비우면 **직전에 성공한 요청의 번호가 그대로 남아**, 서버에 아예 닿지도
      못한 실패가 `HTTP 200` 으로 기록됩니다. 원인을 정반대로 짚게 됩니다. */
@@ -3945,27 +3952,33 @@ function call(fn){
     headers: { 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ fn: fn, args: args, key: LAUNCH_TOKEN }),
     redirect: 'follow',
-    cache: 'no-store'
+    cache: 'no-store',
+    signal: controller.signal
   })
   .then(function(res){
-    LAST_STATUS = res.status;
+    status = res.status; LAST_STATUS = status;
     return res.text();
   })
   .then(function(text){
     var r;
-    try { r = JSON.parse(text); }
+    try { r = JSON.parse(text); if(r===null) throw new Error('빈 응답'); }
     catch(e){
+      readFailure=true;
       /* ★★ '서버가 JSON 이 아닌 것을 보냈다' 와 '통신이 안 됐다' 는 완전히 다른 일입니다
          (2026-09-02). 예전에는 둘 다 `통신이 불안정합니다` 로 뭉뚱그려져서,
          공지 삭제가 안 될 때 무엇이 문제인지 알 길이 없었습니다.
          받은 것을 그대로 남겨 둡니다 — 로그인 화면이 왔는지, 오류 쪽지가 왔는지 보입니다. */
-      keepFail({ fn:fn, why:'응답이 JSON 이 아님', status:LAST_STATUS, quiet:!!QUIET_CALLS[fn],
+      keepFail({ fn:fn, why:'응답이 JSON 이 아님', status:status, quiet:silent,
                  앞부분:String(text||'').substring(0,200), at:new Date().toLocaleString() });
       console.log('[통신] '+fn+' 응답이 JSON 이 아닙니다 ('+LAST_STATUS+')', String(text||'').substring(0,300));
       throw new Error('서버 응답을 읽지 못했습니다.');
     }
 
     if(OFFLINE) setOffline(false);     /* 답이 왔으면 붙은 것이다 */
+    if(r && r.message && !r.msg) r.msg=r.message;
+    if(status>=400){ var httpError=new Error('HTTP '+status); httpError.http=true; throw httpError; }
+    /* 가벼운 상태 조회 성공만으로 업무 자료 연결까지 복구됐다고 표시하지 않는다. */
+    if(r && r.ok && (fn==='api_board' || fn==='api_start')) setServerUnavailable(false);
 
     var ms = Date.now()-t0;
     var server = (r && r.ms) ? r.ms : (r && r.board && r.board.ms ? r.board.ms : null);
@@ -4015,17 +4028,19 @@ function call(fn){
        net: true 는 '서버가 거절한 것이 아니라 연결이 안 됐다' 는 표시입니다. */
     console.log('[속도] '+fn+' 실패 '+((Date.now()-t0)/1000).toFixed(2)+'초', e);
     var offline = (typeof navigator!=='undefined' && navigator.onLine===false);
-    var 읽기실패 = LAST_FAIL && LAST_FAIL.fn===fn && LAST_FAIL.why==='응답이 JSON 이 아님';
+    var 읽기실패 = readFailure;
     if(offline) setOffline(true);
+    setServerUnavailable(true);
 
     if(!읽기실패){
-      keepFail({ fn:fn, why:'서버에 닿지 못함', status:LAST_STATUS, quiet:!!QUIET_CALLS[fn],
+      keepFail({ fn:fn, why:e.name==='AbortError'?'응답 시간 초과':'서버에 닿지 못함', status:status, quiet:silent,
                  앞부분:String((e&&e.message)||e), at:new Date().toLocaleString() });
     }
 
     var 글 = offline ? '인터넷이 끊겼습니다. 연결되면 다시 시도해주세요.'
-           : (읽기실패 ? '서버가 이상한 답을 보냈습니다. 설정(⚙)에서 [마지막 오류] 를 봐주세요.'
-                       : '통신이 잠시 불안정합니다. 다시 시도해주세요.');
+           : (읽기실패 ? '서버 응답을 읽지 못했습니다. 서버 접근 상태를 확인해 주세요.'
+                       : e.name==='AbortError' ? '서버 응답이 늦어 결과를 확인하지 못했습니다.'
+                       : '서버에 연결하지 못했습니다. 연결 상태 또는 서버 접근 권한을 확인해 주세요.');
     /* ★★ 사람이 누르지 않은 통로는 **조용히 넘어갑니다** (2026-09-03).
        `api_lastUpdate` 는 30초마다 뒤에서 '바뀐 게 있나' 를 묻는 통로입니다.
        앱을 올리는 동안(clasp deploy) 구글이 그 주소에 잠깐 404 를 주는데,
@@ -4033,9 +4048,9 @@ function call(fn){
        실제로는 다음 번에 저절로 붙습니다.
        ★ 기록은 그대로 남깁니다 — 설정(⚙)의 [마지막 오류] 에서 볼 수 있습니다.
          조용히 넘어가는 것과 없던 일로 하는 것은 다릅니다. */
-    if(!QUIET_CALLS[fn]) toast(글);
+    if(!silent) toast(글);
     return { ok:false, net:true, msg: 글 };
-  });
+  }).finally(function(){clearTimeout(deadline);});
 }
 
 /* ★ 마지막으로 실패한 통신을 남겨 둔다 (2026-09-02).
@@ -4484,13 +4499,21 @@ function loadSnap(){
  *    부르는 쪽 54곳이 되돌리기를 갖고 있습니다.
  */
 var OFFLINE = false;
+var SERVER_UNAVAILABLE = false;
+function setServerUnavailable(on){
+  SERVER_UNAVAILABLE=!!on;
+  var bar=$('serverBar'); if(bar) bar.classList.toggle('hide',!on || OFFLINE);
+  if(on) markStale(true);
+  else if(!OFFLINE) markStale(false);
+}
 
 function setOffline(on){
   if(OFFLINE === on) return;
   OFFLINE = on;
   var bar = $('offBar');
   if(bar) bar.classList.toggle('hide', !on);
-  markStale(on);
+  var server=$('serverBar'); if(server) server.classList.toggle('hide',on || !SERVER_UNAVAILABLE);
+  markStale(on || SERVER_UNAVAILABLE);
 }
 
 (function(){
@@ -4552,7 +4575,7 @@ function boot(){
 
   // ② 진짜 데이터는 왕복 한 번으로 받는다
   var seq0=++S.boardSeq, ep0=S.epoch;
-  call('api_start', S.token, S.corp).then(function(r){
+  callWithOptions({quiet:true},'api_start', S.token, S.corp).then(function(r){
     /* ★ 보낸 뒤 권한이 줄었으면(업무 창에서 거절을 받는 등) 이 답은 옛것이다 (검수 2차).
        판은 다시 받고, 기준정보는 화면을 그릴 재료가 없을 때만 쓰되 현장 목록은 비운다 */
     var 옛답 = !!(r && r.ok && !boardFresh(seq0, ep0));
@@ -4624,7 +4647,7 @@ function prefetchPosts(){
   if(POSTS_LOADING) return POSTS_LOADING;
 
   var at=areaVer('post');
-  POSTS_LOADING = call('api_posts', S.token).then(function(r){
+  POSTS_LOADING = callWithOptions({quiet:true},'api_posts', S.token).then(function(r){
     if(r && r.ok){ S.postCache=r; S.postCacheAt=at; }
     POSTS_LOADING=null;
   }, function(){ POSTS_LOADING=null; });
@@ -5023,7 +5046,7 @@ function softRefresh(){
     /* ★ 판 받기는 모두 applyBoard 한 길로 (2026-09-30) — 사람·권한이 바뀐 것을 한 곳에서 알아챈다.
        먼저 보낸 요청이 늦게 오면(boardFresh) 버린다 */
     var seq=++S.boardSeq, ep=S.epoch;
-    call('api_board', S.token, S.corp).then(function(r){
+    callWithOptions({quiet:true},'api_board', S.token, S.corp).then(function(r){
       if(!r || !r.ok) return;
       if(!boardFresh(seq, ep)){ if(ep!==S.epoch) softRefresh(); return; }   // 권한이 줄어든 뒤 온 옛 판 — 다시 받는다
       applyBoard(r);
@@ -5036,7 +5059,7 @@ function refresh(showMsg){
   if(showMsg) S.anim=true;
   var rb=$('refBtn'); if(rb) rb.classList.add('spin');
   var seq=++S.boardSeq, ep=S.epoch;
-  return call('api_board', S.token, S.corp).then(function(r){
+  return callWithOptions({quiet:!showMsg},'api_board', S.token, S.corp).then(function(r){
     if(rb) rb.classList.remove('spin');
     if(!r.ok) return;
     if(!boardFresh(seq, ep)){ if(ep!==S.epoch) softRefresh(); return; }     // 권한이 줄어든 뒤 온 옛 판 — 다시 받는다
@@ -6562,6 +6585,7 @@ function dropDocLocal(no){
   });
   S.data.approvals=(S.data.approvals||[]).filter(function(a){ return a.no!==no; });
   delete S.docCache[no]; delete S.docCacheAt[no];
+  if(S.data.docPack) delete S.data.docPack[no];
   navCount();
   if(S.view==='doc') renderDocs();
 }
@@ -11375,7 +11399,7 @@ function prefetchDocs(){
   });
   if(!nos.length) return;
   var at=areaVer('doc');
-  call('api_docDetails', S.token, nos).then(function(r){
+  callWithOptions({quiet:true},'api_docDetails', S.token, nos).then(function(r){
     if(!r || !r.ok) return;
     Object.keys(r.docs||{}).forEach(function(k){
       S.docCache[k]=r.docs[k]; S.docCacheAt[k]=at;
@@ -11435,7 +11459,7 @@ function docSheetHtml(d, r){
     (관리자? '<button class="tdico" onclick="taskMenu()" title="삭제" aria-label="삭제">'+ic('dots')+'</button>' : '')+
     '<button class="btn sm" onclick="closeModal()">닫기</button></div>'+
     (관리자? '<div class="tdmenu" id="tdMenu">'+
-      '<button class="btn sm dg" onclick="deleteDoc(\''+d.no+'\',\''+esc(d.title).replace(/'/g,'')+'\')">삭제</button></div>' : '')+
+      '<button id="docDeleteBtn" data-no="'+esc(d.no)+'" class="btn sm dg" onclick="deleteDoc(this.dataset.no)"'+(DOC_DELETING[d.no]?' disabled':'')+'>'+(DOC_DELETING[d.no]?'삭제 확인 중…':'삭제')+'</button></div><p id="docDeleteStatus" role="status" class="muted"></p>' : '')+
     byline(head)+
     (d.amount? '<p style="margin:0 0 18px"><b class="num" style="font-size:var(--fs-num-md)">'+
        won(d.amount)+'원</b> <span class="sub">'+esc(wonKo(d.amount))+'</span></p>' : '')+
@@ -11672,19 +11696,34 @@ function shareDoc(no){
   });
 }
 
+var DOC_DELETING={};
 function deleteDoc(no, title){
+  if(DOC_DELETING[no]) return Promise.resolve();
+  var brief=findDocBrief(no), cached=S.docCache[no];
+  title=title || (cached && cached.doc && cached.doc.title) || (brief && brief.title) || '결재';
   if(!confirm('"'+title+'" 문서를 삭제할까요?\n결재선·지출내역·영수증 기록까지 함께 지워지고 되돌릴 수 없습니다.')) return;
-  var back=S.data? JSON.parse(JSON.stringify(S.data.docs||null)) : null;
-  var ep=S.epoch;
-  dropDocLocal(no);
-  closeOk(); toast('삭제되었습니다');
-  call('api_deleteDoc', S.token, no, S.corp).then(function(r){
-    if(!r.ok){
-      if(back && S.data && sameAccess(ep)){ S.data.docs=back; renderDocs(); navCount(); }
-      toast('삭제하지 못했습니다: '+r.msg);
+  var ep=S.epoch, token=S.token;
+  DOC_DELETING[no]=true;
+  function currentButton(){var b=$('docDeleteBtn');return b && b.dataset.no===no ? b : null;}
+  var button=currentButton(); if(button){button.disabled=true;button.textContent='삭제 확인 중…';}
+  if(button && $('docDeleteStatus')) $('docDeleteStatus').textContent='서버에서 삭제 결과를 확인하고 있습니다.';
+  return callWithOptions({quiet:true},'api_deleteDoc', token, no, S.corp).then(function(r){
+    if(token!==S.token || !sameAccess(ep)) return;
+    if(!r || !r.ok){
+      var msg=r && r.net ? '삭제 결과를 확인하지 못했습니다. 연결 복구 후 새로고침하여 확인해 주세요.' : '삭제하지 못했습니다: '+((r && (r.msg||r.message))||'서버 응답 확인 필요');
+      if(currentButton() && $('docDeleteStatus')) $('docDeleteStatus').textContent=msg;
+      toast(msg);
       return;
     }
+    S.boardSeq++; /* 삭제 전에 출발한 목록 응답이 문서를 되살리지 않게 한다. */
+    dropDocLocal(no);
+    if(currentButton()) closeOk();
+    renderBoard(); saveSnap();
+    toast('삭제되었습니다');
     softRefresh();
+  }).finally(function(){
+    delete DOC_DELETING[no];
+    var b=currentButton();if(b){b.disabled=false;b.textContent='삭제';}
   });
 }
 
