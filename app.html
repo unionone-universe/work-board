@@ -11861,8 +11861,15 @@ function formList(){
     seenCode[c]=true;
     if(n && seenName[n]) return;
     if(n) seenName[n]=true;
+    f=JSON.parse(JSON.stringify(f));
+    if(c!=='LEAVE'){
+      f.fields=f.fields||[];
+      var reasonName=c==='EXP'?'구매사유':c==='ADD'?'발생사유':c==='SEAL'?'날인사유':((f.fields.filter(function(fd){return /사유$/.test(fd.name);})[0]||{}).name||'사유');
+      var requiredReason=f.fields.filter(function(fd){return fd.name===reasonName;})[0];
+      if(requiredReason){requiredReason.req=true;requiredReason.kind='여러줄';}
+      else f.fields.push({name:reasonName,kind:'여러줄',req:true,help:'신청하는 이유를 적어주세요.'});
+    }
     if(c==='EXP'){
-      f=JSON.parse(JSON.stringify(f));
       var payment=null, reason=null;
       (f.fields||[]).forEach(function(fd){if(fd.name==='결제수단')payment=fd;if(fd.name==='구매사유')reason=fd;});
       f.fields=f.fields||[];
