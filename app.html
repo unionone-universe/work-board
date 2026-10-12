@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v116">
+<meta name="uo-version" content="v117">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
@@ -6828,7 +6828,7 @@ async function linkCustomer(index){
   var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);var requestId=Array.from(bytes).map(function(b){return ('0'+b.toString(16)).slice(-2);}).join('');
   taskSaveRemember(p.key,{id:requestId,digest:'customer-link'});
   var payload={requestId:requestId,taskVersion:p.taskVersion,linkVersion:p.link.version||'',unlink:!item};if(item){payload.gid=item.gid;payload.row=item.row;payload.hash=item.hash;}
-  p.saving=true;$('customerResults').setAttribute('data-saving','1');$('customerResults').textContent='연결을 저장하고 있습니다…';
+  ++p.seq;p.saving=true;$('customerResults').setAttribute('data-saving','1');$('customerResults').textContent='연결을 저장하고 있습니다…';
   var r;try{r=await callWithOptions({quiet:true,timeoutMs:22000},'api_customerLink',p.token,p.id,payload);}catch(e){r=null;}
   p.saving=false;if(!customerPickerAlive(p))return;$('customerResults').removeAttribute('data-saving');
   if(r&&r.ok){customerLinkSaved(p);return;}
@@ -7744,7 +7744,7 @@ function modalSig(){
     s.push(String(e.textContent==null?'':e.textContent));
   });
   [].forEach.call(box.querySelectorAll('input,textarea,select'),function(e){
-    if(e.type==='button' || e.type==='submit') return;
+    if(e.type==='button' || e.type==='submit' || e.id==='customerQuery') return;
     s.push((e.type==='checkbox'||e.type==='radio') ? (e.checked?'1':'0') : String(e.value==null?'':e.value));
   });
   /* 고른 사진도 '쓰던 것' 이다 (2026-08-31).
