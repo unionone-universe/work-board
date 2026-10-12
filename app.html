@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v118">
+<meta name="uo-version" content="v119">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
@@ -2103,6 +2103,8 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 
 
 #masterBody input:not([type=checkbox]),#masterBody select{width:100%;min-width:0} #masterBody .customer-search input{width:auto} #masterBody .fl{margin-top:14px} #masterBody .tdlink{overflow-wrap:anywhere} #masterStatus{margin-top:16px;overflow-wrap:anywhere} .master-confirm{display:flex;align-items:flex-start;gap:8px;margin-top:14px} #masterFields:disabled{opacity:.7}
+
+.site-sources{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}.site-sources p{overflow-wrap:anywhere}#siteSourceStatus,#siteAttendance{margin-top:14px;overflow-wrap:anywhere}
 </style>
 </head>
 <body>
@@ -3976,7 +3978,7 @@ var READ_PENDING=Object.create(null), READ_REV=0;
 var CONNECTION_SEQ=0, CONNECTION_BOARD_OK=0, CONNECTION_FAILED=0;
 var RETRY_READS={api_start:1,api_board:1,api_lastUpdate:1};
 function callWithOptions(options,fn){
-  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1,api_taskSaveStatus:1,api_workContext:1,api_customerSearch:1,api_customerLinkStatus:1,api_masterSearch:1,api_masterStatus:1};
+  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1,api_taskSaveStatus:1,api_workContext:1,api_customerSearch:1,api_customerLinkStatus:1,api_masterSearch:1,api_masterStatus:1,api_siteSourceSearch:1,api_siteSourceStatus:1,api_siteAttendance:1};
   if(!reads[fn]){if(!QUIET_CALLS[fn])READ_REV++;return callTransport.apply(null,args);}
   var key=JSON.stringify([fn,args.slice(2),S.epoch,READ_REV]);
   if(READ_PENDING[key])return READ_PENDING[key];
@@ -6789,13 +6791,61 @@ function siteInfo_(t){
    ★ 탭은 업무마다 기억합니다(TD_TAB · 저장하지 않음). 초안 · 늦은 응답 · 권한 회수 처리는 예전 그대로입니다. */
 /* 연결 탭에서만 조회한다. 메인/업무 열기의 기존 즉시 표시를 유지한다. */
 
+
+var SITE_SOURCE_PICK=null;
+function siteSourcesHtml(c){
+  if(!c.master || !c.master.site)return '';
+  var src=c.siteSources||{items:[]},h='<div class="site-sources"><p class="muted">연결 견적'+(src.items.length?' '+src.items.length+'건':'')+'</p>';
+  if(src.unavailable)h+='<p>견적 연결을 확인하지 못했습니다.</p>';
+  else if(src.items.length)h+=src.items.slice(0,3).map(function(x){return '<p>'+esc(x.code)+' <span class="muted">'+esc(x.name)+'</span></p>';}).join('')+(src.items.length>3?'<p class="muted">그 외 '+(src.items.length-3)+'건</p>':'');
+  else h+='<p class="muted">원본 견적을 확인해 이 현장에 연결하세요.</p>';
+  if(c.canManageCustomer&&!src.unavailable){h+='<button class="btn sm" data-task="'+esc(c.task.id)+'" onclick="openSiteSources(this.dataset.task)">견적 연결 관리</button>';if(src.items.some(function(x){return x.hasAttendance;}))h+=' <button class="btn sm" data-task="'+esc(c.task.id)+'" onclick="loadSiteAttendance(this.dataset.task)">오늘 현장 출근 확인</button><div id="siteAttendance" role="status"></div>';}
+  return h+'</div>';
+}
+function sourceAlive(p){return SITE_SOURCE_PICK===p&&S.epoch===p.epoch&&S.token===p.token&&!!$('siteSourceBody');}
+function openSiteSources(id){
+  var e=WORK_CONTEXT[S.epoch+'|'+id],c=e&&e.result&&e.result.context;if(!c||!c.canManageCustomer||!c.master||!c.master.site||c.siteSources&&c.siteSources.unavailable)return;
+  var p={id:id,epoch:S.epoch,token:S.token,seq:0,taskVersion:c.task.version,masterVersion:c.master.version,site:c.master.site,items:[],linked:c.siteSources&&c.siteSources.items||[],key:'uo.site-source.'+String(S.me.phone)+'|'+id};SITE_SOURCE_PICK=p;BACK_TASK=id;
+  $('modal').innerHTML='<div class="veil"><div class="sheet"><div class="sheethead"><h3 class="tt">견적 연결 관리</h3><button class="btn sm" onclick="closeModal()">닫기</button></div><p><strong>'+esc(p.site.name)+'</strong></p><p class="muted">'+esc(p.site.address)+'</p><p class="muted">같은 현장의 견적인지 확인하세요. 견적과 출퇴근 원본은 바뀌지 않습니다.</p><div id="siteSourceBody"><form class="customer-search" onsubmit="event.preventDefault();searchSiteSources()"><input type="search" id="siteSourceQuery" maxlength="80" aria-label="견적번호·고객명·주소" placeholder="견적번호·고객명·주소" style="min-width:0;flex:1"><button class="btn" type="submit">찾기</button></form><div id="siteSourceMatches" aria-live="polite"></div><details'+(p.linked.length?'':' hidden')+'><summary>현재 연결 '+p.linked.length+'건</summary>'+p.linked.map(function(x,i){return '<p>'+esc(x.code)+' <button class="btn sm" data-index="'+i+'" onclick="saveSiteSource(Number(this.dataset.index),true)">연결 해제</button></p>';}).join('')+'</details></div><div id="siteSourceStatus" role="status"></div></div></div>';
+  if(taskSavePending(p.key))siteSourcePending();else $('siteSourceQuery').focus();
+}
+async function searchSiteSources(){
+  var p=SITE_SOURCE_PICK;if(!p||!sourceAlive(p)||p.saving)return;if(taskSavePending(p.key)){siteSourcePending();return;}
+  var q=$('siteSourceQuery').value.trim();if(q.length<2){$('siteSourceMatches').textContent='두 글자 이상 입력해주세요.';return;}
+  var seq=++p.seq;$('siteSourceMatches').textContent='견적 원본을 확인하고 있습니다…';var r;try{r=await callWithOptions({quiet:true},'api_siteSourceSearch',p.token,p.id,q);}catch(e){r=null;}
+  if(!sourceAlive(p)||seq!==p.seq)return;if(!r||!r.ok){$('siteSourceMatches').textContent=r&&r.msg||'원본을 불러오지 못했습니다.';return;}
+  if(r.siteId!==p.site.id || r.masterVersion!==p.masterVersion){$('siteSourceMatches').textContent='고객·현장이 바뀌었습니다. 닫고 다시 확인해주세요.';p.items=[];return;}
+  p.taskVersion=r.taskVersion;p.items=r.items;
+  $('siteSourceMatches').innerHTML='<p class="muted">'+(r.total>20?'20건을 표시합니다. 검색어를 더 입력해주세요.':r.total+'건')+'</p>'+r.items.map(function(x,i){return '<article class="customer-card"><p><strong>'+esc(x.code)+'</strong> '+esc(x.name)+'</p><p>'+esc(x.address)+'</p><p class="muted">'+(x.hasAttendance?'출퇴근 현장 폴더 있음':'출퇴근 현장 폴더 없음 · 견적만 연결')+'</p><button class="btn sm" data-index="'+i+'" '+(x.linkedElsewhere?'disabled':'')+' onclick="saveSiteSource(Number(this.dataset.index),false)">'+(x.linkedElsewhere?'다른 공통 현장에 연결됨':'이 현장에 연결')+'</button></article>';}).join('');
+}
+function siteSourcePending(){if(!$('siteSourceStatus'))return;$('siteSourceBody').querySelectorAll('button,input').forEach(function(e){e.disabled=true;});$('siteSourceStatus').innerHTML='<p>저장 결과가 아직 확인되지 않았습니다.</p><button class="btn" onclick="checkSiteSource()">저장 결과 확인</button>';}
+function siteSourceSaved(p){taskSaveRemember(p.key,null);WORK_CONTEXT={};SITE_SOURCE_PICK=null;closeOk();openTask(p.id,true);tdTab('flow');toast('현장 견적 연결을 저장했습니다.');}
+async function saveSiteSource(index,unlink){
+  var p=SITE_SOURCE_PICK;if(!p||!sourceAlive(p)||p.saving)return;if(taskSavePending(p.key)){siteSourcePending();return;}var x=(unlink?p.linked:p.items)[index];if(!x||x.linkedElsewhere)return;
+  if(!confirm(unlink?x.code+' 연결을 해제할까요?\n이 공통 현장을 사용하는 모든 업무에 반영됩니다. 견적·출퇴근 원본은 남습니다.':x.code+' · '+x.name+'\n'+x.address+'\n'+p.site.name+'의 견적이 맞습니까?'))return;
+  var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);var requestId=Array.from(bytes).map(function(b){return ('0'+b.toString(16)).slice(-2);}).join('');
+  taskSaveRemember(p.key,{id:requestId,digest:'site-source'});++p.seq;p.saving=true;$('siteSourceBody').setAttribute('data-saving','1');$('siteSourceStatus').textContent='연결을 저장하고 있습니다…';
+  var payload={requestId:requestId,taskVersion:p.taskVersion,masterVersion:p.masterVersion,siteId:p.site.id,code:x.code,version:x.version||'',hash:x.hash||'',unlink:!!unlink},r;
+  try{r=await callWithOptions({quiet:true,timeoutMs:22000},'api_siteSourceLink',p.token,p.id,payload);}catch(e){r=null;}
+  p.saving=false;if(!sourceAlive(p))return;$('siteSourceBody').removeAttribute('data-saving');if(r&&r.ok){siteSourceSaved(p);return;}
+  if(r&&(r.notSaved||r.denied)){taskSaveRemember(p.key,null);$('siteSourceStatus').textContent=r.msg||'저장하지 못했습니다.';return;}siteSourcePending();
+}
+async function checkSiteSource(){var p=SITE_SOURCE_PICK;if(!p||!sourceAlive(p)||p.saving)return;var pending=taskSavePending(p.key);if(!pending)return;p.saving=true;var r;try{r=await callWithOptions({quiet:true},'api_siteSourceStatus',p.token,p.id,pending.id);}catch(e){r=null;}p.saving=false;if(!sourceAlive(p))return;if(r&&r.ok&&r.state==='saved'){siteSourceSaved(p);return;}siteSourcePending();}
+async function loadSiteAttendance(id){
+  var box=$('siteAttendance'),e=WORK_CONTEXT[S.epoch+'|'+id],c=e&&e.result&&e.result.context;if(!box||!c||!c.canManageCustomer||box.dataset.busy==='1')return;
+  var epoch=S.epoch,token=S.token;box.dataset.busy='1';box.textContent='오늘 현장 출근을 확인하고 있습니다…';var r;try{r=await callWithOptions({quiet:true},'api_siteAttendance',token,id,{siteId:c.master.site.id,masterVersion:c.master.version});}catch(err){r=null;}
+  if(epoch!==S.epoch||token!==S.token||S.openTask!==id||$('siteAttendance')!==box)return;box.dataset.busy='';
+  if(!r||!r.ok){box.textContent=r&&r.msg||'오늘 출근을 확인하지 못했습니다.';return;}
+  box.innerHTML='<p class="muted">'+esc(r.date)+' · 조회 '+esc(r.checkedAt)+'</p>'+(r.rows.length?r.rows.map(function(x){return '<p>'+esc(x.name)+' · '+esc(x.in)+(x.out?'~'+esc(x.out)+' 퇴근':' 출근')+'</p>';}).join(''):'<p>이 현장에 기록된 오늘 출근이 없습니다.</p>');
+}
+
 var MASTER_PICK=null;
 function masterSummaryHtml(c){
   var m=c.master||{},h='<section class="tdsec"><h4 class="tdh">고객 · 현장</h4>';
   if(m.customer){h+='<p><strong>'+esc(m.customer.name)+'</strong> '+esc(phoneFmt(m.customer.phone))+'</p>';h+=m.site?'<p>'+esc(m.site.name)+'</p><p class="muted">'+esc(m.site.address)+'</p>':'<p class="muted">현장은 아직 연결하지 않았습니다.</p>';}
   else h+='<p class="tdnone">'+(m.unavailable?'고객·현장 기준을 확인하지 못했습니다.':'등록된 고객·현장을 연결할 수 있습니다.')+'</p>';
   if(c.canManageCustomer && !m.unavailable)h+='<button class="btn sm" data-task="'+esc(c.task.id)+'" onclick="openMasterPicker(this.dataset.task)">'+(m.customer?'고객·현장 변경':'고객·현장 연결')+'</button>';
-  return h+'</section>';
+  return h+siteSourcesHtml(c)+'</section>';
 }
 function masterAlive(p){return MASTER_PICK===p && S.epoch===p.epoch && S.token===p.token && !!$('masterBody');}
 function masterBusy(p,on){p.saving=on;if(!masterAlive(p))return;var body=$('masterBody');if(on)body.setAttribute('data-saving','1');else body.removeAttribute('data-saving');body.querySelectorAll('button,input,select,fieldset').forEach(function(e){e.disabled=on;});}
@@ -7831,7 +7881,7 @@ function modalSig(){
     s.push(String(e.textContent==null?'':e.textContent));
   });
   [].forEach.call(box.querySelectorAll('input,textarea,select'),function(e){
-    if(e.type==='button' || e.type==='submit' || e.id==='customerQuery' || e.id==='masterQuery' || e.id==='masterSiteQuery') return;
+    if(e.type==='button' || e.type==='submit' || e.id==='customerQuery' || e.id==='masterQuery' || e.id==='masterSiteQuery' || e.id==='siteSourceQuery') return;
     s.push((e.type==='checkbox'||e.type==='radio') ? (e.checked?'1':'0') : String(e.value==null?'':e.value));
   });
   /* 고른 사진도 '쓰던 것' 이다 (2026-08-31).
