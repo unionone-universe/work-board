@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v113">
+<meta name="uo-version" content="v114">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
@@ -3957,7 +3957,7 @@ var READ_PENDING=Object.create(null), READ_REV=0;
 var CONNECTION_SEQ=0, CONNECTION_BOARD_OK=0, CONNECTION_FAILED=0;
 var RETRY_READS={api_start:1,api_board:1,api_lastUpdate:1};
 function callWithOptions(options,fn){
-  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1};
+  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1,api_taskSaveStatus:1};
   if(!reads[fn]){if(!QUIET_CALLS[fn])READ_REV++;return callTransport.apply(null,args);}
   var key=JSON.stringify([fn,args.slice(2),S.epoch,READ_REV]);
   if(READ_PENDING[key])return READ_PENDING[key];
@@ -3969,7 +3969,7 @@ function callTransport(options,fn){
   var t0 = Date.now(), connectionSeq=++CONNECTION_SEQ, connectionEpoch=S.epoch, connectionToken=S.token, readRev=READ_REV;
   var status=0, readFailure=false, silent=!!(options.quiet || QUIET_CALLS[fn]);
   var controller=new AbortController();
-  var deadline=setTimeout(function(){controller.abort();},RETRY_READS[fn]?22000:45000);
+  var deadline=setTimeout(function(){controller.abort();},options.timeoutMs || (RETRY_READS[fn]?22000:45000));
   /* ★★ 이번 요청의 답 번호를 비워 둡니다 (2026-09-03).
      안 비우면 **직전에 성공한 요청의 번호가 그대로 남아**, 서버에 아예 닿지도
      못한 실패가 `HTTP 200` 으로 기록됩니다. 원인을 정반대로 짚게 됩니다. */
@@ -4956,6 +4956,7 @@ function applyTaskLocal(p){
                        scope:'', addr:'', tel:'', amount:0,
                        at: todayStr()+' '+p2(d.getHours())+':'+p2(d.getMinutes()) };
   obj.type=p.type; obj.typeName=typeName; obj.corp=p.corp; obj.corpName=corpName;
+  if(p.editVersion)obj.editVersion=p.editVersion;
   obj.title=p.title; obj.content=p.content||''; obj.owner=p.owner; obj.ownerName=ownerName;
   obj.due=p.due; obj.co=p.co;
   obj.upAt=nowStamp();                     // 방금 손댔으니 판의 맨 위로 (2026-09-11)
@@ -7870,7 +7871,7 @@ function drawTaskForm(id, t, files){
     '<div class="sheethead"><h3 class="tt">'+(수정?'업무 수정':'새 업무')+'</h3>'+
       /* 저장될 자리 안내는 새 업무에만 — 수정은 이미 있는 업무라 되풀이하지 않는다 */
       (수정? '' : '<p class="tfdest" id="tfDest" aria-live="polite"></p>')+'</div>'+
-    '<input type="hidden" id="tfId" value="'+(id||'')+'">'+
+    '<input type="hidden" id="tfId" data-edit-version="'+esc(t&&t.editVersion||'')+'" value="'+(id||'')+'">'+
     '<input type="hidden" id="tfCo" value="'+esc(t&&t.co?t.co:'')+'">'+
     '<div class="fgrp f1">'+
       /* 업무명 — 가장 먼저. 긴 이름도 다 보이게 줄이 늘어나는 칸 (Enter 로 줄을 바꾸지 않는다) */
@@ -8202,6 +8203,61 @@ function submitFormSave(buttonId, messageId, key, send, saved, failed){
   }).finally(function(){unlock();delete FORM_WRITES[key];});
 }
 
+/* 업무 저장의 응답이 끊기면 같은 쓰기를 반복하지 않고 저장 영수증만 조회한다. */
+var TASK_SAVE_MEMORY=Object.create(null);
+function taskSaveCanonical(v){
+  if(v===null || typeof v!=='object')return JSON.stringify(v);
+  if(Array.isArray(v))return '['+v.map(taskSaveCanonical).join(',')+']';
+  return '{'+Object.keys(v).filter(function(k){return v[k]!==undefined;}).sort().map(function(k){return JSON.stringify(k)+':'+taskSaveCanonical(v[k]);}).join(',')+'}';
+}
+async function taskSaveDigest(p){
+  var bytes=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(taskSaveCanonical(p)));
+  return Array.from(new Uint8Array(bytes)).map(function(b){return ('0'+b.toString(16)).slice(-2);}).join('');
+}
+function taskSaveKey(p){return 'uo.task-save.'+String(S.me&&S.me.phone||'')+'|'+String(p.id||'new');}
+function taskSavePending(key){
+  if(TASK_SAVE_MEMORY[key])return TASK_SAVE_MEMORY[key];
+  try{var r=JSON.parse(sessionStorage.getItem(key)||'null');if(r && typeof r.id==='string' && /^[a-zA-Z0-9_-]{20,80}$/.test(r.id) && typeof r.digest==='string')return r;}catch(e){}
+  return null;
+}
+function taskSaveRemember(key,r){
+  if(r)TASK_SAVE_MEMORY[key]=r;else delete TASK_SAVE_MEMORY[key];
+  try{if(r)sessionStorage.setItem(key,JSON.stringify(r));else sessionStorage.removeItem(key);}catch(e){}
+}
+function taskSaveUnknown(message){return {ok:false,code:'WRITE_UNCONFIRMED',msg:message||'저장 결과를 확인하지 못했습니다.'};}
+async function saveTaskReliable(token,p,corp){
+  var epoch=S.epoch, key=taskSaveKey(p), digest=await taskSaveDigest({payload:p,corp:corp||''});
+  if(epoch!==S.epoch || token!==S.token)return {ok:false,denied:true};
+  var pending=taskSavePending(key);
+  async function checkResult(op){
+    var status=await callWithOptions({quiet:true,timeoutMs:12000},'api_taskSaveStatus',token,op.id);
+    if(epoch!==S.epoch || token!==S.token)return {ok:false,denied:true};
+    if(status && status.ok && status.result){
+      taskSaveRemember(key,null);
+      if(status.state==='succeeded' && op.digest!==digest){
+        softRefresh();return {ok:false,code:'PREVIOUS_SAVED',msg:'이전 저장은 완료됐습니다. 지금 바꾼 입력은 남겨 두었습니다. 최신 업무를 확인한 뒤 저장해 주세요.'};
+      }
+      return status.result;
+    }
+    if(status && status.denied)return status;
+    return taskSaveUnknown('저장 결과를 아직 확인하지 못했습니다. 입력은 유지됩니다. [저장 결과 확인]을 누르면 다시 보내지 않고 처리 결과만 확인합니다.');
+  }
+  if(pending)return checkResult(pending);
+  var random=new Uint8Array(16);crypto.getRandomValues(random);
+  var id=Array.from(random).map(function(b){return ('0'+b.toString(16)).slice(-2);}).join('');
+  pending={id:id,digest:digest,at:Date.now()};taskSaveRemember(key,pending);
+  var payload=Object.assign({},p,{requestId:id});
+  var result;
+  try{result=await callWithOptions({quiet:true,timeoutMs:22000},'api_saveTask',token,payload,corp);}
+  catch(e){result={ok:false,net:true};}
+  if(epoch!==S.epoch || token!==S.token)return {ok:false,denied:true};
+  if(result && (result.ok || (!result.net && result.code!=='SERVER_ERROR' && result.code!=='WRITE_UNCONFIRMED'))){
+    taskSaveRemember(key,null);return result;
+  }
+  var msg=$('tfMsg');if(msg)msg.textContent='서버의 저장 결과를 확인 중입니다...';
+  return checkResult(pending);
+}
+
 function saveTask(){
   var type=pickedVal('tfType');
   var demo=(type==='DEMO');
@@ -8230,17 +8286,22 @@ function saveTask(){
      예전에는 '철거' 가 미리 켜져 있어서, 다른 유형인데 그대로 저장되는 일이 있었습니다. */
   if(!type){ tfFail('업무 종류를 골라주세요.', $('tfType')); return; }
   if(!p.title){ tfFail('업무명을 입력해주세요.', $('tfTitle')); return; }
+  var version=$('tfId').dataset.editVersion;
+  if(p.id && version)p.expectedVersion=version;
   var token=S.token, corp=S.corp;
   return submitFormSave('tfSave','tfMsg','task:'+(p.id||'new'),function(){
-    return callWithOptions({quiet:true},'api_saveTask',token,p,corp);
+    return saveTaskReliable(token,p,corp);
   },function(r,current){
     p.id=r.id||p.id;
+    if(r.editVersion)p.editVersion=r.editVersion;
     applyTaskLocal(p);
     if(p.id) delete S.taskCache[p.id];
     if(current){TF_DRAFT=null;closeOk();}
     toast(p.progress>=100?'업무를 완료했습니다 · 수고하셨습니다':'저장되었습니다',p.progress>=100?'done':'ok');
     softRefresh();
   },function(r,current){
+    if(current && r && r.code==='WRITE_UNCONFIRMED')$('tfSave').textContent='저장 결과 확인';
+    if(current && r && r.code==='EDIT_CONFLICT')softRefresh();
     if(!current && !TF_DRAFT && !(r && r.denied))TF_DRAFT={p:p,ep:S.epoch,who:S.me&&S.me.phone};
   });
 }
