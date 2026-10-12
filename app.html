@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v112">
+<meta name="uo-version" content="v113">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
@@ -13213,13 +13213,17 @@ function saveCfgGroup(keys){
   });
 }
 function syncNow(){
-  var b=$('syncBtn'); b.disabled=true; $('syncMsg').textContent='가져오는 중입니다...';
+  var b=$('syncBtn'), msg=$('syncMsg'), tk=taskTicket('');
+  if(!b || b.disabled || !msg) return;
+  b.disabled=true; msg.textContent='가져오는 중입니다...';
   call('api_syncNow', S.token).then(function(r){
-    b.disabled=false;
-    if(!r.ok){ $('syncMsg').textContent=r.msg; return; }
-    $('syncMsg').textContent='출퇴근 '+r.att+' · 견적 '+r.est+' 가져왔습니다.';
+    if(!ticketOk(tk)) return;
+    if(msg.isConnected) msg.textContent=r.msg || (r.ok ? '출퇴근 '+r.att+' · 견적 '+r.est+' 가져왔습니다.' : '동기화 결과를 확인하지 못했습니다.');
+    // 한 앱만 성공했어도 실제 반영된 현황을 다시 읽는다. 쓰기 요청을 재전송하지 않는다.
     refresh(false);
-  });
+  }).catch(function(){
+    if(ticketOk(tk) && msg.isConnected) msg.textContent='동기화 결과를 확인하지 못했습니다. 잠시 후 현황을 확인해 주세요.';
+  }).finally(function(){ if(b.isConnected) b.disabled=false; });
 }
 
 function refreshMeta(){
