@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v115">
+<meta name="uo-version" content="v116">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
@@ -2092,6 +2092,15 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 .work-back{width:100%;text-align:left;margin:0 0 16px;cursor:pointer}.work-forms{display:grid;gap:10px;margin-top:18px}.work-forms .btn{justify-content:space-between;text-align:left;white-space:normal}
 @media(max-width:600px){.tdtabs{overflow-x:auto;flex-wrap:nowrap}.tdtabs button{flex-shrink:0;white-space:nowrap}.work-actions .btn{min-height:44px}}
 
+
+.customer-search{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:8px;margin-bottom:16px}
+.customer-search input{width:100%;min-height:44px;min-width:0;padding:10px 12px;border:1px solid var(--fieldline);border-radius:var(--r-md);background:var(--card);color:var(--t1);font:inherit}
+.customer-search .btn{min-width:64px}.customer-count{margin:12px 0 0;font-size:14px}
+.customer-card{padding:16px 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+.customer-card p{margin:4px 0;line-height:1.6}.customer-card .muted{font-size:14px;font-weight:400}
+.customer-card details{margin:10px 0}.customer-card summary{cursor:pointer;min-height:32px;line-height:32px}
+.customer-card .btn{min-height:44px}.customer-card:last-child{border-bottom:0}
+
 </style>
 </head>
 <body>
@@ -3965,7 +3974,7 @@ var READ_PENDING=Object.create(null), READ_REV=0;
 var CONNECTION_SEQ=0, CONNECTION_BOARD_OK=0, CONNECTION_FAILED=0;
 var RETRY_READS={api_start:1,api_board:1,api_lastUpdate:1};
 function callWithOptions(options,fn){
-  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1,api_taskSaveStatus:1,api_workContext:1};
+  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1,api_taskSaveStatus:1,api_workContext:1,api_customerSearch:1,api_customerLinkStatus:1};
   if(!reads[fn]){if(!QUIET_CALLS[fn])READ_REV++;return callTransport.apply(null,args);}
   var key=JSON.stringify([fn,args.slice(2),S.epoch,READ_REV]);
   if(READ_PENDING[key])return READ_PENDING[key];
@@ -6777,6 +6786,62 @@ function siteInfo_(t){
    ★ 설명(업무 내용)은 개요 탭 맨 위 — 기록을 내려가지 않아도 보인다.
    ★ 탭은 업무마다 기억합니다(TD_TAB · 저장하지 않음). 초안 · 늦은 응답 · 권한 회수 처리는 예전 그대로입니다. */
 /* 연결 탭에서만 조회한다. 메인/업무 열기의 기존 즉시 표시를 유지한다. */
+var CUSTOMER_PICK=null;
+function customerSummaryHtml(c){
+  var link=c.customerLink||{},r=link.record,h='<section class="tdsec"><h4 class="tdh">고객 상담</h4>';
+  if(r)h+='<p><strong>'+esc(r.name)+'</strong> '+esc(phoneFmt(r.phone))+'</p><p class="muted">'+esc(r.region)+'</p><p>'+esc(r.state)+'</p><p class="muted work-source">'+esc(r.source)+' · 연결할 때 확인한 내용</p><a class="btn sm" href="'+esc(r.url)+'" target="_blank" rel="noopener noreferrer">상담 시트 열기 ↗</a> ';
+  else h+='<p class="tdnone">'+(link.unavailable?'연결 자료 확인이 필요합니다.':'연결한 상담이 없습니다.')+'</p>';
+  if(c.canManageCustomer)h+='<button class="btn sm" data-task="'+esc(c.task.id)+'" onclick="openCustomerPicker(this.dataset.task)">'+(r?'연결 변경':'고객 상담 연결')+'</button>';
+  return h+'</section>';
+}
+function customerPickerAlive(p){return CUSTOMER_PICK===p && S.epoch===p.epoch && S.token===p.token && !!$('customerResults');}
+function openCustomerPicker(id){
+  var wr=WORK_CONTEXT[S.epoch+'|'+id],c=wr&&wr.result&&wr.result.context;
+  if(!c||!c.canManageCustomer)return;
+  var p={id:id,epoch:S.epoch,token:S.token,seq:0,items:[],link:c.customerLink||{version:''},taskVersion:c.task.version,key:'uo.customer-link.'+String(S.me.phone)+'|'+id};
+  CUSTOMER_PICK=p;BACK_TASK=id;
+  $('modal').innerHTML='<div class="veil"><div class="sheet"><div class="sheethead"><h3 class="tt">고객 상담 연결</h3><button class="btn sm" onclick="closeModal()">닫기</button></div><p class="muted">이 업무의 고객인지 확인한 뒤 연결하세요. 상담 기록과 업무 원문은 바뀌지 않습니다.</p><label class="fl" for="customerQuery">고객 이름 또는 전화번호</label><form onsubmit="event.preventDefault();searchCustomers()" class="customer-search"><input id="customerQuery" type="search" maxlength="80" placeholder="고객 이름 또는 전화번호" style="min-width:0;flex:1"><button class="btn" type="submit">찾기</button></form><div id="customerResults" aria-live="polite"></div><div id="customerLinkActions"></div></div></div>';
+  if(taskSavePending(p.key))customerPendingHtml();
+  else $('customerResults').innerHTML='<p class="muted">이름 두 글자 이상 또는 전화번호 네 자리 이상으로 찾을 수 있습니다.</p>';
+  if(p.link.record)$('customerLinkActions').innerHTML='<button class="btn sm" onclick="linkCustomer(-1)">현재 상담 연결 해제</button>';
+  $('customerQuery').focus();
+}
+function customerPendingHtml(){if($('customerResults'))$('customerResults').innerHTML='<p role="status">연결 결과가 아직 확인되지 않았습니다.</p><button class="btn" onclick="checkCustomerLink()">연결 결과 확인</button>';}
+async function searchCustomers(){
+  var p=CUSTOMER_PICK;if(!p||!customerPickerAlive(p)||p.saving)return;
+  if(taskSavePending(p.key)){customerPendingHtml();return;}
+  var query=$('customerQuery').value.trim();if(query.length<2){$('customerResults').textContent='두 글자 이상 입력해주세요.';return;}
+  var seq=++p.seq;$('customerResults').textContent='고객 상담을 찾고 있습니다…';
+  var r;try{r=await callWithOptions({quiet:true},'api_customerSearch',p.token,p.id,query);}catch(e){r=null;}
+  if(!customerPickerAlive(p)||seq!==p.seq)return;
+  if(!r||!r.ok){$('customerResults').textContent=r&&r.msg||'고객 상담을 불러오지 못했습니다. 다시 찾아주세요.';return;}
+  p.items=r.items;p.taskVersion=r.taskVersion;p.link=r.link;
+  var h='<p class="muted customer-count">'+(r.total>20?'20건을 표시합니다. 이름이나 번호를 더 입력해 좁혀주세요.':r.total+'건')+'</p>';
+  h+=r.items.map(function(x,i){return '<article class="customer-card"><p><strong>'+esc(x.name)+'</strong> <span class="muted">'+esc(phoneFmt(x.phone))+'</span></p><p>'+esc(x.region)+'</p><p class="muted">'+esc(x.source)+' · '+esc(x.state)+'</p><details><summary>요청 내용</summary><p style="white-space:pre-wrap;overflow-wrap:anywhere">'+esc(x.service)+'</p></details><button class="btn sm" data-index="'+i+'" onclick="linkCustomer(Number(this.dataset.index))">이 상담 연결</button></article>';}).join('');
+  $('customerResults').innerHTML=h;
+}
+async function linkCustomer(index){
+  var p=CUSTOMER_PICK;if(!p||!customerPickerAlive(p)||p.saving)return;
+  if(taskSavePending(p.key)){customerPendingHtml();return;}
+  var item=index<0?null:p.items[index];if(index>=0&&!item)return;
+  if(!confirm(item?item.name+' · '+item.source+'\n'+item.region+'\n이 상담을 현재 업무에 연결할까요?':'현재 업무의 상담 연결을 해제할까요? 원본 상담은 남습니다.'))return;
+  var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);var requestId=Array.from(bytes).map(function(b){return ('0'+b.toString(16)).slice(-2);}).join('');
+  taskSaveRemember(p.key,{id:requestId,digest:'customer-link'});
+  var payload={requestId:requestId,taskVersion:p.taskVersion,linkVersion:p.link.version||'',unlink:!item};if(item){payload.gid=item.gid;payload.row=item.row;payload.hash=item.hash;}
+  p.saving=true;$('customerResults').setAttribute('data-saving','1');$('customerResults').textContent='연결을 저장하고 있습니다…';
+  var r;try{r=await callWithOptions({quiet:true,timeoutMs:22000},'api_customerLink',p.token,p.id,payload);}catch(e){r=null;}
+  p.saving=false;if(!customerPickerAlive(p))return;$('customerResults').removeAttribute('data-saving');
+  if(r&&r.ok){customerLinkSaved(p);return;}
+  if(r&&(r.notSaved||r.denied)){taskSaveRemember(p.key,null);$('customerResults').textContent=r.msg||'연결하지 못했습니다. 다시 검색해주세요.';return;}
+  customerPendingHtml();
+}
+function customerLinkSaved(p){taskSaveRemember(p.key,null);WORK_CONTEXT={};CUSTOMER_PICK=null;closeOk();openTask(p.id,true);tdTab('flow');toast('고객 상담 연결을 저장했습니다.');}
+async function checkCustomerLink(){
+  var p=CUSTOMER_PICK;if(!p||!customerPickerAlive(p)||p.saving)return;var pending=taskSavePending(p.key);if(!pending)return;
+  p.saving=true;var r;try{r=await callWithOptions({quiet:true},'api_customerLinkStatus',p.token,p.id,pending.id);}catch(e){r=null;}p.saving=false;
+  if(!customerPickerAlive(p))return;if(r&&r.ok&&r.state==='saved'){customerLinkSaved(p);return;}customerPendingHtml();
+}
+
 var WORK_CONTEXT={};
 function workContextHtml(r){
   var c=r.context,t=c.task,s=c.site;
@@ -6793,7 +6858,7 @@ function workContextHtml(r){
   if(c.customer.phone)h+='<div><dt>연락처</dt><dd>'+esc(phoneFmt(c.customer.phone))+'</dd></div>';
   h+='</dl>';
   if(s && s.available)h+='<p class="muted work-source">견적 정보 · 연락처는 업무에 등록한 번호입니다.</p><a class="btn sm" href="https://estimate.unionone8868.com/" target="_blank" rel="noopener noreferrer">현장견적 앱 열기 ↗</a>';
-  h+='</section><section class="tdsec"><h4 class="tdh">관련 결재'+(r.docs.length?' <span class="n">'+r.docs.length+'</span>':'')+'</h4>';
+  h+='</section>'+customerSummaryHtml(c)+'<section class="tdsec"><h4 class="tdh">관련 결재'+(r.docs.length?' <span class="n">'+r.docs.length+'</span>':'')+'</h4>';
   h+=r.docs.length?r.docs.map(function(d){return '<button class="tdlink" data-no="'+esc(d.no)+'" onclick="openDoc(this.dataset.no)">'+ic('doc')+'<span class="n">'+esc(d.title)+'</span><span class="g">'+docBadge(d.status)+'</span></button>';}).join(''):'<p class="tdnone">현재 볼 수 있는 관련 결재가 없습니다.</p>';
   return h+'</section>';
 }
