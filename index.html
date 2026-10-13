@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <title>UNION ONE WORK BOARD</title>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-<meta name="theme-color" content="#16130F">
+<meta name="theme-color" content="#10141D">
 <meta name="color-scheme" content="dark light">
 
 <link rel="manifest" href="./manifest.webmanifest">
@@ -19,10 +19,10 @@
 <meta name="mobile-web-app-capable" content="yes">
 
 <style>
-  html,body{margin:0;padding:0;height:100%;background:#16130F;overflow:hidden}
+  html,body{margin:0;padding:0;height:100%;background:#10141D;overflow:hidden}
   /* 기본은 화면을 꽉 채웁니다. 여기서 벗어나면 안 됩니다. */
   #app{position:fixed;top:0;left:0;width:100%;height:100%;
-    border:0;display:block;background:#16130F}
+    border:0;display:block;background:#10141D}
 
   /* 아이폰 노치·홈바 대응은 반드시 여기(런처)에서 합니다.
      앱 화면(app.html)은 iframe 안에 있어서 env(safe-area-inset-*) 가 언제나 0 입니다.
@@ -41,7 +41,7 @@
     }
   }
 
-  #splash{position:fixed;inset:0;z-index:10;background:#16130F;
+  #splash{position:fixed;inset:0;z-index:10;background:#10141D;
     display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;
     font-family:-apple-system,BlinkMacSystemFont,"Pretendard","Malgun Gothic",sans-serif;
     transition:opacity .35s ease}
@@ -50,7 +50,7 @@
   #splash .t{color:#8A8A94;font-size:12px;letter-spacing:.22em}
   #splash .s{color:#8A8A94;font-size:12px}
   #splash .bar{width:132px;height:3px;border-radius:2px;background:#2B2B31;overflow:hidden}
-  #splash .bar i{display:block;width:40%;height:100%;background:#D22B2B;border-radius:2px;
+  #splash .bar i{display:block;width:40%;height:100%;background:#91B8FF;border-radius:2px;
     animation:slide 1.1s ease-in-out infinite}
   @keyframes slide{0%{transform:translateX(-110%)}100%{transform:translateX(340%)}}
   #splash button{margin-top:6px;border:1px solid #454550;background:transparent;color:#B6B6BE;
@@ -121,7 +121,7 @@ var retry = document.getElementById('retry');
 
    ▶ 이 번호를 안 올려도 새 화면은 그대로 반영됩니다(서비스워커가 확인하므로).
      올리면 확실하게 한 번 더 눌러주는 것뿐이라 부담 없이 두셔도 됩니다. */
-var APP_VER = 'v121';  // 2026-10-08 결재 삭제 확인 · 연결 장애 안내
+var APP_VER = 'v122';  // 2026-10-08 결재 삭제 확인 · 연결 장애 안내
 
 frame.src = APP_URL + '?dt=' + encodeURIComponent(token) + '&v=' + APP_VER;
 

@@ -3,24 +3,21 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v121">
+<meta name="uo-version" content="v122">
 <title>UNION ONE WORK BOARD</title>
 <style>
-/* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
-   ★ 중립 회색 바탕 위 흰 업무 면 — 위계는 **면의 밝기 + 또렷한 구분선**으로 만든다 (그림자 · 큰 모서리 · 색 바탕을 되풀이하지 않는다).
-     녹색은 주요 행동 · 고른 것 · 정상 상태에만. 빨강 · 노랑은 '지금 손댈 것 · 곧 문제' 뜻으로만.
-   ★ 층 — 바탕(--bg) < 업무 면(--card) < 띄운 창(--sheet). 어두운 테마도 같은 층을 밝기로 가른다 (녹색으로 덮지 않는다).
-   ★ 글자 — 값(--t1) > 본문(--t2) > 라벨(--t3). 대비는 두 테마 모두 4.5:1 이상 (가독성검수가 잽니다).
-   ★ 굵기 — 업무명 600 · 담당 · 날짜 · 설명 400~500. 모든 문장을 진하게 쓰지 않는다 (21 지시). */
+/* 워크보드 시각 기준 · 2026-10-13
+   밝은 회색 바탕 / 흰 콘텐츠 / 블루 행동색. 어두운 화면도 명도 단계로 구분한다.
+   제목만 강조하고 본문은 기본 글꼴로 읽는다. 상태 색은 경고·성공의 의미를 유지한다. */
 :root{
-  --bg:#F3F5F7; --card:#FFFFFF; --field:#FFFFFF; --sheet:#FFFFFF;
-  --panel:#EDF0F3; --panel2:#E1E6EB;
+  --bg:#F4F6FA; --card:#FFFFFF; --field:#FFFFFF; --sheet:#FFFFFF;
+  --panel:#F0F3F8; --panel2:#E5EAF2;
   --line:#D2D9DF; --line2:#B4BEC8;     /* 줄 구분 · 단추 테두리 — 흰 면 위에서 또렷하게 (예전 #E4E9E2 는 거의 안 보였다) */
   --fieldline:#76838F;   /* 입력칸 테두리 — 흰 바탕 대비 3:1 이상 */
-  --rt-sheen:rgba(35,90,66,.14);
-  --t1:#17212B; --t2:#3A4754; --t3:#52606D;
-  --pri:#1E6446; --pri-press:#164F37; --on-pri:#FFFFFF;
-  --soft:#E3F1E9;        /* 고른 것 — 녹색은 선택 · 주요 행동에만 */
+  --rt-sheen:rgba(36,95,214,.12);
+  --t1:#192537; --t2:#465469; --t3:#5E6C80;
+  --pri:#245FD6; --pri-press:#184EB8; --on-pri:#FFFFFF;
+  --soft:#EAF1FF;        /* 고른 것 — 녹색은 선택 · 주요 행동에만 */
   --run-bg:#F0F3F5;
   --dg-bg:#FBEDE9; --dg-line:#E3A898; --dg:#A3341F;
   --wn-bg:#FFF4DB; --wn-line:#E3C27A; --wn:#6A4700;
@@ -44,7 +41,7 @@
 
   /* ★ 글꼴 — 화면 제목 · 업무 공간 제목 · 큰 숫자만 에이투지체(--font-title). 목록 · 본문은 읽기 편한 기본 글꼴 */
   --font-ui:-apple-system,BlinkMacSystemFont,"Pretendard","Malgun Gothic","맑은 고딕",sans-serif;
-  --font-title:"A2Z","A2Z Fallback",var(--font-ui);
+  --font-title:var(--font-ui);
 
   /* ★★ 글자 — 화면 제목 28px(폰 22px) · 업무 공간 제목 28px(폰 22px) · 창 제목 20px · 업무 이름 17px · 본문 16px · 보조 14px.
      한 구역에 세 종류까지. 더 작게 쓰지 않는다 */
@@ -62,7 +59,7 @@
   --sp-1:4px; --sp-2:8px; --sp-3:12px; --sp-4:16px; --sp-5:20px; --sp-6:24px; --sp-7:32px; --sp-8:40px;
   --pad-card:var(--sp-3) var(--sp-4);
   /* 모서리 — 면 · 단추 · 창이 같은 큰 모서리를 되풀이하지 않게 작게 (21 지시). 알약 모양은 상태 딱지 · 칩에만 */
-  --r-sm:6px; --r-md:8px; --r-lg:10px; --r-xl:12px; --r-2xl:16px;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-2xl:24px;
   --r:var(--r-md); --r2:var(--r-lg);
 
   --tap:44px; --tap-main:48px;
@@ -75,14 +72,14 @@
 /* ★ 어두운 테마 — 따로 완성합니다. 중립 짙은 회색 면을 밝기로 단계별로 가르고(바탕 < 업무 면 < 보조 면 < 창),
      경계는 그림자가 아니라 보이는 구분선으로. 녹색은 주요 행동 · 고른 것에만 (전체를 녹색으로 덮지 않는다 · 21 지시) */
 html[data-theme="dark"]{
-  --bg:#111519; --card:#1A2026; --field:#151A1F; --sheet:#20272E;
-  --panel:#222A32; --panel2:#2C353F;
-  --line:#3A444F; --line2:#536070;
+  --bg:#10141D; --card:#1B2230; --field:#151B26; --sheet:#1B2230;
+  --panel:#242D3D; --panel2:#303C50;
+  --line:#3E4B60; --line2:#5D6B82;
   --fieldline:#76838F;
-  --rt-sheen:rgba(126,211,167,.18);
-  --t1:#EEF2F6; --t2:#CDD5DD; --t3:#AEB8C3;
-  --pri:#7ED3A7; --pri-press:#9BDFBB; --on-pri:#0C1A12;
-  --soft:#1E3329; --run-bg:#1A2026;
+  --rt-sheen:rgba(145,184,255,.16);
+  --t1:#F1F4FA; --t2:#CAD3E2; --t3:#AAB8CD;
+  --pri:#91B8FF; --pri-press:#B1CDFF; --on-pri:#102349;
+  --soft:#223658; --run-bg:#1B2230;
   --dg-bg:#351B17; --dg-line:#8A3A2E; --dg:#FFB4A6;
   --wn-bg:#312614; --wn-line:#8A6614; --wn:#FFD98A;
   --ok:#6FD39C; --accent:#FF8A78;
@@ -894,9 +891,9 @@ table.mk-tb .al-c{text-align:center} table.mk-tb .al-r{text-align:right}
 :root{
   --wb-fs-title:17px; --wb-fs-body:16px; --wb-fs-meta:14px; --wb-fs-label:14px;
   --wb-pad:16px; --wb-gap:12px; --wb-radius:10px; --wb-bar:6px; --wb-ctl:44px; --wb-icon:22px;
-  --wb-hover:#F6F8FA; --wb-sel:#FFFFFF; --wb-shutbg:#E8ECF0; --wb-pick:#E3F1E9;
+  --wb-hover:#F0F5FF; --wb-sel:#FFFFFF; --wb-shutbg:#E8ECF0; --wb-pick:#EAF1FF;
 }
-html[data-theme="dark"]{ --wb-hover:#20272E; --wb-sel:#2C353F; --wb-shutbg:#151A1F; --wb-pick:#1E3329; }
+html[data-theme="dark"]{ --wb-hover:#243249; --wb-sel:#303C50; --wb-shutbg:#151B26; --wb-pick:#223658; }
 :focus-visible{outline:3px solid var(--pri);outline-offset:2px}
 
 /* ── 머리 ── */
@@ -1153,8 +1150,7 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .sumbox.go:hover{background:var(--panel2)}
 @media (hover:none){ .trow .who{pointer-events:none;text-decoration:none} }
 
-/* 지원사업 소식 — 상단 한 줄, 분야별 카드는 펼친 창에서만 (2026-10-07).
-   아직 자동 조사/게시 서버와 연결하지 않았다. 예시 자료는 시험에서만 주입한다. */
+/* 지원사업 소식 — 상단 한 줄과 펼친 목록. 공개 예약 게시본을 사용한다. */
 .support-ribbon[hidden]{display:none}
 .support-ribbon{display:flex;align-items:center;gap:4px;min-width:0;margin:0 0 16px;padding:2px 6px 2px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--card)}
 .support-ribbon button{border:0;background:transparent;color:var(--t2);font:inherit;font-size:var(--fs-sm);min-height:44px;cursor:pointer;border-radius:var(--r-sm)}
@@ -1197,27 +1193,55 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .support-card .support-warning,.support-warning{color:var(--wn);font-size:var(--fs-sm)}
 .support-more{margin:16px auto 0;display:block}.support-more[hidden]{display:none}
 
-.sheet.support-sheet{width:820px;max-width:100%;background:var(--sheet)}
-.support-sub{margin:0 0 14px;color:var(--t3);font-size:var(--fs-sm);line-height:1.5}
-.support-filters{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:16px}
-.support-filters button{min-height:44px;padding:6px 12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--card);color:var(--t2);font:inherit;font-size:var(--fs-sm);cursor:pointer}
-.support-filters button[aria-pressed="true"]{border-color:var(--pri);background:var(--soft);color:var(--t1);font-weight:600;box-shadow:inset 0 -2px 0 var(--pri)}
-.support-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start}
-.support-card{min-width:0;padding:18px;border:1px solid var(--line2);border-radius:var(--r-md);background:var(--card);overflow-wrap:anywhere;scroll-margin-top:90px}
-.support-tags{display:flex;flex-wrap:wrap;gap:4px 8px;margin-bottom:9px;color:var(--t3);font-size:var(--fs-sm)}
-.support-tags span+span:before{content:'·';margin-right:8px}
-.support-card h4{margin:0 0 10px;font-size:18px;line-height:1.45;font-weight:600;color:var(--t1)}
-.support-card p{margin:0 0 12px;color:var(--t2);font-size:var(--fs-body);line-height:1.6;white-space:pre-line}
-.support-card .support-deadline{font-size:var(--fs-sm);color:var(--t2);font-weight:500}
-.support-card summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;border-top:1px solid var(--line);color:var(--t1);font-size:var(--fs-sm);cursor:pointer;list-style:none}
+.sheet.support-sheet{width:860px;max-width:100%;background:var(--bg)}
+.support-sheet .sheethead{background:var(--bg);border-bottom:0;margin-bottom:4px;padding-bottom:12px}
+.support-sheet .sheethead .tt{font-size:24px;letter-spacing:-.035em}
+.support-sub{margin:0 0 16px;color:var(--t3);font-size:var(--fs-sm);line-height:1.6}
+.support-search{margin:14px 0 12px;font-weight:500}
+.support-search input{min-height:48px;border-color:var(--fieldline);border-radius:12px;background:var(--card);font-size:16px}
+.support-filters{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 12px}
+.support-filters button{min-height:44px;padding:8px 14px;border:1px solid var(--line2);border-radius:99px;background:var(--card);color:var(--t2);font:inherit;font-size:14px;cursor:pointer}
+.support-filters button[aria-pressed="true"]{border-color:var(--pri);background:var(--pri);color:var(--on-pri);font-weight:600}
+.support-health{margin:0 0 16px;padding:0 2px;background:transparent;border-radius:0;border-bottom:1px solid var(--line);font-size:14px}
+.support-health summary{min-height:44px;line-height:1.5;padding:12px 0;color:var(--t3)}
+.support-health[open]{padding-bottom:12px}
+#supportCount{margin-bottom:10px;font-weight:500;color:var(--t2)}
+.support-cards{display:grid;grid-template-columns:minmax(0,1fr);gap:12px;align-items:start}
+.support-card{min-width:0;padding:22px 24px 10px;border:1px solid var(--line);border-radius:16px;background:var(--card);overflow-wrap:anywhere;scroll-margin-top:90px}
+.support-card-meta{display:flex;align-items:center;justify-content:space-between;gap:8px 16px;flex-wrap:wrap;margin-bottom:12px}
+.support-tags{display:flex;flex-wrap:wrap;gap:6px;color:var(--pri);font-size:14px;line-height:1.5}
+.support-tags span{padding:3px 9px;background:var(--soft);border-radius:6px}
+.support-status{font-size:14px;color:var(--t3);font-weight:500}
+.support-status.open{color:var(--ok)}
+.support-status.unknown{color:var(--wn)}
+.support-card h4{margin:0 0 6px;font-size:19px;line-height:1.55;font-weight:600;letter-spacing:-.025em;color:var(--t1);word-break:keep-all;overflow-wrap:anywhere}
+.support-facts{display:flex;align-items:center;flex-wrap:wrap;gap:0 16px;margin-bottom:4px;color:var(--t3);font-size:14px}
+.support-card .support-deadline{display:flex;align-items:center;gap:6px;min-height:28px;font-size:14px;color:var(--t2);font-weight:400}
+.support-deadline .ic{width:15px;height:15px;flex:none}
+.support-card p{margin:12px 0;color:var(--t2);font-size:16px;line-height:1.7;white-space:pre-line}
+.support-card .support-warning{font-size:14px;color:var(--wn)}
+.support-card summary{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;border-top:1px solid var(--line);color:var(--t2);font-size:14px;cursor:pointer;list-style:none}
 .support-card summary::-webkit-details-marker{display:none}
 .support-card details[open] summary .ic{transform:rotate(90deg)}
-.support-card dl{margin:4px 0 12px;font-size:var(--fs-sm);line-height:1.6}
-.support-card dt{margin-top:8px;color:var(--t3)}
-.support-card dd{margin:2px 0 0;color:var(--t1);white-space:pre-line}
-.support-card .support-source{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:44px;padding:8px 0;color:var(--pri);font-size:var(--fs-sm);font-weight:600;text-decoration:underline;text-underline-offset:3px}
-.support-card .support-source .ic{flex:none;width:16px;height:16px}
-@media(max-width:599px){.support-cards{grid-template-columns:minmax(0,1fr)}.support-card{padding:16px}}
+.support-card dl{display:grid;grid-template-columns:110px minmax(0,1fr);gap:16px;margin:16px 0 20px;font-size:15px;line-height:1.65}
+.support-card dt{margin:0;color:var(--t3)}
+.support-card dd{margin:0;color:var(--t1);white-space:pre-line}
+.support-card .support-source{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 0;color:var(--pri);font-size:14px;font-weight:400;text-decoration:none;word-break:keep-all;overflow-wrap:anywhere}
+.support-card .support-source:hover{text-decoration:underline;text-underline-offset:4px}
+.support-card .support-source .ic{flex:none;width:14px;height:14px}
+.support-card:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
+@media(max-width:599px){
+ .support-sheet .sheethead .tt{font-size:22px}
+ .sheet.support-sheet{padding-left:16px;padding-right:16px}
+ .support-sheet .sheethead{margin-left:-16px;margin-right:-16px;padding-left:16px;padding-right:16px}
+ .support-card{padding:18px 16px 8px;border-radius:14px}
+ .support-card h4{font-size:18px}
+ .support-card-meta{gap:8px;margin-bottom:10px}
+ .support-card dl{grid-template-columns:minmax(0,1fr);gap:4px}
+ .support-card dd{margin-bottom:12px}
+ .support-filters{gap:6px}
+ .support-filters button{padding:8px 12px}
+}
 
 /* ── 지금 확인할 일 · 오늘 · 대기 · 완료 (PC 오른쪽) — 21 지시 ──
    ★ 상자를 두르지 않은 구획 — 바탕 위에서 구분선으로만 나눈다. 흰 업무 면(진행 중)이 화면의 중심.
@@ -2107,6 +2131,21 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 .site-sources{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}.site-sources p{overflow-wrap:anywhere}#siteSourceStatus,#siteAttendance{margin-top:14px;overflow-wrap:anywhere}
 
 .work-more{border-top:1px solid var(--line);margin-top:12px;padding:8px 0}.work-more>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--t2)}.work-more>summary::after{content:"＋";margin-left:auto}.work-more[open]>summary::after{content:"−"}#opsBody .tdsec{padding:16px 0}#opsBody .actions{flex-wrap:wrap;gap:8px}#masterEditBody .field{display:block;margin:16px 0}#masterEditBody input:not([type=checkbox]){width:100%;margin-top:6px;min-height:44px}#masterEditBody input[type=checkbox]{width:20px;height:20px;vertical-align:middle}
+/* 공통 읽기 리듬 — 핵심 제목 / 본문 / 보조 정보, 업무·결재·입력창에 같은 기준 */
+.bhead h1{font-weight:700;letter-spacing:-.04em}
+.bhead .bsub b{font-weight:500}
+.lsurf{border-radius:16px;box-shadow:0 2px 8px rgba(20,40,80,.025)}
+.lbar{background:var(--panel);border-radius:16px 16px 0 0}
+.trow .cn{font-weight:600;letter-spacing:-.02em}
+.trow .who:not(.on){background:transparent;padding-left:0;color:var(--t3)}
+.trow .ctop{row-gap:6px}
+.tdh{font-weight:600;letter-spacing:-.025em}
+.sheethead .tt{font-weight:600}
+.btn:not(.pri):not(.dg){font-weight:500}
+.support-ribbon{border-radius:12px;background:var(--soft);border-color:var(--line);padding-left:14px}
+.support-label{font-weight:600}
+.support-ribbon .support-all{border-left:0!important;color:var(--pri);font-weight:600}
+@media(max-width:719px){.lsurf{border-radius:0;box-shadow:none}.lbar{background:transparent;border-radius:0}}
 </style>
 </head>
 <body>
@@ -5497,22 +5536,26 @@ function toggleSupportRotation(){SUPPORT_TICKER.paused=!SUPPORT_TICKER.paused;sy
 if(SUPPORT_MOTION.addEventListener)SUPPORT_MOTION.addEventListener('change',syncSupportRotation);
 function supportCard(n,i){
   var fields=[['지원 유형',n.types.join(' · ')],['신청 대상',n.audience],['지원 내용',n.benefit],['제외 조건',n.exclusions],['자부담·금리',n.copay],['접수 기간·시각',n.period]];
+  var status=n.status||'접수 상태 확인 필요';
+  var tone=status==='접수 기간 중'?' open':status.indexOf('확인')!==-1?' unknown':'';
   return '<article class="support-card" id="supportCard'+i+'" tabindex="-1">'+
-    '<div class="support-tags">'+n.categories.map(function(c){return '<span>'+esc(c)+'</span>';}).join('')+'</div>'+
-    '<h4>'+esc(n.title)+'</h4>'+(n.relevanceReason?'<p>'+esc(n.relevanceReason)+'</p>':'')+
-    '<p class="support-deadline">'+esc(n.status||supportDeadline(n))+(n.changedAt?' · 변경 감지':'')+'</p>'+
+    '<div class="support-card-meta"><div class="support-tags">'+n.categories.map(function(c){return '<span>'+esc(c)+'</span>';}).join('')+'</div>'+
+    '<span class="support-status'+tone+'">'+esc(status)+(n.changedAt?' · 변경 감지':'')+'</span></div>'+
+    '<h4>'+esc(n.title)+'</h4>'+
+    '<div class="support-facts"><span class="support-deadline">'+ic('clock')+esc(supportDeadline(n))+'</span>'+
+    '<a class="support-source" href="'+esc(n.url)+'" target="_blank" rel="noopener noreferrer">'+esc(n.source)+' · 원문<span class="sronly"> (새 창)</span>'+ic('chev')+'</a></div>'+
     (n.lastError?'<p class="support-warning">최근 재확인 실패 · 이전 조사 자료</p>':'')+
-    '<details><summary tabindex="0">신청 정보·확인 근거'+ic('chev')+'</summary>'+(n.summary?'<p>'+esc(n.summary)+'</p>':'')+'<dl>'+
+    '<details><summary tabindex="0">신청 정보·확인 근거'+ic('chev')+'</summary>'+
+    (n.relevanceReason?'<p>'+esc(n.relevanceReason)+'</p>':'')+(n.summary?'<p>'+esc(n.summary)+'</p>':'')+'<dl>'+
     fields.map(function(f){return '<dt>'+f[0]+'</dt><dd>'+esc(f[1]||'자동 확인 못함 · 원문 확인 필요')+'</dd>';}).join('')+'</dl>'+
     (n.issues.length?'<p class="support-warning">'+n.issues.map(esc).join('<br>')+'</p>':'')+
     (n.attachments.length?'<div class="support-evidence">'+n.attachments.map(function(d){return '<a href="'+esc(d.url)+'" target="_blank" rel="noopener noreferrer">'+esc(d.name)+' · '+esc(d.status)+'</a>';}).join('')+'</div>':'<p>첨부파일 확인 자료 없음</p>')+
     (n.originals.length?'<div class="support-evidence">'+n.originals.map(function(d){return '<a href="'+esc(d.url)+'" target="_blank" rel="noopener noreferrer">주관기관 원문 · '+esc(d.status)+'</a>';}).join('')+'</div>':'')+
-    (n.checkedAt?'<p class="support-sub">조사 '+esc(n.checkedAt.slice(0,16).replace('T',' '))+'</p>':'')+'</details>'+
-    '<a class="support-source" href="'+esc(n.url)+'" target="_blank" rel="noopener noreferrer">'+esc(n.source)+' · 원문<span class="sronly"> (새 창)</span>'+ic('chev')+'</a></article>';
+    (n.checkedAt?'<p class="support-sub">조사 '+esc(n.checkedAt.slice(0,16).replace('T',' '))+'</p>':'')+'</details></article>';
 }
 function supportHealthHtml(pack){
   var warning=pack.error||(pack.stale?'오늘 게시본이 없어 이전 조사 자료를 표시합니다.':'');
-  return '<details class="support-health"><summary>조사 상태'+(pack.partial?' · 일부 미확인':'')+'</summary>'+
+  return '<details class="support-health"><summary>조사 상태'+(pack.error?' · 연결 확인 필요':pack.stale?' · 이전 조사 자료':pack.partial?' · 일부 미확인':' · 확인 내역')+'</summary>'+
     (warning?'<p class="support-warning">'+esc(warning)+'</p>':'')+
     '<p>매일 오전 8시 조사 마감 목표 · 오전 8시 30분 게시(한국시간). 기관 장애나 예약 실행 지연 시 이전 자료를 유지합니다.</p>'+
     '<p>공식 본문·첨부에서 조건을 자동 추출합니다. 회사 업종·소재지만으로 신청 가능하다고 판정하지 않습니다. 기관 전체 공고의 완전한 수집을 보장하지 않습니다.</p>'+
@@ -5527,8 +5570,8 @@ function openSupportNews(index){
   SUPPORT_VIEW={pack:pack,category:'',query:'',limit:12};
   $('modal').innerHTML='<div class="veil" onclick="if(event.target===this)closeModal()"><div class="sheet support-sheet">'+
     '<div class="sheethead"><h3 class="tt">지원사업 소식</h3><button class="btn sm" onclick="closeModal()">닫기</button></div>'+
-    '<p class="support-sub">'+(pack.publishedOn?esc(krDate(pack.publishedOn))+' 게시 · ':'')+'우리 업무에 관련된 지원만 추렸습니다. 신청 자격은 원문 확인이 필요합니다.</p>'+
-    '<label class="support-search">공고 찾기<input id="supportSearch" type="search" placeholder="공고명·지역·신청 대상 검색" oninput="searchSupportNews(this.value)"></label>'+
+    '<p class="support-sub">'+(pack.publishedOn?esc(krDate(pack.publishedOn))+' 게시 · ':'')+'업무 관련 공고 모음 · 신청 자격은 원문에서 확인해 주세요.</p>'+
+    '<label class="support-search"><span class="sronly">공고 찾기</span><input id="supportSearch" type="search" placeholder="공고명·지역·신청 대상 검색" oninput="searchSupportNews(this.value)"></label>'+
     '<div id="supportFilters" class="support-filters" role="group" aria-label="지원사업 분야"></div>'+supportHealthHtml(pack)+
     '<p id="supportCount" class="support-sub" role="status" aria-live="polite"></p><div id="supportCards" class="support-cards"></div>'+
     '<button class="btn support-more" id="supportMore" onclick="moreSupportNews()">더 보기</button></div></div>';
