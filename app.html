@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v123">
+<meta name="uo-version" content="v124">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -2146,6 +2146,7 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 .support-label{font-weight:600}
 .support-ribbon .support-all{border-left:0!important;color:var(--pri);font-weight:600}
 @media(max-width:719px){.lsurf{border-radius:0;box-shadow:none}.lbar{background:transparent;border-radius:0}}
+#customerSheetLink[hidden],#customerSheetSettings[hidden],#customerSheetSettingsRow[hidden]{display:none!important}
 </style>
 </head>
 <body>
@@ -2237,7 +2238,7 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
         <p class="bsub" id="boardSub"></p>
       </div>
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end">
-        <a class="btn sm" id="customerSheetLink" href="https://docs.google.com/spreadsheets/d/1sFArdatqGV_lCxa7eBKp42hfmB-l1vtAWNjunYZJ4NM/edit?gid=1209240728#gid=1209240728" target="_blank" rel="noopener noreferrer" aria-label="고객 관리시트 새 탭에서 열기">고객 관리 ↗</a>
+        <a class="btn sm" id="customerSheetLink" hidden target="_blank" rel="noopener noreferrer" aria-label="고객 관리시트 새 탭에서 열기">고객 관리 ↗</a>
         <button class="btn pri addtask" id="addTask" onclick="openTaskForm()"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-plus"/></svg>새 업무</button>
       </div>
     </header>
@@ -2300,7 +2301,7 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
   <!-- ================= 설정 ================= -->
   <div id="view-settings" class="hide page">
     <div class="pagehead"><h3 class="tt">내 정보 · 설정</h3></div>
-    <div class="actions" style="margin:0 0 20px"><a class="btn" id="customerSheetSettings" href="https://docs.google.com/spreadsheets/d/1sFArdatqGV_lCxa7eBKp42hfmB-l1vtAWNjunYZJ4NM/edit?gid=1209240728#gid=1209240728" target="_blank" rel="noopener noreferrer" aria-label="고객 관리시트 새 탭에서 열기">고객 관리시트 ↗</a></div>
+    <div class="actions" id="customerSheetSettingsRow" hidden style="margin:0 0 20px"><a class="btn" id="customerSheetSettings" hidden target="_blank" rel="noopener noreferrer" aria-label="고객 관리시트 새 탭에서 열기">고객 관리시트 ↗</a></div>
     <!-- 2.0 — 내 정보 · PIN · 로그아웃이 맨 위 한 줄 (위 탐색의 '나' 를 누르면 여기) -->
     <section class="mecard" aria-label="내 정보"><div class="meinfo" id="meInfo"></div>
       <div class="tfrow"><button class="btn sm" onclick="openPinChange()">PIN 변경</button>
@@ -4513,7 +4514,7 @@ function clearBoardData(){
   try{ localStorage.removeItem(SNAP); }catch(e){ quiet('지난 화면 지우기', e); }
   if(S.openTask) accessLost(null, '');
   resetUserCaches();
-  S.me=null;
+  S.me=null; paintCustomerSheetLinks();
   S.data={ ok:true, me:null, scope:'none', tasks:[], approvals:[], staff:[], recent:[], noti:[],
            attendance:{ linked:false, rows:[] }, docs:{ toAct:[], drafts:[], others:[] }, docPack:{},
            logsByTask:{}, logCount:{}, docsByTask:{}, filesByTask:{}, settle:{}, notices:[], noticeCmt:{},
@@ -4686,7 +4687,7 @@ function boot(){
   // ① 지난번 화면이 있으면 먼저 그린다 (서버를 기다리지 않음)
   var snap=loadSnap();
   if(snap){
-    S.meta=snap.meta; S.me=snap.me; S.corp=snap.corp||'ALL'; S.data=snap.data;
+    S.meta=snap.meta; S.me=snap.me; paintCustomerSheetLinks(); S.corp=snap.corp||'ALL'; S.data=snap.data;
     S.confirmedAt=snap.t;         // 이 화면을 서버가 마지막으로 확인해 준 시각
     useRanks(S.meta);
     takeDocPack(S.data);          // 지난번에 받아둔 문서 상세도 되살린다
@@ -4921,7 +4922,7 @@ function doLogin(phone, first){
   call('api_login', phone, pin, S.token).then(function(r){
     $('lgGo').disabled=false;
     if(!r.ok){ $('lgMsg').textContent=r.msg; return; }
-    S.me=r.me; $('modal').innerHTML='';
+    S.me=r.me; paintCustomerSheetLinks(); $('modal').innerHTML='';
     try{ localStorage.removeItem(SNAP); }catch(e){ quiet('지난 화면 지우기', e); }
     resetUserCaches();
     renderFilters();
@@ -5083,6 +5084,23 @@ function takeDocPack(b){
 /** 누구의 · 어떤 권한의 화면인가 — 이것이 바뀌면 들고 있던 것을 버린다 */
 function whoKey(me, d){ return me ? (String(me.phone||'')+'|'+String(me.grade||'')+'|'+String((d&&d.scope)||'')) : ''; }
 
+/** 고객 시트 바로가기 표시 정책. 문서 자체의 Drive 공유 권한과는 별개다.
+    직원ID를 우선 사용하고, ID가 없는 이전 저장 화면은 이름으로 숨김을 유지한다. */
+function showCustomerSheetLink(me){
+  if(!me) return false;
+  if(me.personId) return me.personId!=='PE-abcfe118-bab8-43cc-9728-ff72e54638a8';
+  return !!me.name && String(me.name).trim()!=='김한빈';
+}
+function paintCustomerSheetLinks(){
+  var visible=showCustomerSheetLink(S.me);
+  ['customerSheetLink','customerSheetSettings'].forEach(function(id){
+    var el=$(id);if(!el)return;
+    el.hidden=!visible;
+    if(visible)el.href='https://docs.google.com/spreadsheets/d/1sFArdatqGV_lCxa7eBKp42hfmB-l1vtAWNjunYZJ4NM/edit?gid=1209240728#gid=1209240728';else el.removeAttribute('href');
+  });
+  if($('customerSheetSettingsRow'))$('customerSheetSettingsRow').hidden=!visible;
+}
+
 function applyBoard(b){
   if(!b || !b.ok) return false;
   /* ★ `me` 가 없으면 로그인한 사람이 아닙니다. 그리려 들면 흰 화면이 됩니다. */
@@ -5114,7 +5132,7 @@ function applyBoard(b){
     });
     if(줄어듦) S.epoch++;                   // 이 앞에 보낸 요청의 답 · 저장 되돌리기는 옛것 (검수 2차)
   }
-  S.data=b; S.me=b.me||S.me;
+  S.data=b; S.me=b.me||S.me; paintCustomerSheetLinks();
   S.confirmedAt=Date.now();                 // 서버가 확인해 준 시각 (지난 화면 저장본의 기준)
   if(ownScope()) S.owner='';                // 본인 업무만 보는 사람에게 담당자 거르기는 없다
   /* ★ 현장(견적) 목록도 판과 같이 지금 권한으로 갈아끼운다 (검수 1차).
@@ -13075,6 +13093,7 @@ function saveVendor(was){
 }
 
 function renderSettings(){
+  paintCustomerSheetLinks();
   applyTheme();
   renderPush();                  // 폰 알림 (서버에 안 켜져 있으면 아예 안 그린다)
   [].forEach.call($('themePick').children,function(l){
@@ -13111,6 +13130,7 @@ function renderSettings(){
 
 function paintSettings(r){
     if(r.me) S.me=r.me;
+    paintCustomerSheetLinks();
 
     var me=S.me||{};
     /* 등급 숫자는 사람에게 보여주지 않습니다 — `현장` 만으로 충분합니다 (2026-09-09).
