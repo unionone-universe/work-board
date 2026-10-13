@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v122">
+<meta name="uo-version" content="v123">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -7976,7 +7976,7 @@ function modalSig(){
     s.push(String(e.textContent==null?'':e.textContent));
   });
   [].forEach.call(box.querySelectorAll('input,textarea,select'),function(e){
-    if(e.type==='button' || e.type==='submit' || e.id==='customerQuery' || e.id==='masterQuery' || e.id==='masterSiteQuery' || e.id==='siteSourceQuery') return;
+    if(e.type==='button' || e.type==='submit' || e.id==='customerQuery' || e.id==='masterQuery' || e.id==='masterSiteQuery' || e.id==='siteSourceQuery' || e.id==='supportSearch') return;
     s.push((e.type==='checkbox'||e.type==='radio') ? (e.checked?'1':'0') : String(e.value==null?'':e.value));
   });
   /* 고른 사진도 '쓰던 것' 이다 (2026-08-31).
