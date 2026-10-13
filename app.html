@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v124">
+<meta name="uo-version" content="v125">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -2147,6 +2147,29 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 .support-ribbon .support-all{border-left:0!important;color:var(--pri);font-weight:600}
 @media(max-width:719px){.lsurf{border-radius:0;box-shadow:none}.lbar{background:transparent;border-radius:0}}
 #customerSheetLink[hidden],#customerSheetSettings[hidden],#customerSheetSettingsRow[hidden]{display:none!important}
+
+/* 업데이트 안내: 핵심은 즉시, 세부 내용은 주제별로 펼쳐 읽는다. */
+.update-sheet{max-width:640px!important;padding:0 24px!important;display:flex;flex-direction:column;overflow:hidden;max-height:min(880px,calc(var(--vvh,100vh) - 24px))}
+.update-sheet .sheethead{flex-shrink:0;margin:0 -24px 0;padding:20px 24px 16px;align-items:flex-start;flex-wrap:nowrap;border-bottom:1px solid var(--line)}
+.update-sheet .sheethead>div{min-width:0}
+.update-sheet .sheethead .tt{font-size:24px;line-height:1.35;word-break:keep-all}
+.update-eyebrow{color:var(--pri);font-size:13px;font-weight:600;margin:0 0 8px}
+.update-content{min-height:0;overflow-y:auto;padding:20px 0 8px;font-size:15px;line-height:1.65;overflow-wrap:anywhere}
+.update-intro{color:var(--t2);margin-bottom:18px}
+.update-essential{padding:16px 18px;background:var(--soft);border-radius:14px;margin-bottom:18px}
+.update-essential h4{margin:0 0 10px;font-size:16px}
+.update-essential .mk:last-child{margin-bottom:0}
+.update-topic{border-bottom:1px solid var(--line)}
+.update-topic summary{min-height:52px;display:flex;align-items:center;justify-content:space-between;gap:16px;cursor:pointer;padding:14px 2px;font-weight:600;list-style:none}
+.update-topic summary::-webkit-details-marker{display:none}
+.update-topic summary::after{content:'+';font-size:20px;font-weight:400;color:var(--t3);flex-shrink:0}
+.update-topic[open] summary::after{content:'−'}
+.update-topic>div{padding:0 2px 12px;color:var(--t2)}
+.update-footer{flex-shrink:0;position:sticky;bottom:0;background:var(--sheet);padding:12px 0 max(16px,env(safe-area-inset-bottom));border-top:1px solid var(--line);z-index:4}
+.update-footer>p{font-size:12px;color:var(--t3);margin:0 0 10px;line-height:1.5}
+.update-actions{display:flex;gap:8px}.update-actions .btn{flex:1;min-width:0}
+.update-topic summary:focus-visible{outline:2px solid var(--pri);outline-offset:-2px;border-radius:6px}
+@media(max-width:479px){.update-sheet{padding:0 16px!important}.update-sheet .sheethead{flex-shrink:0;margin:0 -16px;padding:18px 16px 14px}.update-sheet .sheethead .tt{font-size:21px}.update-essential{padding:14px}.update-content{font-size:15px}.update-actions .btn{padding:10px 8px}}
 </style>
 </head>
 <body>
@@ -2739,8 +2762,8 @@ function fmt(s){
         return '<li'+(x.on?' class="on"':'')+'>'+mkInline(x.t)+'</li>';
       }).join('')+'</ul>';
     }else{
-      html+='<'+listTag+' class="mk">'+
-        list.map(function(x){ return '<li>'+mkInline(x)+'</li>'; }).join('')+'</'+listTag+'>';
+      html+='<'+listTag+' class="mk"'+(listTag==='ol'?' start="'+list[0].n+'"':'')+'>'+
+        list.map(function(x){ return listTag==='ol' ? '<li value="'+x.n+'">'+mkInline(x.t)+'</li>' : '<li>'+mkInline(x)+'</li>'; }).join('')+'</'+listTag+'>';
     }
     list=[]; listTag='';
   }
@@ -2791,7 +2814,8 @@ function fmt(s){
     if(ck){ push('ck', { on: ck[1]!==' ', t: t.replace(/^\s*\[[ xX]\]\s+/,'') }); continue; }
 
     if(/^\s*-\s+/.test(t)){ push('ul', t.replace(/^\s*-\s+/,'')); continue; }
-    if(/^\s*\d{1,3}\.\s+/.test(t)){ push('ol', t.replace(/^\s*\d{1,3}\.\s+/,'')); continue; }
+    var numbered=/^\s*(\d{1,3})\.\s+(.+)$/.exec(t);
+    if(numbered){ push('ol', {n:Number(numbered[1]),t:numbered[2]}); continue; }
 
     flushList();
     if(!t.trim()){ flushPara(); continue; }
@@ -3859,9 +3883,10 @@ function mkValue(id){
       }
       if(t==='UL'||t==='OL'){
         var check = t==='UL' && String(n.className||'').indexOf('mk-ck')>=0;
-        var i=1;
+        var i=t==='OL' && n.hasAttribute('start') ? Number(n.getAttribute('start')) : 1;
         [].slice.call(n.children).forEach(function(li){
           if(li.tagName!=='LI') return;
+          if(t==='OL' && li.hasAttribute('value')) i=Number(li.getAttribute('value'));
           var head = check ? (String(li.className||'').indexOf('on')>=0 ? '[x] ' : '[ ] ')
                            : (t==='OL' ? (i++)+'. ' : '- ');
           out.push(head+oneLine(li));
@@ -4514,6 +4539,7 @@ function clearBoardData(){
   try{ localStorage.removeItem(SNAP); }catch(e){ quiet('지난 화면 지우기', e); }
   if(S.openTask) accessLost(null, '');
   resetUserCaches();
+  UPDATE_NOTICE_AUTH='';
   S.me=null; paintCustomerSheetLinks();
   S.data={ ok:true, me:null, scope:'none', tasks:[], approvals:[], staff:[], recent:[], noti:[],
            attendance:{ linked:false, rows:[] }, docs:{ toAct:[], drafts:[], others:[] }, docPack:{},
@@ -5156,6 +5182,8 @@ function applyBoard(b){
   if(S.view==='doc') renderDocs();
   scheduleSnap();
   // 공지 3건과 댓글은 판에 이미 있다. 전체 공지 이력은 공지를 열 때만 받는다.
+  UPDATE_NOTICE_AUTH=updateNoticeAccount();
+  scheduleUpdateNotice();
 
   return true;
 }
@@ -6465,6 +6493,7 @@ function go(v){
     if(!CAL.ym){ var t=todayStr(); CAL.ym=t.substring(0,7); CAL.pick=t; }
     drawCal();
   }
+  if(v==='board') scheduleUpdateNotice();
   if(v==='doc') renderDocs();
   if(v==='settings') renderSettings();
   /* 들어가 있는 동안에는 탭이 남고, 나가면 다시 사라집니다 */
@@ -8080,6 +8109,7 @@ var MODAL_FROM=null, DLG_N=0;
     }
     if(sheet){ dialogOn(sheet); return; }
     if(열림){ 열림=false; focusBack(); }
+    scheduleUpdateNotice();
   }).observe(box, { childList:true });
 })();
 /** 넓은 화면(720px↑)의 업무 공간 — 위 탐색이 그대로 보이고 쓸 수 있으므로 대화상자로 가두지 않는다 (뒤의 목록은 inert · panelSync) */
@@ -10097,6 +10127,68 @@ function notiListHtml(rows){
 }
 
 /** 공지를 열어 봤나 — 이 기기에 적어 둔다(막혀 있으면 이번 접속 동안만). '새 공지' 가 앱을 열 때마다 다시 뜨지 않게 */
+
+/* 2026-10-13 직원 업데이트 공지. 서버가 허용한 공지만, 로그인 확인 후 표시한다.
+   읽음과 팝업 확인은 별개다. 확인은 이 브라우저의 계정별로만 저장하며 전사 열람 집계가 아니다. */
+var UPDATE_NOTICE_ID='NT-261013-001';
+var UPDATE_NOTICE_UNTIL=Date.parse('2026-10-28T00:00:00+09:00');
+var UPDATE_NOTICE_AUTH='',UPDATE_NOTICE_SEEN={},UPDATE_NOTICE_LOOKUP={},UPDATE_NOTICE_TIMER=null;
+function updateNoticeAccount(){
+  return S.me ? String(S.me.personId||S.me.phone||'') : '';
+}
+function updateNoticeKey(){return 'uo_update_ack:'+UPDATE_NOTICE_ID+':'+updateNoticeAccount();}
+function updateNoticeAcknowledged(){
+  try{return localStorage.getItem(updateNoticeKey())==='1';}catch(e){return false;}
+}
+function scheduleUpdateNotice(){
+  if(UPDATE_NOTICE_TIMER) clearTimeout(UPDATE_NOTICE_TIMER);
+  UPDATE_NOTICE_TIMER=setTimeout(maybeOpenUpdateNotice,350);
+}
+function maybeOpenUpdateNotice(){
+  UPDATE_NOTICE_TIMER=null;
+  var account=updateNoticeAccount(),box=$('modal');
+  if(!account || UPDATE_NOTICE_AUTH!==account || !S.token || Date.now()>=UPDATE_NOTICE_UNTIL ||
+     document.hidden || S.view!=='board' || !box || box.innerHTML || S.openTask ||
+     UPDATE_NOTICE_SEEN[account] || updateNoticeAcknowledged()) return;
+  var post=((S.data&&S.data.notices)||[]).find(function(p){return p.no===UPDATE_NOTICE_ID;}) ||
+    ((S.postCache&&S.postCache.posts)||[]).find(function(p){return p.no===UPDATE_NOTICE_ID;});
+  // 새 공지 세 건에 밀려도 놓치지 않는다. 미확인 계정당 접속 중 한 번만 기존 조회를 재사용한다.
+  if(!post || !post.body){
+    if(!UPDATE_NOTICE_LOOKUP[account]){
+      UPDATE_NOTICE_LOOKUP[account]=true;
+      prefetchPosts().then(function(){if(updateNoticeAccount()===account)scheduleUpdateNotice();});
+    }
+    return;
+  }
+  UPDATE_NOTICE_SEEN[account]=true;
+  var body=String(post.body).replace(/^\s*\d{1,3}\.\s+(.+)$/gm,'## $1')
+    .replace(/^(꼭 확인해 주세요|이용 중 문제가 생기면)$/gm,'## $1');
+  var parts=body.split(/^##\s+/m),html='<div class="update-intro">'+fmt(parts.shift())+'</div>';
+  parts.forEach(function(part,i){
+    var cut=part.indexOf('\n'),title=cut<0?part:part.slice(0,cut),text=cut<0?'':part.slice(cut+1);
+    if(i===0 && title.indexOf('꼭 확인')>=0){
+      html+='<section class="update-essential"><h4>'+esc(title)+'</h4>'+fmt(text)+'</section>';
+    }else{
+      html+='<details class="update-topic"><summary>'+esc(title)+'</summary><div>'+fmt(text)+'</div></details>';
+    }
+  });
+  BACK_TASK=null;BACK_BOX='';
+  box.innerHTML='<div class="veil"><div class="sheet update-sheet">'+
+    '<div class="sheethead"><div><p class="update-eyebrow">9월 30일 — 10월 13일 업데이트</p><h3 class="tt">사내 앱이 새로워졌어요</h3></div>'+
+    '<button class="btn sm" onclick="closeModal()">나중에</button></div>'+
+    '<div class="update-content">'+html+'</div><div class="update-footer">'+
+    '<p>확인하면 이 브라우저의 내 계정에서는 다시 뜨지 않습니다.</p><div class="update-actions">'+
+    '<button class="btn" onclick="openPost(UPDATE_NOTICE_ID)">공지 전체 보기</button>'+
+    '<button class="btn pri" onclick="acknowledgeUpdateNotice()">확인했어요</button></div></div></div></div>';
+}
+function acknowledgeUpdateNotice(){
+  if(!document.querySelector('#modal .update-sheet') || !S.me || UPDATE_NOTICE_AUTH!==updateNoticeAccount()) return;
+  try{localStorage.setItem(updateNoticeKey(),'1');}catch(e){toast('이 기기에 확인 상태를 저장하지 못했습니다.');}
+  postReadMark(UPDATE_NOTICE_ID);
+  closeOk();renderNotices();
+}
+document.addEventListener('visibilitychange',function(){if(!document.hidden)scheduleUpdateNotice();});
+
 function postRead(no){
   if(S.seen['N'+no]) return true;
   try{ return (localStorage.getItem('uo_postRead')||'').split(',').indexOf(String(no))>=0; }catch(e){ return false; }
@@ -10240,7 +10332,7 @@ function postRealNo(no){
   return Promise.resolve(no || '');
 }
 
-function savePost(no){
+function savePost(no, confirmed){
   var title=$('pfTitle').value.trim();
   var body=mkValue('pfBody');
   var msg=$('pfMsg');
@@ -10249,8 +10341,13 @@ function savePost(no){
   if(!title){ msg.textContent='제목을 입력해주세요.'; return; }
   if(!body){ msg.textContent='내용을 입력해주세요.'; return; }
 
-  // 전 직원에게 알림이 가므로 한 번 더 묻는다
-  if(!confirm('전 직원에게 알림이 갑니다. 올리시겠습니까?')) return;
+  // 브라우저 확인창 대신 입력을 보존하는 앱 안 확인 단계. 수정은 새 알림을 보내지 않는다.
+  if(!confirmed){
+    msg.innerHTML='<span>'+(no?'수정 내용을 저장할까요?':'전 직원에게 공지 알림이 전달됩니다.')+'</span> '+
+      '<button type="button" class="btn pri sm" id="pfConfirm" onclick="savePost(\''+(no||'')+'\',true)">'+(no?'수정 저장':'알리고 게시')+'</button>';
+    $('pfConfirm').focus();
+    return;
+  }
 
   var nowS=todayStr()+' '+nowHM(), token=S.token, corp=S.corp;
   var np={no:no||'',corp:'',title:title,body:body,who:(S.me&&S.me.name)||'',
