@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v119">
+<meta name="uo-version" content="v120">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* ===================== 워크보드 색 · 글꼴 · 크기 (2.0 · 2026-10-06 시각 재설계 21 지시) =====================
@@ -2105,6 +2105,8 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 #masterBody input:not([type=checkbox]),#masterBody select{width:100%;min-width:0} #masterBody .customer-search input{width:auto} #masterBody .fl{margin-top:14px} #masterBody .tdlink{overflow-wrap:anywhere} #masterStatus{margin-top:16px;overflow-wrap:anywhere} .master-confirm{display:flex;align-items:flex-start;gap:8px;margin-top:14px} #masterFields:disabled{opacity:.7}
 
 .site-sources{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}.site-sources p{overflow-wrap:anywhere}#siteSourceStatus,#siteAttendance{margin-top:14px;overflow-wrap:anywhere}
+
+.work-more{border-top:1px solid var(--line);margin-top:12px;padding:8px 0}.work-more>summary{min-height:44px;display:flex;align-items:center;cursor:pointer;color:var(--t2)}.work-more>summary::after{content:"＋";margin-left:auto}.work-more[open]>summary::after{content:"−"}#opsBody .tdsec{padding:16px 0}#opsBody .actions{flex-wrap:wrap;gap:8px}#masterEditBody .field{display:block;margin:16px 0}#masterEditBody input:not([type=checkbox]){width:100%;margin-top:6px;min-height:44px}#masterEditBody input[type=checkbox]{width:20px;height:20px;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -3978,7 +3980,7 @@ var READ_PENDING=Object.create(null), READ_REV=0;
 var CONNECTION_SEQ=0, CONNECTION_BOARD_OK=0, CONNECTION_FAILED=0;
 var RETRY_READS={api_start:1,api_board:1,api_lastUpdate:1};
 function callWithOptions(options,fn){
-  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1,api_taskSaveStatus:1,api_workContext:1,api_customerSearch:1,api_customerLinkStatus:1,api_masterSearch:1,api_masterStatus:1,api_siteSourceSearch:1,api_siteSourceStatus:1,api_siteAttendance:1};
+  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1,api_taskSaveStatus:1,api_workContext:1,api_customerSearch:1,api_customerLinkStatus:1,api_masterSearch:1,api_masterStatus:1,api_siteSourceSearch:1,api_siteSourceStatus:1,api_siteAttendance:1,api_masterEditStatus:1};
   if(!reads[fn]){if(!QUIET_CALLS[fn])READ_REV++;return callTransport.apply(null,args);}
   var key=JSON.stringify([fn,args.slice(2),S.epoch,READ_REV]);
   if(READ_PENDING[key])return READ_PENDING[key];
@@ -6839,12 +6841,60 @@ async function loadSiteAttendance(id){
   box.innerHTML='<p class="muted">'+esc(r.date)+' · 조회 '+esc(r.checkedAt)+'</p>'+(r.rows.length?r.rows.map(function(x){return '<p>'+esc(x.name)+' · '+esc(x.in)+(x.out?'~'+esc(x.out)+' 퇴근':' 출근')+'</p>';}).join(''):'<p>이 현장에 기록된 오늘 출근이 없습니다.</p>');
 }
 
+var OPS_VIEW=null;
+function opsAlive(p){return OPS_VIEW===p&&p.epoch===S.epoch&&p.token===S.token&&!!$('opsBody');}
+function opsTime(s){if(!s)return '아직 없음';var d=new Date(s);return isNaN(d.getTime())?'시각 확인 필요':d.toLocaleString('ko-KR',{timeZone:'Asia/Seoul'});}
+function openOperations(){
+  if(!S.me||Number(S.me.grade)!==9)return;var p={epoch:S.epoch,token:S.token,busy:false};OPS_VIEW=p;
+  $('modal').innerHTML='<div class="veil"><div class="sheet"><div class="sheethead"><h3 class="tt">운영 관리</h3><button class="btn sm" onclick="closeModal()">닫기</button></div><div id="opsBody" aria-live="polite">연결 상태를 확인하고 있습니다…</div><p id="opsMessage" role="status"></p></div></div>';refreshOperations();
+}
+function operationsHtml(r){
+  var report=r.report||{},counts=report.counts||{},b=r.backup,h='<p class="muted">'+esc(opsTime(report.at))+' 확인</p><section class="tdsec"><h4 class="tdh">공통 자료</h4><p>직원 '+Number(counts.people||0)+'명 · 고객 '+Number(counts.customers||0)+' · 현장 '+Number(counts.sites||0)+'</p>';
+  if(counts.peopleMissing)h+='<p>직원 '+Number(counts.peopleMissing)+'명의 공통 번호가 필요합니다.</p><button class="btn" onclick="runOperations(\'api_personSetup\')">직원 공통 번호 준비</button>';
+  h+='</section><section class="tdsec"><h4 class="tdh">확인할 상태</h4>'+(report.issues&&report.issues.length?'<ul>'+report.issues.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'<p>점검 항목에 문제가 없습니다.</p>');
+  if(r.pending&&r.pending.length)h+='<details><summary>미확인 업무 저장 '+Number(counts.pending||0)+'건</summary><p class="muted">업무 기록을 확인하기 전에는 같은 내용을 다시 저장하지 마세요.</p>'+r.pending.map(function(x){return '<p>'+esc(x.at)+' · '+esc(x.taskId||'신규 업무')+'</p>';}).join('')+'</details>';
+  h+='</section><section class="tdsec"><h4 class="tdh">자동 백업</h4><p>'+(r.scheduled?'매시간 상태 점검 · 하루 한 번 백업':'자동 점검이 아직 설정되지 않았습니다.')+'</p>';
+  if(!r.scheduled)h+='<button class="btn" onclick="runOperations(\'api_opsSetup\')">자동 점검 켜기</button>';
+  h+=b?'<p>'+esc(b.state==='complete'?'최근 백업 완료':'백업 확인 필요')+' · '+esc(opsTime(b.at))+'</p>':'<p>아직 백업이 없습니다.</p>';
+  if(b&&b.error)h+='<p>'+esc(b.error)+'</p>';
+  if(b&&b.checkedAt)h+='<p class="muted">사본 검증 '+esc(opsTime(b.checkedAt))+'</p>';
+  h+='<div class="actions"><button class="btn" onclick="runOperations(\'api_opsBackup\')">오늘 백업 확인·실행</button>'+(b&&b.state==='complete'?'<button class="btn" onclick="runOperations(\'api_opsRestoreCheck\')">백업 사본 검증</button>':'')+'</div>';
+  if(b&&b.copies&&b.copies.length)h+='<details><summary>백업 사본 보기</summary>'+b.copies.map(function(c){return '<p><a href="'+esc(c.url)+'" target="_blank" rel="noopener noreferrer">'+esc(c.name)+' ↗</a></p>';}).join('')+'</details>';
+  h+='<p class="muted">소유 계정의 비공개 사본입니다. 원본을 덮어쓰지 않습니다. 세 앱의 사본 생성 시각은 서로 다를 수 있습니다.</p></section><button class="btn" onclick="refreshOperations()">다시 확인</button>';return h;
+}
+async function refreshOperations(){var p=OPS_VIEW;if(!p||!opsAlive(p)||p.busy)return;p.busy=true;var r;try{r=await callWithOptions({quiet:true},'api_opsStatus',p.token);}catch(e){r=null;}p.busy=false;if(!opsAlive(p))return;$('opsBody').innerHTML=r&&r.ok?operationsHtml(r):'<p>운영 상태를 확인하지 못했습니다.</p><button class="btn" onclick="refreshOperations()">다시 확인</button>';}
+async function runOperations(fn){
+  var p=OPS_VIEW;if(!p||!opsAlive(p)||p.busy||!['api_personSetup','api_opsSetup','api_opsBackup','api_opsRestoreCheck'].includes(fn))return;
+  p.busy=true;var body=$('opsBody');body.setAttribute('data-saving','1');body.querySelectorAll('button').forEach(function(b){b.disabled=true;});$('opsMessage').textContent='처리 중입니다. 창을 그대로 두세요.';var r;
+  try{r=await callWithOptions({quiet:true,timeoutMs:45000},fn,p.token);}catch(e){r=null;}p.busy=false;if(!opsAlive(p))return;body.removeAttribute('data-saving');$('opsMessage').textContent=r&&r.ok?(r.msg||'처리를 확인했습니다.'):(r&&r.msg||'응답을 받지 못했습니다. 다시 실행하기 전에 현재 상태부터 확인합니다.');await refreshOperations();
+}
+
+var MASTER_EDIT=null;
+function masterEditAlive(p){return MASTER_EDIT===p&&S.epoch===p.epoch&&S.token===p.token&&!!$('masterEditBody');}
+function openMasterEdit(id,kind){
+  var e=WORK_CONTEXT[S.epoch+'|'+id],c=e&&e.result&&e.result.context,m=c&&c.master,target=m&&m[kind];if(!c||!c.canManageCustomer||!target)return;
+  var p={id:id,kind:kind,target:target,version:m[kind+'Version'],epoch:S.epoch,token:S.token,key:'uo.master-edit.'+S.me.phone+'|'+id+'|'+kind};MASTER_EDIT=p;BACK_TASK=id;
+  $('modal').innerHTML='<div class="veil"><div class="sheet"><div class="sheethead"><h3 class="tt">'+(kind==='customer'?'고객 정보 수정':'현장 정보 수정')+'</h3><button class="btn sm" onclick="closeModal()">닫기</button></div><p class="muted">이 항목을 연결한 모든 업무에 반영됩니다. 기존 기록은 남습니다.</p><div id="masterEditBody"><label class="field">이름<input type="text" id="masterEditName" maxlength="100" value="'+esc(target.name)+'"></label><label class="field">'+(kind==='customer'?'연락처':'주소')+'<input type="text" id="masterEditExtra" maxlength="'+(kind==='customer'?40:300)+'" value="'+esc(kind==='customer'?target.phone:target.address)+'"></label><label class="field"><span><input type="checkbox" id="masterEditSeparate"> 같은 이름·주소가 있어도 별개 항목입니다</span></label><div class="actions"><button class="btn pri" onclick="saveMasterEdit()">변경 저장</button></div></div><div id="masterEditStatus" role="status" aria-live="polite"></div></div></div>';
+  if(taskSavePending(p.key))masterEditPending();else{modalWatch();$('masterEditName').focus();}
+}
+function masterEditPending(){var p=MASTER_EDIT;if(!p||!masterEditAlive(p))return;$('masterEditBody').querySelectorAll('input,button').forEach(function(x){x.disabled=true;});$('masterEditStatus').innerHTML='<p>저장 결과를 확인하지 못했습니다. 다시 저장하지 말고 결과를 확인해주세요.</p><button class="btn" onclick="checkMasterEdit()">저장 결과 확인</button>';}
+function masterEditDone(p){taskSaveRemember(p.key,null);WORK_CONTEXT={};MASTER_EDIT=null;closeOk();openTask(p.id,true);tdTab('flow');toast('명부 정보를 수정했습니다.');}
+async function saveMasterEdit(){
+  var p=MASTER_EDIT;if(!p||!masterEditAlive(p)||p.busy)return;if(taskSavePending(p.key)){masterEditPending();return;}
+  var data={name:$('masterEditName').value.trim()};data[p.kind==='customer'?'phone':'address']=$('masterEditExtra').value.trim();if(!data.name||p.kind==='site'&&!data.address){$('masterEditStatus').textContent='이름과 필요한 주소를 입력해주세요.';return;}
+  var b=new Uint8Array(16);crypto.getRandomValues(b);var requestId=Array.from(b).map(function(x){return ('0'+x.toString(16)).slice(-2);}).join('');taskSaveRemember(p.key,{id:requestId});p.busy=true;$('masterEditBody').setAttribute('data-saving','1');$('masterEditStatus').textContent='저장 중…';var r;
+  try{r=await callWithOptions({quiet:true},'api_masterEdit',p.token,p.id,{requestId:requestId,kind:p.kind,target:p.target.id,version:p.version,data:data,confirmSeparate:$('masterEditSeparate').checked});}catch(e){r=null;}p.busy=false;if(!masterEditAlive(p))return;$('masterEditBody').removeAttribute('data-saving');
+  if(r&&r.ok){masterEditDone(p);return;}if(r&&(r.notSaved||r.denied)){taskSaveRemember(p.key,null);$('masterEditStatus').textContent=r.msg;return;}masterEditPending();
+}
+async function checkMasterEdit(){var p=MASTER_EDIT;if(!p||!masterEditAlive(p)||p.busy)return;var v=taskSavePending(p.key);if(!v)return;p.busy=true;var r;try{r=await callWithOptions({quiet:true},'api_masterEditStatus',p.token,p.id,v.id);}catch(e){r=null;}p.busy=false;if(!masterEditAlive(p))return;if(r&&r.ok&&r.state==='saved'){masterEditDone(p);return;}masterEditPending();}
+
 var MASTER_PICK=null;
 function masterSummaryHtml(c){
   var m=c.master||{},h='<section class="tdsec"><h4 class="tdh">고객 · 현장</h4>';
   if(m.customer){h+='<p><strong>'+esc(m.customer.name)+'</strong> '+esc(phoneFmt(m.customer.phone))+'</p>';h+=m.site?'<p>'+esc(m.site.name)+'</p><p class="muted">'+esc(m.site.address)+'</p>':'<p class="muted">현장은 아직 연결하지 않았습니다.</p>';}
   else h+='<p class="tdnone">'+(m.unavailable?'고객·현장 기준을 확인하지 못했습니다.':'등록된 고객·현장을 연결할 수 있습니다.')+'</p>';
   if(c.canManageCustomer && !m.unavailable)h+='<button class="btn sm" data-task="'+esc(c.task.id)+'" onclick="openMasterPicker(this.dataset.task)">'+(m.customer?'고객·현장 변경':'고객·현장 연결')+'</button>';
+  if(c.canManageCustomer && m.customer && !m.unavailable)h+='<details class="work-more"><summary>등록 정보 수정</summary><div class="actions"><button class="btn sm" data-task="'+esc(c.task.id)+'" onclick="openMasterEdit(this.dataset.task,\'customer\')">고객 수정</button>'+(m.site?'<button class="btn sm" data-task="'+esc(c.task.id)+'" onclick="openMasterEdit(this.dataset.task,\'site\')">현장 수정</button>':'')+'</div></details>';
   return h+siteSourcesHtml(c)+'</section>';
 }
 function masterAlive(p){return MASTER_PICK===p && S.epoch===p.epoch && S.token===p.token && !!$('masterBody');}
@@ -6983,7 +7033,8 @@ function workContextHtml(r){
   var c=r.context,t=c.task,s=c.site;
   var h='<section class="tdsec"><h4 class="tdh">업무에서 이어서</h4><div class="work-actions">'+
     '<button class="btn pri" data-task="'+esc(t.id)+'" onclick="chooseWorkDoc(this.dataset.task)">결재 작성</button></div></section>';
-  h+='<section class="tdsec"><h4 class="tdh">담당자 · 연결 견적</h4><dl class="tdinfo">'+
+  h+=masterSummaryHtml(c);
+  h+='<details class="work-more"><summary>기존 업무 자료 · 상담</summary><section class="tdsec"><h4 class="tdh">담당자 · 연결 견적</h4><dl class="tdinfo">'+
     '<div><dt>담당자</dt><dd>'+esc(c.staff.name)+'</dd></div>';
   if(s){
     h+='<div><dt>고객 · 상호</dt><dd>'+esc(s.available?(s.name||s.code):'연결 자료 확인 필요')+'</dd></div>'+
@@ -6994,7 +7045,7 @@ function workContextHtml(r){
   if(c.customer.phone)h+='<div><dt>연락처</dt><dd>'+esc(phoneFmt(c.customer.phone))+'</dd></div>';
   h+='</dl>';
   if(s && s.available)h+='<p class="muted work-source">견적 정보 · 연락처는 업무에 등록한 번호입니다.</p><a class="btn sm" href="https://estimate.unionone8868.com/" target="_blank" rel="noopener noreferrer">현장견적 앱 열기 ↗</a>';
-  h+='</section>'+masterSummaryHtml(c)+customerSummaryHtml(c)+'<section class="tdsec"><h4 class="tdh">관련 결재'+(r.docs.length?' <span class="n">'+r.docs.length+'</span>':'')+'</h4>';
+  h+='</section>'+customerSummaryHtml(c)+'</details><section class="tdsec"><h4 class="tdh">관련 결재'+(r.docs.length?' <span class="n">'+r.docs.length+'</span>':'')+'</h4>';
   h+=r.docs.length?r.docs.map(function(d){return '<button class="tdlink" data-no="'+esc(d.no)+'" onclick="openDoc(this.dataset.no)">'+ic('doc')+'<span class="n">'+esc(d.title)+'</span><span class="g">'+docBadge(d.status)+'</span></button>';}).join(''):'<p class="tdnone">현재 볼 수 있는 관련 결재가 없습니다.</p>';
   return h+'</section>';
 }
@@ -13099,6 +13150,7 @@ function paintAdmin(r){
         '<button class="btn" onclick="openVendors()">거래처</button>'+
         /* 누가 언제 들어왔는지 (2026-09-02). 누를 때만 불러옵니다 */
         '<button class="btn" onclick="openAccess()">접속 기록</button>'+
+        '<button class="btn" onclick="openOperations()">운영 관리</button>'+
       '</div>';
     if($('adminTop')) $('adminTop').innerHTML=top;
 
