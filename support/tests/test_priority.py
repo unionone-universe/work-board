@@ -6,7 +6,9 @@ from relevance import classify,research_priority,AREAS
 class PriorityTest(unittest.TestCase):
  def test_joint_region_and_other_district(self):
   self.assertTrue(classify({'title':'[대구·경북] 소상공인 경영안정자금 지원'})['eligible'])
-  self.assertFalse(classify({'title':'[대구] 수성구 소상공인 경영안정자금 지원'})['eligible'])
+  r=classify({'title':'[대구] 수성구 소상공인 경영안정자금 지원'})
+  self.assertNotIn('union',[a['id'] for a in r['applicants']])
+  self.assertIn('demolition',[a['id'] for a in r['applicants']]) # 별도 사업자 소재지는 미확인
   self.assertTrue(classify({'title':'[대구] 동구 소상공인 경영안정자금 지원'})['eligible'])
  def test_dance_evidence_not_generic_art(self):
   self.assertIn(AREAS[2],classify({'title':'공연예술 창작지원','discipline':'지원분야 연극, 무용, 음악'})['categories'])

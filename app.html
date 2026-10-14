@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v125">
+<meta name="uo-version" content="v126">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -1229,6 +1229,13 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .support-card .support-source{display:inline-flex;align-items:center;gap:6px;min-height:44px;padding:6px 0;color:var(--pri);font-size:14px;font-weight:400;text-decoration:none;word-break:keep-all;overflow-wrap:anywhere}
 .support-card .support-source:hover{text-decoration:underline;text-underline-offset:4px}
 .support-card .support-source .ic{flex:none;width:14px;height:14px}
+.support-match{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:12px 0 8px;font-size:13px;color:var(--t2)}
+.support-money{padding:4px 8px;background:var(--bg);border:1px solid var(--line);border-radius:6px;font-weight:600;color:var(--t1)}
+.support-applicant-line{font-size:14px;line-height:1.65;color:var(--t2);margin-bottom:6px}
+.support-applicants section{margin:16px 0;padding:14px 16px;background:var(--bg);border-radius:10px}
+.support-applicants strong{font-size:15px;color:var(--t1)}
+.support-applicants section p,.support-applicants ul{font-size:14px;line-height:1.7;color:var(--t2);margin:6px 0}
+.support-applicants ul{padding-left:20px}
 .support-card:focus-visible{outline:2px solid var(--pri);outline-offset:2px}
 @media(max-width:599px){
  .support-sheet .sheethead .tt{font-size:22px}
@@ -5509,11 +5516,15 @@ function supportNewsPack(){
   var sources=Array.isArray(health.sources)?health.sources:(raw&&Array.isArray(raw.sources)?raw.sources:[]);
   if(raw&&Array.isArray(raw.items))raw.items.forEach(function(r){
     if(!r||typeof r!=='object')return;
-    if(!r.relevance || r.relevance.policy!==2 || !r.relevance.eligible)return;
+    if(!r.relevance || [2,3].indexOf(r.relevance.policy)===-1 || !r.relevance.eligible)return;
     var title=text(r.title),url=supportSafeLink(text(r.url));
     if(!title||!url||!text(r.source)||seen[url])return;seen[url]=true;
     var n={title:title,url:url,source:text(r.source),categories:SUPPORT_CATEGORIES.filter(function(c){return Array.isArray(r.categories)&&r.categories.indexOf(c)!==-1;})};
     n.relevanceReason=text(r.relevance.reason);
+    n.profilePending=r.relevance.policy!==3;
+    n.fundingKind=text(r.relevance.finance&&r.relevance.finance.kind)||'금전 지원 여부 확인';
+    n.repayment=text(r.relevance.finance&&r.relevance.finance.repayment);
+    n.applicants=Array.isArray(r.relevance.applicants)?r.relevance.applicants.filter(function(a){return a&&typeof a.name==='string';}).map(function(a){return {name:text(a.name),reasons:Array.isArray(a.reasons)?a.reasons.filter(function(v){return typeof v==='string';}):[],checks:Array.isArray(a.checks)?a.checks.filter(function(v){return typeof v==='string';}):[]};}):[];
     ['summary','audience','benefit','exclusions','copay','period','status','firstSeen','checkedAt','changedAt','lastError'].forEach(function(k){n[k]=text(r[k]);});
     n.deadline=realDate(text(r.deadline))?text(r.deadline):'';
     if(n.deadline&&n.deadline<today&&['접수 기간 중','접수 예정'].indexOf(n.status)!==-1)n.status='마감';
@@ -5581,17 +5592,20 @@ function syncSupportRotation(){
 function toggleSupportRotation(){SUPPORT_TICKER.paused=!SUPPORT_TICKER.paused;syncSupportRotation();}
 if(SUPPORT_MOTION.addEventListener)SUPPORT_MOTION.addEventListener('change',syncSupportRotation);
 function supportCard(n,i){
-  var fields=[['지원 유형',n.types.join(' · ')],['신청 대상',n.audience],['지원 내용',n.benefit],['제외 조건',n.exclusions],['자부담·금리',n.copay],['접수 기간·시각',n.period]];
+  var fields=[['지원 방식',n.fundingKind],['상환·정산',n.repayment],['원문 지원 유형',n.types.join(' · ')],['신청 대상',n.audience],['지원 내용',n.benefit],['제외 조건',n.exclusions],['자부담·금리',n.copay],['접수 기간·시각',n.period]];
   var status=n.status||'접수 상태 확인 필요';
   var tone=status==='접수 기간 중'?' open':status.indexOf('확인')!==-1?' unknown':'';
   return '<article class="support-card" id="supportCard'+i+'" tabindex="-1">'+
     '<div class="support-card-meta"><div class="support-tags">'+n.categories.map(function(c){return '<span>'+esc(c)+'</span>';}).join('')+'</div>'+
     '<span class="support-status'+tone+'">'+esc(status)+(n.changedAt?' · 변경 감지':'')+'</span></div>'+
     '<h4>'+esc(n.title)+'</h4>'+
+    '<div class="support-match"><span class="support-money">'+esc(n.fundingKind)+'</span><span>'+esc(n.profilePending?'이전 선별 자료 · 새 조건 대조 중':'조건 확인 필요')+'</span></div>'+
+    '<div class="support-applicant-line">검토 대상 · '+esc(n.applicants.map(function(a){return a.name;}).join(' / ')||'신청 주체 확인 필요')+'</div>'+
     '<div class="support-facts"><span class="support-deadline">'+ic('clock')+esc(supportDeadline(n))+'</span>'+
     '<a class="support-source" href="'+esc(n.url)+'" target="_blank" rel="noopener noreferrer">'+esc(n.source)+' · 원문<span class="sronly"> (새 창)</span>'+ic('chev')+'</a></div>'+
     (n.lastError?'<p class="support-warning">최근 재확인 실패 · 이전 조사 자료</p>':'')+
     '<details><summary tabindex="0">신청 정보·확인 근거'+ic('chev')+'</summary>'+
+    (n.applicants.length?'<div class="support-applicants">'+n.applicants.map(function(a){return '<section><strong>'+esc(a.name)+'</strong>'+(a.reasons.length?'<p>'+a.reasons.map(esc).join(' · ')+'</p>':'')+'<ul>'+a.checks.map(function(c){return '<li>'+esc(c)+'</li>';}).join('')+'</ul></section>';}).join('')+'</div>':'')+
     (n.relevanceReason?'<p>'+esc(n.relevanceReason)+'</p>':'')+(n.summary?'<p>'+esc(n.summary)+'</p>':'')+'<dl>'+
     fields.map(function(f){return '<dt>'+f[0]+'</dt><dd>'+esc(f[1]||'자동 확인 못함 · 원문 확인 필요')+'</dd>';}).join('')+'</dl>'+
     (n.issues.length?'<p class="support-warning">'+n.issues.map(esc).join('<br>')+'</p>':'')+
@@ -5616,7 +5630,7 @@ function openSupportNews(index){
   SUPPORT_VIEW={pack:pack,category:'',query:'',limit:12};
   $('modal').innerHTML='<div class="veil" onclick="if(event.target===this)closeModal()"><div class="sheet support-sheet">'+
     '<div class="sheethead"><h3 class="tt">지원사업 소식</h3><button class="btn sm" onclick="closeModal()">닫기</button></div>'+
-    '<p class="support-sub">'+(pack.publishedOn?esc(krDate(pack.publishedOn))+' 게시 · ':'')+'업무 관련 공고 모음 · 신청 자격은 원문에서 확인해 주세요.</p>'+
+    '<p class="support-sub">'+(pack.publishedOn?esc(krDate(pack.publishedOn))+' 게시 · ':'')+'우리 사업 관련 금전 지원 · 자부담 포함 · 신청 자격은 확인이 필요합니다.</p>'+
     '<label class="support-search"><span class="sronly">공고 찾기</span><input id="supportSearch" type="search" placeholder="공고명·지역·신청 대상 검색" oninput="searchSupportNews(this.value)"></label>'+
     '<div id="supportFilters" class="support-filters" role="group" aria-label="지원사업 분야"></div>'+supportHealthHtml(pack)+
     '<p id="supportCount" class="support-sub" role="status" aria-live="polite"></p><div id="supportCards" class="support-cards"></div>'+
@@ -5633,7 +5647,7 @@ function renderSupportCards(){
   var count=0,shown=0,query=v.query.toLocaleLowerCase();
   $('supportCards').innerHTML=v.pack.items.map(function(n,i){
     if(v.category&&n.categories.indexOf(v.category)===-1)return '';
-    if(query&&[n.title,n.summary,n.audience,n.source,n.benefit].join(' ').toLocaleLowerCase().indexOf(query)===-1)return '';
+    if(query&&[n.title,n.summary,n.audience,n.source,n.benefit,n.fundingKind,n.applicants.map(function(a){return a.name;}).join(' ')].join(' ').toLocaleLowerCase().indexOf(query)===-1)return '';
     count++;if(shown>=v.limit)return '';shown++;return supportCard(n,i);
   }).join('')||(v.pack.scheduled?'<p>첫 조사 자료가 준비되었습니다. 오전 8시 30분에 공개됩니다.</p>':'<p>조건에 맞는 공고가 없습니다.</p>');
   $('supportCount').textContent=(v.category||'전체')+' '+count+'건'+(count>shown?' · '+shown+'건 표시':'');
