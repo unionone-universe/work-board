@@ -49,3 +49,9 @@ class ApplicantTest(unittest.TestCase):
  def test_guarantee_only_not_selected(self):
   self.assertFalse(funding({'title':'소상공인 특례보증'})['include'])
   self.assertTrue(funding({'title':'소상공인 특례보증 대출'})['include'])
+ def test_seoul_district_is_separate(self):
+  self.assertNotIn('dance',self.names({'title':'[서울] 은평구 중소기업 융자지원'}))
+  self.assertIn('dance',self.names({'title':'[서울] 강남구 중소기업 융자지원'}))
+  self.assertIn('dance',self.names({'title':'[서울] 중소기업 융자지원'}))
+ def test_other_art_title_not_attachment_boilerplate(self):
+  self.assertFalse(classify({'title':'공연장연계연극대표작육성지원','discipline':'연극 무용 음악','benefit':'제작비 지원'})['eligible'])

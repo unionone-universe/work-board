@@ -62,6 +62,8 @@ def applicant_matches(item, categories, finance):
         if region and region_type != 'residence' and key in ('union','dance'):
             expected = '대구' if key == 'union' else '서울'
             if expected not in region and not (key == 'dance' and '강남' in region): continue
+            district = re.search(r'(?:\]|서울(?:특별시)?|대구(?:광역시)?)\s*([가-힣]{1,4}[구군])(?:\s|\d|$)', title+' '+audience)
+            if district and district[1] != ('동구' if key == 'union' else '강남구'): continue
             if key == 'union' and has(r'수성구|북구|서구|중구|남구|달서구|달성군|군위군', title): continue
             if key == 'dance' and has(r'서초|서대문|강북|송파|마포', region+' '+title): continue
         if region:
