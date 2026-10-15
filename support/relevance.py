@@ -1,12 +1,17 @@
 """회사 업무 관련성 선별. 수집 원본은 보존하며 노출 여부만 결정한다."""
-import re, datetime as dt
+import re, datetime as dt, json
+from pathlib import Path
 
 from matching import match
 
 POLICY = 3
+RULE_REVISION = 4
+REVIEWED_EXCLUSIONS = json.loads(Path(__file__).with_name("reviewed-exclusions.json").read_text(encoding="utf-8"))
 AREAS = ['철거·인테리어', '부동산·경영 컨설팅', '현대무용·공연기획', '부동산 앱·플랫폼']
 
 def classify(item):
+ if item.get('url') in REVIEWED_EXCLUSIONS:
+  return {'policy':POLICY,'eligible':False,'reason':REVIEWED_EXCLUSIONS[item['url']]['reason'],'categories':[],'score':0}
  title = str(item.get('title',''))
  audience = str(item.get('audience',''))
  core = title+' '+audience
@@ -20,6 +25,8 @@ def classify(item):
   return {'policy':POLICY,'eligible':False,'reason':'다른 업종 전용 공고','categories':[],'score':0}
  if has(r'(주관기관|운영기관|수행기관).{0,10}모집|액셀러레이터.*\(보육사\).*공모|보육사.*공모',title):
   return {'policy':POLICY,'eligible':False,'reason':'지원받을 기업 모집 아님','categories':[],'score':0}
+ if has(r'관광코스|굿즈\s*상품화|철강[ㆍ·\s]*금속|철강산업\(C24\)|배출시설|방지시설|사물인터넷.*측정기기',core):
+  return {'policy':POLICY,'eligible':False,'reason':'다른 업종·시설 전용 공고','categories':[],'score':0}
  categories=[];reasons=[];score=0
  if has(r'철거|해체공사|인테리어|리모델링|실내건축',core):
   categories.append(AREAS[0]);reasons.append('철거·실내건축 관련');score+=90
@@ -54,11 +61,34 @@ def classify(item):
  return {'policy':POLICY,'eligible':True,'reason':' · '.join(reasons), 'categories':categories,'score':score,**fit}
 
 
+def period_ended(period,today):
+ # 날짜 하나만 있으면 접수 시작일일 수 있다. 명시된 범위의 끝/마감일만 사용한다.
+ if re.search(r'상시|예산\s*소진|별도\s*공지|연장|추후',period):return False
+ ends=[]
+ for line in period.splitlines():
+  parts=re.split(r'[~∼～]',line,maxsplit=1)
+  if len(parts)==2:
+   years=re.findall(r'(20\d{2})\s*[.년/-]',parts[0])
+   m=re.match(r'\s*(?:(20\d{2})\s*[.년/-]\s*)?(\d{1,2})\s*[.월/-]\s*(\d{1,2})',parts[1])
+   if not m or not (m[1] or years):continue
+   year=int(m[1] or years[-1]);month=int(m[2]);day=int(m[3])
+   starts=re.findall(r'20\d{2}\s*[.년/-]\s*(\d{1,2})\s*[.월/-]\s*(\d{1,2})',parts[0])
+   if not m[1] and starts and month<int(starts[-1][0]):year+=1
+  else:
+   m=re.search(r'(?:접수\s*마감(?:일)?|신청\s*기한)\s*[:：]?\s*(20\d{2})\s*[.년/-]\s*(\d{1,2})\s*[.월/-]\s*(\d{1,2})',line)
+   if not m:continue
+   year,month,day=map(int,m.groups())
+  try:ends.append(dt.date(year,month,day))
+  except ValueError:pass
+ return bool(ends) and max(ends)<today
+
 def select(items):
  selected=[]
  today=dt.datetime.now(dt.timezone(dt.timedelta(hours=9))).date()
  for record in items:
-  if record.get('deadline') and record['deadline']<today.isoformat() and not record.get('changedAt'):continue
+  if record.get('deadline') and record['deadline']<today.isoformat():continue
+  if record.get('status') in ('마감','종료 안내','예산 소진 공지','결과 발표'):continue
+  if period_ended(str(record.get('period','')),today) and not record.get('deadline','')>=today.isoformat():continue
   title=record.get('title','');year=re.search(r'20\d{2}',title);end=re.search(r'[~∼～]\s*(\d{1,2})[./월]\s*(\d{1,2})',title)
   if year and int(year[0])<today.year and not (record.get('deadline','')>=today.isoformat()):continue
   if year and end and not record.get('changedAt'):

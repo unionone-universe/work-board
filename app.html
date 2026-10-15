@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v127">
+<meta name="uo-version" content="v128">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -2177,6 +2177,8 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 .update-actions{display:flex;gap:8px}.update-actions .btn{flex:1;min-width:0}
 .update-topic summary:focus-visible{outline:2px solid var(--pri);outline-offset:-2px;border-radius:6px}
 @media(max-width:479px){.update-sheet{padding:0 16px!important}.update-sheet .sheethead{flex-shrink:0;margin:0 -16px;padding:18px 16px 14px}.update-sheet .sheethead .tt{font-size:21px}.update-essential{padding:14px}.update-content{font-size:15px}.update-actions .btn{padding:10px 8px}}
+
+.tfattach{padding:16px 0;border-top:1px solid var(--line);margin:8px 0}.tfattach .fl{display:block;margin-bottom:8px}.tf-file{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.tf-file>div{min-width:0;flex:1}.tf-file strong{display:block;font-size:14px;overflow-wrap:anywhere}.tf-file small{display:block;margin-top:4px;color:var(--muted)}.tf-file .btn{min-height:44px;flex-shrink:0}
 </style>
 </head>
 <body>
@@ -4451,6 +4453,7 @@ function resetUserCaches(){
   S.taskCache={}; S.docCache={}; S.docCacheAt={}; S.postCache=null; S.postCacheAt=null;
   S.readers={}; S.readSent={}; S.setCache=null; S.owner='';
   try{ MON.cache={}; }catch(e){}               // 월별 보고 (임원) — 사람이 바뀌면 버린다
+  tfFilesReset();
   TF_DRAFT=null;                               // 앞사람의 저장 실패 글 (2026-09-30 검수 1차)
 }
 
@@ -8070,6 +8073,7 @@ function closeModal(force){
     var 그줄=visibleTaskRow(닫은업무);
     if(그줄) MODAL_FROM=그줄;
   }
+  tfFilesReset();
   box.innerHTML='';
   MODAL_ROOT=null; MODAL_SIG=null; MODAL_TOUCHED=false; MODAL_DRAWN=false;
   S.openTask=null; S.openTaskFromBoard=false;      // 열린 업무 창 표시도 지운다 (돌아갈 곳이 있으면 openTask 가 다시 적는다)
@@ -8216,6 +8220,80 @@ document.addEventListener('focusin', function(e){
 /* ★ 저장이 실패한 업무 창의 글 (2026-09-30) — 다음에 같은 창을 열 때 채운다. 저장하지 않는다 (이 화면에서만)
    ★★ 누구의 · 어느 권한 때 글인지 함께 적어 둔다 (검수 1차). 계정·권한이 바뀌면(S.epoch) 버린다 —
      다른 직원의 새 업무 창에 앞사람이 적은 업무명·현장·금액이 채워지면 안 된다 (resetUserCaches 도 비운다) */
+/* 새 업무의 파일은 업무 번호가 확인된 뒤 한 장씩 저장한다. 응답 유실은 조회만 한다. */
+var TF_FILES=null;
+function tfFilesReset(){TF_FILES=null;}
+function tfFilesDraw(){
+  var q=TF_FILES,box=$('tfFiles');if(!q||!box||q.root!==document.querySelector('#modal .tform'))return;
+  box.innerHTML=q.items.map(function(f,i){return '<div class="tf-file"><div><strong>'+esc(f.file.name)+'</strong><small>'+esc(f.file.size<1024*1024?Math.max(1,Math.round(f.file.size/1024))+' KB':(f.file.size/1024/1024).toFixed(1)+' MB')+' · '+esc(f.state==='saved'?'첨부 완료':f.state==='unknown'?'결과 확인 필요':f.state==='failed'?'다시 올릴 수 있습니다':'등록 시 첨부')+'</small></div>'+(f.state==='ready'||f.state==='failed'?'<button type="button" class="btn sm" aria-label="'+esc(f.file.name)+' 첨부 취소" onclick="tfFileRemove('+i+')">빼기</button>':'')+'</div>';}).join('');
+}
+function tfFileRemove(index){
+  if(!TF_FILES||TF_FILES.busy)return;var f=TF_FILES.items[index];
+  if(f && (f.state==='ready'||f.state==='failed'))TF_FILES.items.splice(index,1);
+  MODAL_TOUCHED=true;MODAL_DRAWN=true;tfFilesDraw();
+}
+function tfFilesPick(input){
+  var q=TF_FILES;if(!q||q.busy||q.taskId)return;
+  var files=Array.from(input.files||[]);input.value='';
+  var notes=[];files.forEach(function(f){
+    if(!/\.(pdf|jpe?g|png|webp|gif|heic|heif)$/i.test(f.name)||!(/^(application\/pdf|image\/(jpeg|png|webp|gif|heic|heif))$/i.test(f.type)||!f.type)){notes.push('PDF 또는 이미지 파일만 선택해주세요.');return;}
+    if(!f.size||f.size>8*1024*1024){notes.push('파일당 8MB 이하로 선택해주세요.');return;}
+    if(q.items.some(function(x){return x.file.name===f.name&&x.file.size===f.size&&x.file.lastModified===f.lastModified;}))return;
+    if(q.items.length>=3){notes.push('한 번에 3개까지 첨부할 수 있습니다.');return;}
+    q.items.push({file:f,state:'ready',requestId:'',data:''});
+  });
+  if(q.items.length){MODAL_TOUCHED=true;MODAL_DRAWN=true;}
+  $('tfFilesNote').textContent=notes.length?Array.from(new Set(notes)).join(' '):'PDF·이미지 · 최대 3개 · 파일당 8MB';tfFilesDraw();
+}
+function tfFileRead(f){return new Promise(function(resolve,reject){
+  var reader=new FileReader();reader.onerror=function(){reject(new Error('파일을 읽지 못했습니다. 다시 선택해주세요.'));};
+  reader.onload=function(){var raw=String(reader.result||'');
+    var mime=f.file.type||(/\.pdf$/i.test(f.file.name)?'application/pdf':/\.jpe?g$/i.test(f.file.name)?'image/jpeg':'image/'+f.file.name.split('.').pop().toLowerCase());
+    f.data=raw.replace(/^data:[^;]*;/,'data:'+mime+';');resolve();};reader.readAsDataURL(f.file);
+});}
+async function tfSaveWithFiles(token,p,corp,q){
+  var epoch=S.epoch;function valid(){return S.token===token&&S.epoch===epoch&&q===TF_FILES&&q.root.isConnected;}
+  q.busy=true;
+  try{
+    // 파일 읽기 실패면 업무 자체를 만들기 전에 멈춘다.
+    for(var f of q.items){if(!f.data&&f.state!=='saved')await tfFileRead(f);if(!valid())return {ok:false,denied:true};}
+    var result=q.result||await saveTaskReliable(token,p,corp);
+    if(!valid())return {ok:false,denied:true};if(!result.ok)return result;
+    q.result=result;q.taskId=result.id;p.id=result.id;
+    // 이후에는 첨부만 처리한다. 저장 단추를 다시 눌러도 업무를 새로 만들지 않는다.
+    $('tfId').value=result.id;$('tfId').dataset.editVersion=result.editVersion||'';
+    applyTaskLocal(p);delete S.taskCache[result.id];
+    for(var f of q.items){
+      if(f.state==='saved')continue;
+      $('tfMsg').textContent='업무 등록 완료 · '+f.file.name+' 첨부 중입니다...';
+      var r;
+      if(f.requestId){
+        var check=await callWithOptions({quiet:true,timeoutMs:12000},'api_taskSaveStatus',token,f.requestId);
+        r=check&&check.ok&&check.result?check.result:{ok:false,code:'WRITE_UNCONFIRMED'};
+        if(check&&check.denied)r=check;
+      }else{
+        var bytes=new Uint8Array(16);crypto.getRandomValues(bytes);f.requestId='file_'+Array.from(bytes).map(function(b){return ('0'+b.toString(16)).slice(-2);}).join('');
+        try{r=await callWithOptions({quiet:true,timeoutMs:45000},'api_addTaskFile',token,q.taskId,[{name:f.file.name,data:f.data}],f.requestId);}catch(e){r={ok:false,net:true};}
+      }
+      if(!valid())return {ok:false,denied:true};
+      if(r&&r.ok){f.state='saved';f.data='';tfFilesDraw();continue;}
+      if(r&&r.denied)return r;
+      var unknown=!r||r.net||r.code==='WRITE_UNCONFIRMED'||r.code==='SERVER_ERROR';
+      f.state=unknown?'unknown':'failed';if(!unknown)f.requestId='';tfFilesDraw();
+      return {ok:false,code:unknown?'ATTACH_UNCONFIRMED':'ATTACH_FAILED',msg:'업무는 등록됐습니다. '+(unknown?'첨부 결과를 확인하지 못했습니다. [첨부 결과 확인]을 눌러주세요.':'첨부를 마치지 못했습니다. 파일은 남아 있습니다. [첨부 다시 올리기]를 눌러주세요.')};
+    }
+    return result;
+  }catch(e){return {ok:false,msg:q.taskId?'업무는 등록됐습니다. 첨부 결과를 확인해주세요.':'파일을 읽지 못했습니다. 다시 선택해주세요.'};}
+  finally{q.busy=false;}
+}
+function tfFilesLock(q){
+  if(!q||!q.taskId||!q.root.isConnected)return;
+  q.root.querySelectorAll('input,textarea,select,[contenteditable],.tfpick').forEach(function(el){if('disabled' in el)el.disabled=true;if(el.hasAttribute('contenteditable'))el.setAttribute('contenteditable','false');if(el.classList.contains('tfpick')){el.style.pointerEvents='none';el.querySelectorAll('[tabindex]').forEach(function(x){x.tabIndex=-1;});}});
+  q.root.querySelectorAll('.fgrp').forEach(function(el){el.inert=true;});
+  var more=q.root.querySelector('.fmorebtn');if(more)more.disabled=true;
+  var pick=$('tfFilesAdd');if(pick)pick.disabled=true;
+}
+
 var TF_DRAFT=null;
 function tfKeep(p, msg){
   if($('modal') && $('modal').innerHTML){ TF_DRAFT={ p:p, ep:S.epoch, who:(S.me && S.me.phone) || '' }; return; }
@@ -8315,6 +8393,10 @@ function drawTaskForm(id, t, files){
         '</div></div>')+
       (한법인? 법인칸 : '')+
     '</div>'+
+    (!id ? '<section class="tfattach" aria-label="첨부파일"><label class="fl">첨부파일</label>'+
+      '<input id="tfFilesInput" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.pdf,.heic,.heif" multiple hidden onchange="tfFilesPick(this)">'+
+      '<button id="tfFilesAdd" type="button" class="btn" onclick="document.getElementById(\'tfFilesInput\').click()">'+ic('clip')+'PDF · 이미지 추가</button>'+
+      '<p id="tfFilesNote" class="fhelp">PDF·이미지 · 최대 3개 · 파일당 8MB</p><div id="tfFiles" aria-live="polite"></div></section>' : '')+
     '<button type="button" class="fmorebtn" onclick="tfMore()" aria-expanded="false">'+ic('plus')+'더 입력하기'+
       '<span class="fmh">내용 · 현장 · 협업자'+(한법인? '' : ' · 법인')+(수정? ' · 진행률 · 자료' : '')+'</span></button>'+
     '<div class="fmorebox">'+
@@ -8358,6 +8440,7 @@ function drawTaskForm(id, t, files){
     '<button class="btn pri" id="tfSave" onclick="saveTask()">'+(id?'변경 저장':'업무 만들기')+'</button></div>'+
     '</div></div>';
   $('modal').innerHTML=h;
+  TF_FILES=!id?{root:document.querySelector('#modal .tform'),items:[],taskId:'',result:null,busy:false}:null;
   syncDemo();
   syncProg('tf');          /* 상태 · 저장될 자리를 지금 값에 맞춰 그린다 */
   tfGrow($('tfTitle'));
@@ -8593,7 +8676,9 @@ function submitFormSave(buttonId, messageId, key, send, saved, failed){
   msg.setAttribute('role','status'); msg.textContent='저장 중입니다. 서버 확인을 기다려 주세요.';
   var current=function(){return root.isConnected && $(buttonId)===btn;};
   var same=function(){return epoch===S.epoch && token===S.token;};
+  var unlocked=false;
   var unlock=function(){
+    if(unlocked)return;unlocked=true;
     ['click','keydown','beforeinput','paste','drop'].forEach(function(name){root.removeEventListener(name,stopEdit,true);});
     fields.forEach(function(w){if('disabled' in w.el)w.el.disabled=w.disabled;if(w.editable!==null)w.el.setAttribute('contenteditable',w.editable);});
     delete root.dataset.saving;root.removeAttribute('aria-busy');
@@ -8699,8 +8784,9 @@ function saveTask(){
   var version=$('tfId').dataset.editVersion;
   if(p.id && version)p.expectedVersion=version;
   var token=S.token, corp=S.corp;
+  var queue=TF_FILES&&TF_FILES.root===document.querySelector('#modal .tform')?TF_FILES:null;
   return submitFormSave('tfSave','tfMsg','task:'+(p.id||'new'),function(){
-    return saveTaskReliable(token,p,corp);
+    return queue&&(queue.items.length||queue.taskId)?tfSaveWithFiles(token,p,corp,queue):saveTaskReliable(token,p,corp);
   },function(r,current){
     p.id=r.id||p.id;
     if(r.editVersion)p.editVersion=r.editVersion;
@@ -8710,6 +8796,7 @@ function saveTask(){
     toast(p.progress>=100?'업무를 완료했습니다 · 수고하셨습니다':'저장되었습니다',p.progress>=100?'done':'ok');
     softRefresh();
   },function(r,current){
+    if(current && queue && queue.taskId){tfFilesLock(queue);$('tfSave').textContent=r&&r.code==='ATTACH_UNCONFIRMED'?'첨부 결과 확인':'첨부 다시 올리기';}
     if(current && r && r.code==='WRITE_UNCONFIRMED')$('tfSave').textContent='저장 결과 확인';
     if(current && r && r.code==='EDIT_CONFLICT')softRefresh();
     if(!current && !TF_DRAFT && !(r && r.denied))TF_DRAFT={p:p,ep:S.epoch,who:S.me&&S.me.phone};

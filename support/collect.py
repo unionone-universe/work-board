@@ -11,7 +11,7 @@ import requests
 from bs4 import BeautifulSoup
 from pypdf import PdfReader
 import olefile
-from relevance import POLICY, select, research_priority
+from relevance import POLICY, RULE_REVISION, select, research_priority
 
 KST = dt.timezone(dt.timedelta(hours=9))
 HERE = pathlib.Path(__file__).resolve().parent
@@ -257,6 +257,7 @@ def attachments(node,base):
 
 def detail(web,src,entry,old):
  data,_,url=web.get(entry['url']);s=soup_of(data)
+ header_text=flat(s.get_text(' ',strip=True))
  candidates=s.select(src['body']);body=max(candidates,key=lambda x:len(x.get_text()),default=None)
  if not body:raise ValueError('공고 본문 영역을 찾지 못함')
  bodycopy=BeautifulSoup(str(body),'html.parser')
@@ -327,12 +328,20 @@ def detail(web,src,entry,old):
  if len(bullets)>1:facts['benefit']=tidy(bullets[1])[:650]
  attachment_period=facts['period'];facts['period']=period[:650]
  startdate,deadline,deadline_at=schedule(period,title)
+ header_end=re.search(r'마감일\s*(20\d{2})[.년/-]\s*(\d{1,2})[.월/-]\s*(\d{1,2})',header_text) if src['kind']=='arko' else None
+ if header_end:
+  header_deadline=date_iso(*header_end.groups())
+  if header_deadline and not deadline:deadline=header_deadline
+ if src['kind']=='dip' and not deadline:
+  header_period=re.search(r'기간\s*(20\d{2}[-.]\d{1,2}[-.]\d{1,2}\s*[~∼～]\s*20\d{2}[-.]\d{1,2}[-.]\d{1,2})',header_text)
+  if header_period:startdate,deadline,deadline_at=schedule(header_period[1])
  # Conflicting portal / attachment date ranges must not become a confident deadline.
  ends={schedule(line)[1] for line in attachment_period.splitlines() if schedule(line)[1]}
  if deadline:ends.add(deadline)
  if len(ends)>1:
   issues.append('접수 기간이 여러 개이거나 서로 다름 — 원문 일정 대조 필요');deadline='';deadline_at=''
   facts['period']=period[:300]+'\n추가 일정 발췌: '+attachment_period[:350]
+  if ends and max(ends)<now().date().isoformat():deadline=max(ends)
  title=flat(title).removesuffix(' 찜하기');categories=[k for k,p in CATEGORIES.items() if re.search(p,title+' '+overview+' '+text,re.I)]
  if src.get('category') and src['category'] not in categories:categories.append(src['category'])
  if not categories:categories=['법인·경영'];issues.append('분야 자동분류 불확실 — 상세 확인 필요')
@@ -398,7 +407,7 @@ def edition(state,finished):
  items=select(items)
  sources=list(state['sources'].values())
  return {'publishedOn':publish.date().isoformat(),'publishAt':publish.isoformat(),'researchedAt':finished.isoformat(timespec='seconds'),
-  'items':items,'selectionPolicy':POLICY,'reviewedCount':collected,'sources':sources,'pending':len(state['pending']),
+  'items':items,'selectionPolicy':POLICY,'selectionRevision':RULE_REVISION,'reviewedCount':collected,'sources':sources,'pending':len(state['pending']),
   'partial':bool(state['pending']) or any(x.get('status')!='목록 확인' or x.get('unreadAttachments',0) for x in sources),
   'method':'공식 본문·첨부의 규칙 기반 추출. 신청 자격 확정/법률 판단이 아닙니다. 미확인 항목은 원문 확인이 필요합니다.'}
 
@@ -515,7 +524,7 @@ def refilter(output):
   eligible.update({n['url']:n for n in e.get('items',[]) if n.get('url')})
   e.setdefault('reviewedCount',len(e.get('items',[])))
   candidates=[{k:v for k,v in n.items() if k not in ('hash','history','closed')} for n in eligible.values() if not n.get('closed') and n.get('status')!='결과 발표']
-  e['items']=select(candidates);e['selectionPolicy']=POLICY
+  e['items']=select(candidates);e['selectionPolicy']=POLICY;e['selectionRevision']=RULE_REVISION
   e['reviewedCount']=max(e['reviewedCount'],len(candidates))
  save(out/'feed.json',feed)
  print(json.dumps({'editions':[{'publishAt':e.get('publishAt'),'selected':len(e['items']),'reviewed':e['reviewedCount']} for e in feed['editions']]},ensure_ascii=False))
