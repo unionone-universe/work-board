@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v128">
+<meta name="uo-version" content="v129">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -2179,6 +2179,9 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 @media(max-width:479px){.update-sheet{padding:0 16px!important}.update-sheet .sheethead{flex-shrink:0;margin:0 -16px;padding:18px 16px 14px}.update-sheet .sheethead .tt{font-size:21px}.update-essential{padding:14px}.update-content{font-size:15px}.update-actions .btn{padding:10px 8px}}
 
 .tfattach{padding:16px 0;border-top:1px solid var(--line);margin:8px 0}.tfattach .fl{display:block;margin-bottom:8px}.tf-file{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}.tf-file>div{min-width:0;flex:1}.tf-file strong{display:block;font-size:14px;overflow-wrap:anywhere}.tf-file small{display:block;margin-top:4px;color:var(--muted)}.tf-file .btn{min-height:44px;flex-shrink:0}
+.newsheet .noti-stale{width:100%;font:inherit;text-align:left;background:transparent;color:var(--t1);border:0;border-bottom:1px solid var(--line);border-radius:0;min-height:44px}
+.newsheet .noti-stale .t,.newsheet .noti-stale .b{display:block;white-space:normal;overflow-wrap:anywhere;overflow:visible;text-overflow:clip}
+.newsheet .noti-stale:focus-visible{outline:2px solid var(--pri);outline-offset:-2px}
 </style>
 </head>
 <body>
@@ -10204,6 +10207,14 @@ function notiListHtml(rows){
   if(!rows.length) return '<div class="none big">'+HELPER+'<p class="emsg">새 알림이 없습니다</p></div>';
   return rows.map(function(n){
     var 갈수있나 = !!notiTarget(n);
+    if(n.kind==='기록 확인'){
+      var parts=String(n.text||'').split('\n'), title=parts.shift(), detail=parts.join(' ');
+      return '<button type="button" class="lrow noti-stale"'+
+        (갈수있나? ' onclick="gotoNoti(\''+esc(n.kind)+'\',\''+esc(n.to||'')+'\')"' : ' disabled')+'>'+
+        '<span class="m"><span class="t">'+esc(title)+'</span><span class="b">'+esc(detail)+'</span>'+
+        (n.at? '<span class="b">'+esc(shortDate(n.at))+'</span>':'')+'</span>'+
+        '<span class="r"><span class="tag gy">기록 확인</span></span></button>';
+    }
     return '<div class="lrow'+(갈수있나?'':' plain')+'"'+
       (갈수있나? ' onclick="gotoNoti(\''+esc(n.kind)+'\',\''+esc(n.to||'')+'\')"' : '')+'>'+
       '<div class="m"><p class="t">'+esc(n.text)+'</p>'+
