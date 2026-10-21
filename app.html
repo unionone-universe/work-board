@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v129">
+<meta name="uo-version" content="v130">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -1415,7 +1415,7 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
   .sheet.tdsheet{height:var(--vvh,100vh);padding:0 16px 0}
 }
 .tdsheet .tdbar{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:8px;margin:0 -28px;padding:12px 28px;background:var(--bg)}
-.tdsheet .tdbar .tdwrapbar{display:flex;align-items:center;gap:8px;width:100%;max-width:1280px;margin:0 auto}
+.tdsheet .tdbar .tdwrapbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%;max-width:1280px;margin:0 auto}
 @media (max-width:719px){ .tdsheet .tdbar{margin:0 -16px;padding:8px 16px} }
 .tdsheet .tdclose{border-color:transparent;background:transparent;color:var(--t2);padding:0 12px 0 6px}
 .tdsheet .tdclose:hover{background:var(--panel);color:var(--t1)}
@@ -2182,6 +2182,7 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 .newsheet .noti-stale{width:100%;font:inherit;text-align:left;background:transparent;color:var(--t1);border:0;border-bottom:1px solid var(--line);border-radius:0;min-height:44px}
 .newsheet .noti-stale .t,.newsheet .noti-stale .b{display:block;white-space:normal;overflow-wrap:anywhere;overflow:visible;text-overflow:clip}
 .newsheet .noti-stale:focus-visible{outline:2px solid var(--pri);outline-offset:-2px}
+.task-delete-confirm{margin:12px 0;padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--surface);overflow-wrap:anywhere}.task-delete-confirm p{margin:0 0 12px}.task-delete-confirm .actions{flex-wrap:wrap}.task-delete-status:empty{display:none}
 </style>
 </head>
 <body>
@@ -4053,12 +4054,17 @@ var PERF=[];
 function call(fn){
   return callWithOptions.apply(null,[{}].concat(Array.prototype.slice.call(arguments)));
 }
-var READ_PENDING=Object.create(null), READ_REV=0;
+var READ_PENDING=Object.create(null), READ_REV=0, ACTIVE_WRITES=0;
 var CONNECTION_SEQ=0, CONNECTION_BOARD_OK=0, CONNECTION_FAILED=0;
 var RETRY_READS={api_start:1,api_board:1,api_lastUpdate:1};
 function callWithOptions(options,fn){
-  var args=Array.prototype.slice.call(arguments), reads={api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1,api_taskSaveStatus:1,api_workContext:1,api_customerSearch:1,api_customerLinkStatus:1,api_masterSearch:1,api_masterStatus:1,api_siteSourceSearch:1,api_siteSourceStatus:1,api_siteAttendance:1,api_masterEditStatus:1};
-  if(!reads[fn]){if(!QUIET_CALLS[fn])READ_REV++;return callTransport.apply(null,args);}
+  var args=Array.prototype.slice.call(arguments), reads={api_taskDetail:1,api_notifications:1,api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1,api_taskSaveStatus:1,api_workContext:1,api_customerSearch:1,api_customerLinkStatus:1,api_masterSearch:1,api_masterStatus:1,api_siteSourceSearch:1,api_siteSourceStatus:1,api_siteAttendance:1,api_masterEditStatus:1};
+  if(!reads[fn]){
+    if(QUIET_CALLS[fn])return callTransport.apply(null,args);
+    READ_REV++;ACTIVE_WRITES++;
+    try{return callTransport.apply(null,args).finally(function(){ACTIVE_WRITES=Math.max(0,ACTIVE_WRITES-1);});}
+    catch(e){ACTIVE_WRITES=Math.max(0,ACTIVE_WRITES-1);throw e;}
+  }
   var key=JSON.stringify([fn,args.slice(2),S.epoch,READ_REV]);
   if(READ_PENDING[key])return READ_PENDING[key];
   var job=callTransport.apply(null,args).finally(function(){if(READ_PENDING[key]===job)delete READ_PENDING[key];});
@@ -5023,6 +5029,7 @@ function dayChanged(){
 }
 var POLL_BUSY=null, POLL_BOUND=false;
 function pollBoard(){
+  if(ACTIVE_WRITES)return;
   if(document.hidden || navigator.onLine===false || !S.me || !S.token || POLL_BUSY || SOFT) return;
   if($('modal') && $('modal').innerHTML) return;
   if(Date.now()-(S.lastCheck||0)<20000) return;
@@ -5212,6 +5219,7 @@ function softRefresh(){
   if(SOFT) clearTimeout(SOFT);
   SOFT=setTimeout(function(){
     SOFT=null;
+    if(ACTIVE_WRITES){softRefresh();return;}
     /* ★ 판 받기는 모두 applyBoard 한 길로 (2026-09-30) — 사람·권한이 바뀐 것을 한 곳에서 알아챈다.
        먼저 보낸 요청이 늦게 오면(boardFresh) 버린다 */
     var seq=++S.boardSeq, ep=S.epoch;
@@ -7269,8 +7277,10 @@ function taskSheetHtml(t, r){
     '<div class="tdbar"><div class="tdwrapbar">'+
       '<button class="btn tdclose" onclick="closeModal()">'+ic('chev-l')+'업무 목록</button>'+
       '<button class="btn sm tdedit" onclick="openTaskForm(\''+t.id+'\')">'+ic('pen')+'업무 수정</button>'+
+      (canDeleteTask(t)? '<button type="button" class="btn sm dg" data-task-delete="'+esc(t.id)+'" onclick="deleteTask(this.dataset.taskDelete)">업무 삭제</button>' : '')+
     '</div></div>'+
     '<div class="tdwrap">'+
+      '<div id="taskDeleteBox"></div>'+
       '<header class="tdhero">'+
         ((유형||표시)? '<p class="tdkind"><span class="tico" aria-hidden="true">'+ic(typeIco(t))+'</span>'+
            (유형? '<span>'+유형+'</span>' : '')+표시+'</p>' : '')+
@@ -7989,23 +7999,54 @@ function openAddWork(taskId){
   }, 60);
 }
 
-function deleteTask(id, title){
-  if(!confirm('"'+title+'" 업무를 삭제할까요?\n이 업무에 남긴 작업기록도 함께 지워지고, 되돌릴 수 없습니다.')) return;
-  var backup = S.data ? JSON.parse(JSON.stringify(S.data.tasks)) : null;
-  var ep=S.epoch;
-  if(S.data){
-    S.data.tasks = S.data.tasks.filter(function(t){ return t.id!==id; });
-    renderBoard();
-  }
-  closeOk(); toast('삭제되었습니다');
-
-  call('api_deleteTask', S.token, id, S.corp).then(function(r){
-    if(!r.ok){
-      if(backup && S.data && sameAccess(ep)){ S.data.tasks=backup; renderBoard(); }
-      toast('삭제 실패: '+r.msg);
-      return;
+var TASK_DELETING=Object.create(null);
+function canDeleteTask(t){
+  return !!(t && S.me && [1,2,3,9].indexOf(Number(S.me.grade))>=0 &&
+    (Number(S.me.grade)===9 || (S.me.phone && String(t.owner)===String(S.me.phone))));
+}
+function deleteTask(id){
+  var t=taskOf_(id) || (S.taskCache[id] && S.taskCache[id].task),box=$('taskDeleteBox');
+  if(!box || !canDeleteTask(t) || TASK_DELETING[id])return;
+  box.innerHTML='<section class="task-delete-confirm" aria-label="업무 삭제 확인"><p><strong>'+esc(t.title)+'</strong></p>'+
+    '<p>이 업무와 작업기록을 삭제할까요? 삭제하면 되돌릴 수 없습니다. 연결된 결재문서가 있으면 삭제할 수 없습니다.</p>'+
+    '<div class="actions"><button type="button" class="btn" id="taskDeleteCancel" onclick="cancelTaskDelete()">취소</button>'+
+    '<button type="button" class="btn dg" id="taskDeleteConfirm" data-id="'+esc(id)+'" onclick="commitTaskDelete(this.dataset.id)">삭제하기</button></div>'+
+    '<p id="taskDeleteStatus" class="task-delete-status" role="status"></p></section>';
+  $('taskDeleteCancel').focus();box.scrollIntoView({block:'nearest'});
+}
+function cancelTaskDelete(){
+  var b=$('taskDeleteConfirm');if(b && TASK_DELETING[b.dataset.id])return;
+  var id=b&&b.dataset.id,box=$('taskDeleteBox');if(box)box.innerHTML='';
+  var opener=Array.from(document.querySelectorAll('[data-task-delete]')).find(function(el){return el.dataset.taskDelete===id;});if(opener)opener.focus();
+}
+function commitTaskDelete(id){
+  var btn=$('taskDeleteConfirm'),box=$('taskDeleteBox');
+  if(!btn || btn.dataset.id!==id || TASK_DELETING[id])return;
+  var t=taskOf_(id) || (S.taskCache[id] && S.taskCache[id].task);if(!canDeleteTask(t))return;
+  var ep=S.epoch,token=S.token,root=$('modal').firstElementChild;
+  TASK_DELETING[id]=true;
+  var controls=Array.from(root.querySelectorAll('button,input,select,textarea,[contenteditable]')).map(function(el){
+    var old={el:el,disabled:el.disabled,editable:el.getAttribute('contenteditable')};
+    if('disabled' in el)el.disabled=true;if(old.editable!==null)el.setAttribute('contenteditable','false');return old;
+  });
+  btn.textContent='삭제 확인 중…';$('taskDeleteStatus').textContent='서버에서 삭제 결과를 확인하고 있습니다.';
+  return callWithOptions({quiet:true},'api_deleteTask',token,id,S.corp).then(function(r){
+    if(ep!==S.epoch || token!==S.token)return;
+    if(!r || !r.ok){
+      var msg=!r || r.net?'삭제 결과를 확인하지 못했습니다. 목록을 새로 확인해 주세요.':(r.msg||'삭제하지 못했습니다.');
+      if(box.isConnected && $('taskDeleteStatus'))$('taskDeleteStatus').textContent=msg;
+      toast(msg);return;
     }
-    softRefresh();
+    if(root===$('modal').firstElementChild){BACK_TASK=null;closeOk();}
+    forgetTask(id);WORK_CONTEXT={};renderBoard();saveSnap();toast('삭제되었습니다');softRefresh();
+  }).catch(function(){
+    if(ep!==S.epoch || token!==S.token)return;
+    var msg='삭제 결과를 확인하지 못했습니다. 목록을 새로 확인해 주세요.';
+    if(box.isConnected && $('taskDeleteStatus'))$('taskDeleteStatus').textContent=msg;toast(msg);
+  }).finally(function(){
+    delete TASK_DELETING[id];
+    controls.forEach(function(w){if('disabled' in w.el)w.el.disabled=w.disabled;if(w.editable!==null)w.el.setAttribute('contenteditable',w.editable);});
+    if(btn.isConnected)btn.textContent='삭제하기';
   });
 }
 /* ===================== 창 닫기 보호 (v38) =====================
@@ -8435,8 +8476,8 @@ function drawTaskForm(id, t, files){
         ((S.me && (S.me.grade>=2 || t.owner===S.me.phone))
           ? '<div class="field"><label class="fl">고객 진행 링크</label><div id="tfGuest">'+guestRow_(t, '')+'</div></div>' : '')+
         '</div>' : '')+
-      (id && t ? '<div class="tfdel"><button type="button" class="btn sm dg" onclick="tfDelete()">이 업무 삭제</button></div>' : '')+
     '</div>'+
+      (id && t && canDeleteTask(t) ? '<div class="tfdel"><button type="button" class="btn sm dg" data-task-delete="'+esc(id)+'" onclick="tfDelete()">이 업무 삭제</button><div id="taskDeleteBox"></div></div>' : '')+
     /* 막혔을 때의 안내는 단추 **위**에 — 아래에 두면 붙어 있는 단추 줄에 가린다 */
     '<p class="tfmsg" id="tfMsg" role="alert"></p>'+
     '<div class="actions tfoot"><button class="btn" onclick="closeModal()">취소</button>'+
@@ -8757,6 +8798,7 @@ async function saveTaskReliable(token,p,corp){
 }
 
 function saveTask(){
+  if($('tfId') && TASK_DELETING[$('tfId').value])return;
   var type=pickedVal('tfType');
   var demo=(type==='DEMO');
   /* 창에 있는 칸만 보낸다.
@@ -11999,7 +12041,7 @@ function findDocBrief(no){
  * 여기서는 거기에 안 담긴 오래된 문서만 뒤에서 채운다.
  */
 function prefetchDocs(){
-  if(document.hidden || S.view!=='doc')return;
+  if(document.hidden || S.view!=='doc' || ACTIVE_WRITES || ($('modal') && $('modal').innerHTML))return;
   var src=docSource(); if(!src) return;
   var nos=[];
   ['toAct','drafts','others'].forEach(function(k){
