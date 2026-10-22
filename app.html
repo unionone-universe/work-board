@@ -8884,7 +8884,7 @@ function submitFormSave(buttonId, messageId, key, send, saved, failed){
   var btn=$(buttonId), msg=$(messageId);
   if(!btn || btn.disabled) return;
   if(FORM_WRITES[key]){ toast('같은 항목을 저장 중입니다. 잠시 기다려 주세요.'); return; }
-  var root=btn.closest('.sheet'), epoch=S.epoch, token=S.token, account=accountStamp();
+  var root=btn.closest('.sheet'), account=accountStamp();
   var fields=Array.prototype.map.call(root.querySelectorAll('input,textarea,select,button,[contenteditable]'),function(el){
     var was={el:el,disabled:el.disabled,editable:el.getAttribute('contenteditable')};
     if('disabled' in el) el.disabled=true;
@@ -8896,7 +8896,7 @@ function submitFormSave(buttonId, messageId, key, send, saved, failed){
   root.dataset.saving='1'; root.setAttribute('aria-busy','true');
   msg.setAttribute('role','status'); msg.textContent='저장 중입니다. 서버 확인을 기다려 주세요.';
   var current=function(){return $('modal').contains(root) && $(buttonId)===btn;};
-  var same=function(){return buttonId==='tfSave'?sameAccount(account):epoch===S.epoch && token===S.token;};
+  var same=function(){return sameAccount(account);};
   var unlocked=false;
   var unlock=function(){
     if(unlocked)return;unlocked=true;
@@ -8910,7 +8910,7 @@ function submitFormSave(buttonId, messageId, key, send, saved, failed){
   var request;try{request=send();}catch(e){request=Promise.reject(e);}
   return Promise.resolve(request).catch(function(){return {ok:false,net:true};}).then(function(r){
     unlock();
-    if(!same()){writeFormDiscard(background);return;}
+    if(!same()){writeFormDiscard(background);if(!background&&current())closeOk();return;}
     if(!r || !r.ok){
       if(background&&r&&r.denied){
         var lost=background.id;if(lost)forgetTask(lost);writeFormDiscard(background);renderBoard();softRefresh();
@@ -9272,17 +9272,24 @@ function saveLog(){
   if(!p.text){ msg.textContent='작업내용을 입력해주세요.'; $('lgText').classList.add('err'); return; }
   if(p.next && !p.nextDate){ msg.textContent='다음 할일을 적으셨으면 일정일도 골라주세요.'; $('lgNextDate').classList.add('err'); return; }
 
-  var seq=LOG_SEQ, token=S.token, corp=S.corp;
+  var seq=LOG_SEQ, token=S.token, corp=S.corp, taskGen=S.taskGen[p.taskId]||0;
   p.photos=photoValues('lgPhoto');
   return submitFormSave('lgSave','lgMsg2','log:'+p.taskId,function(){
     return callWithOptions({quiet:true},'api_saveLog',token,p,corp);
   },function(r,current){
-    draftSent(p.taskId,seq);
-    applyLogLocal(p);
-    if(r.log) addLogLocal(p.taskId,r.log);
+    // 같은 사람의 다른 업무가 사라져도 결과는 알리되, 접근을 잃은 업무의 기록은 되살리지 않는다.
+    if((S.taskGen[p.taskId]||0)===taskGen&&taskOf_(p.taskId)){
+      draftSent(p.taskId,seq);applyLogLocal(p);
+      if(r.log) addLogLocal(p.taskId,r.log);
+    }
     if(current) closeOk();
     toast(p.progress>=100?'기록을 남기고 업무를 완료했습니다':'기록이 저장되었습니다',p.progress>=100?'done':'ok');
     softRefresh();
+  },function(r,current){
+    if(r&&r.denied){
+      accessLost(p.taskId,'');if(current)closeOk();
+      toast('이 업무를 볼 수 없게 되어 기록을 저장하지 못했습니다. 입력을 지웠습니다.');softRefresh();
+    }
   });
 }
 
