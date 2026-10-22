@@ -12,5 +12,5 @@ function request(payload){
  var p;try{p=JSON.parse(payload);}catch(e){throw new Error('Invalid request');}
  var direct=["api_start", "api_boot", "api_settings", "api_health", "api_refreshMeta", "api_syncNow", "api_opsStatus", "api_opsSetup", "api_opsBackup", "api_opsRestoreCheck", "api_fastTransportSetup", "api_dispatchPush"];
  if(!p||typeof p!=='object'||Array.isArray(p)||direct.indexOf(p.fn)>=0)return JSON.stringify({ok:false,code:'DIRECT_ONLY',notSaved:true,msg:'기존 연결에서 처리해야 하는 요청입니다.'});
- return Workboard.doPost({postData:{contents:payload}}).getContent();
+ return Workboard.rpcRequest(payload);
 }

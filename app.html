@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v134">
+<meta name="uo-version" content="v135">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -4149,7 +4149,7 @@ function callWithOptions(options,fn){
   var args=Array.prototype.slice.call(arguments), reads={api_checkPhone:1,api_docList:1,api_vendors:1,api_monthly:1,api_taxExport:1,api_payExport:1,api_accessLog:1,api_guestView:1,api_noteAll:1,api_opsStatus:1,api_taskDetail:1,api_notifications:1,api_board:1,api_start:1,api_lastUpdate:1,api_docDetail:1,api_docDetails:1,api_settings:1,api_posts:1,api_taskSaveStatus:1,api_workContext:1,api_customerSearch:1,api_customerLinkStatus:1,api_masterSearch:1,api_masterStatus:1,api_siteSourceSearch:1,api_siteSourceStatus:1,api_siteAttendance:1,api_masterEditStatus:1};
   if(!reads[fn]){
     if(QUIET_CALLS[fn])return backgroundCall(options,fn,args.slice(2));
-    READ_REV++;ACTIVE_WRITES++;var activity=/^api_(save|act|delete|drop|add|set|change|sub|done|approve|reject|signup|merge|customerLink$|masterLink$|masterEdit$|siteSourceLink$)/.test(fn)?activityBegin(fn):0;
+    READ_REV++;S.boardSeq++;ACTIVE_WRITES++;var activity=/^api_(save|act|delete|drop|add|set|change|sub|done|approve|reject|signup|merge|customerLink$|masterLink$|masterEdit$|siteSourceLink$)/.test(fn)?activityBegin(fn):0;
     try{return callTransport.apply(null,args).finally(function(){ACTIVE_WRITES=Math.max(0,ACTIVE_WRITES-1);activityEnd(activity);});}
     catch(e){ACTIVE_WRITES=Math.max(0,ACTIVE_WRITES-1);activityEnd(activity);throw e;}
   }
