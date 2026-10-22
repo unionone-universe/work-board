@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v142">
+<meta name="uo-version" content="v143">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -4061,7 +4061,7 @@ var PERF=[];
    보내지 않는다. application/json 으로 보내면 앱스스크립트에서 전부 실패한다. */
 /* Persistent RPC channel. Only authenticated, nonce-bound messages from our own
    descendant frame can carry requests. An in-flight write is never replayed. */
-var FAST_CHANNEL={frame:null,source:null,origin:'',nonce:'',ready:false,pending:Object.create(null),seq:0,cooldown:0,slowUntil:0};
+var FAST_CHANNEL={frame:null,source:null,origin:'',nonce:'',ready:false,pending:Object.create(null),seq:0,cooldown:0};
 var FAST_URL='https://script.google.com/macros/s/AKfycbxG-OCFPcbUYhTPOQE4XBkzMD7JM8BXSgd8-VLh6F9lF8VvM3TArEviEDqb9xEj5Z7gNA/exec';
 var DIRECT_ONLY={api_start:1,api_boot:1,api_settings:1,api_health:1,api_refreshMeta:1,api_syncNow:1,api_opsStatus:1,api_opsSetup:1,api_opsBackup:1,api_opsRestoreCheck:1,api_fastTransportSetup:1,api_dispatchPush:1};
 function fastChannelStart(){
@@ -4101,18 +4101,9 @@ function fastRequest(payload,signal){
   catch(e){delete c.pending[id];cleanup();c.ready=false;reject(e);}
  });
 }
-// A slow completed RPC changes only future routing. Never resend a write.
-function observeTransportDelay(route,result,wall,account){
- if(route!=='rpc'||!result||result.ok!==true||!sameAccount(account))return;
- var server=result.통신ms;
- if(typeof server!=='number'||!Number.isFinite(server)||server<0||!Number.isFinite(wall)||wall<server)return;
- if(wall-server<6000)return;
- FAST_CHANNEL.slowUntil=Math.max(FAST_CHANNEL.slowUntil||0,Date.now()+120000);
- console.log('[연결] 응답 지연 감지 · 다음 요청은 2분 동안 기존 경로 사용');
-}
 function transportSend(fn,payload,signal){
  fastChannelStart();
- if(FAST_CHANNEL.ready&&Date.now()>=(FAST_CHANNEL.slowUntil||0)&&!DIRECT_ONLY[fn])return fastRequest(payload,signal).then(function(text){return {status:200,route:'rpc',text:function(){return Promise.resolve(text);}};});
+ if(FAST_CHANNEL.ready&&!DIRECT_ONLY[fn])return fastRequest(payload,signal).then(function(text){return {status:200,route:'rpc',text:function(){return Promise.resolve(text);}};});
  return fetch(API_URL+'?request='+Date.now().toString(36)+Math.random().toString(36).slice(2,10),{
   method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:payload,redirect:'follow',cache:'no-store',signal:signal
  });
@@ -4173,7 +4164,7 @@ function callWithOptions(options,fn){
 }
 function callTransport(options,fn){
   var args = Array.prototype.slice.call(arguments,2);
-  var t0 = Date.now(), connectionSeq=++CONNECTION_SEQ, connectionEpoch=S.epoch, connectionToken=S.token, readRev=READ_REV, connectionAccount=accountStamp();
+  var t0 = Date.now(), connectionSeq=++CONNECTION_SEQ, connectionEpoch=S.epoch, connectionToken=S.token, readRev=READ_REV;
   var status=0, readFailure=false, silent=!!(options.quiet || QUIET_CALLS[fn]);
   var controller=new AbortController();
   var deadline=setTimeout(function(){controller.abort();},options.timeoutMs || (RETRY_READS[fn]?22000:45000));
@@ -4214,7 +4205,6 @@ function callTransport(options,fn){
     }
 
     var ms = Date.now()-t0;
-    observeTransportDelay(route,r,ms,connectionAccount);
     var server = (r && typeof r.통신ms==='number') ? r.통신ms : (r && r.ms) ? r.ms : (r && r.board && r.board.ms ? r.board.ms : null);
     PERF.push({fn:fn, ms:ms, server:server,route:route});
     if(PERF.length>50) PERF.shift();
@@ -4554,7 +4544,6 @@ function ownScope(){ return !!(S.data && S.data.scope === 'own'); }
 /** 사람·권한이 바뀌었을 때 이 화면이 들고 있던 것을 전부 버린다 (2026-09-30) */
 function resetUserCaches(){
   S.acctGen=(S.acctGen||0)+1;
-  FAST_CHANNEL.slowUntil=0;
   S.epoch++;
   deleteNoticeClose();
   if(SNAP_JOB!==null){clearTimeout(SNAP_JOB);SNAP_JOB=null;}
