@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v135">
+<meta name="uo-version" content="v136">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -2187,6 +2187,9 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 #requestActivity{position:fixed;left:50%;bottom:max(24px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:10050;background:var(--t1);color:var(--card);padding:11px 18px;border-radius:24px;font-size:14px;pointer-events:none;box-shadow:0 4px 20px #0002;max-width:calc(100vw - 32px);text-align:center;}
 #requestActivity[hidden]{display:none;}
 @media(max-width:767px){#requestActivity{bottom:calc(84px + env(safe-area-inset-bottom));}}
+.write-dock{position:fixed;z-index:500;bottom:calc(78px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);width:min(540px,calc(100% - 24px));display:flex;gap:12px;align-items:center;padding:12px 16px;border:1px solid var(--line);border-radius:16px;background:var(--card,#202936);color:var(--t1);box-shadow:0 8px 32px #0003}
+.write-dock[hidden]{display:none}.write-dock span{flex:1;font-size:14px;overflow-wrap:anywhere}.write-dock button{flex-shrink:0;min-height:44px}.write-pending{opacity:.6;pointer-events:none}
+@media(min-width:720px){.write-dock{bottom:24px}}
 </style>
 </head>
 <body>
@@ -4546,6 +4549,7 @@ function resetUserCaches(){
   S.readers={}; S.readSent={}; S.setCache=null; S.owner='';
   try{ MON.cache={}; }catch(e){}               // 월별 보고 (임원) — 사람이 바뀌면 버린다
   tfFilesReset();
+  if(WRITE_FORM)writeFormClear(WRITE_FORM);
   TF_DRAFT=null;                               // 앞사람의 저장 실패 글 (2026-09-30 검수 1차)
 }
 
@@ -5298,7 +5302,7 @@ function applyBoard(b){
  * 연달아 여러 번 저장해도 한 번만 받아온다.
  */
 var SOFT=null;
-function softRefresh(){
+function softRefresh(delay){
   if(SOFT) clearTimeout(SOFT);
   SOFT=setTimeout(function(){
     SOFT=null;
@@ -5312,7 +5316,7 @@ function softRefresh(){
       applyBoard(r);
 
     });
-  }, 400);
+  }, delay===undefined?400:delay);
 }
 
 function refresh(showMsg){
@@ -6381,6 +6385,8 @@ function dueState(t){
 }
 function taskRow(t, i, opt){
   opt=opt||{};
+  if(TASK_DELETING[t.id])return '<div class="trow write-pending" data-tid="'+esc(t.id)+'" aria-busy="true"><div class="tm"><p class="cn tt">'+esc(t.title)+'</p><p role="status">삭제 중…</p></div></div>';
+  if(WRITE_FORM&&WRITE_FORM.state==='pending'&&WRITE_FORM.id===t.id)return '<div class="trow write-pending" data-tid="'+esc(t.id)+'" aria-busy="true"><div class="tm"><p class="cn tt">'+esc(t.title)+'</p><p role="status">저장 중…</p></div></div>';
   var done=(t.status==='완료'), 급함=dueState(t);
   var hot=(급함==='late' || 급함==='today');
   /* ★ 21 지시 — 업무명 → 최근 기록(있을 때만 · 날짜와 함께) → 담당 · 마감 · 표시 하나 · 새 댓글.
@@ -6646,6 +6652,8 @@ function detailFromBoard(id, t){
 }
 
 function openTask(id, keepFold){
+  if(TASK_DELETING[id]){toast('이 업무를 삭제 중입니다. 결과 확인 후 열 수 있습니다.');return;}
+  if(WRITE_FORM&&WRITE_FORM.state==='pending'&&WRITE_FORM.id===id){writeFormResume();return;}
   /* ★ 옆 패널에서 다른 업무로 바꾸기 전에 — 쓰던 글은 그 업무의 초안으로 (검수 1차) */
   tdKeepDraft();
   S.wantTask=id;                 // 마지막으로 연 업무 — 늦게 온 다른 업무의 답이 이 창을 덮지 않게
@@ -8105,6 +8113,7 @@ function cancelTaskDelete(){
   var opener=Array.from(document.querySelectorAll('[data-task-delete]')).find(function(el){return el.dataset.taskDelete===id;});if(opener)opener.focus();
 }
 function commitTaskDelete(id){
+  if(WRITE_FORM){toast('진행 중이거나 보관된 입력을 먼저 확인해 주세요.');writeFormResume();return;}
   var btn=$('taskDeleteConfirm'),box=$('taskDeleteBox');
   if(!btn || btn.dataset.id!==id || TASK_DELETING[id])return;
   var t=taskOf_(id) || (S.taskCache[id] && S.taskCache[id].task);if(!canDeleteTask(t))return;
@@ -8115,6 +8124,8 @@ function commitTaskDelete(id){
     if('disabled' in el)el.disabled=true;if(old.editable!==null)el.setAttribute('contenteditable','false');return old;
   });
   btn.textContent='삭제 확인 중…';$('taskDeleteStatus').textContent='서버에서 삭제 결과를 확인하고 있습니다.';
+  BACK_TASK=null;closeOk();renderBoard();
+  toast('삭제 중입니다 · 다른 업무를 계속 확인할 수 있습니다');
   return callWithOptions({quiet:true},'api_deleteTask',token,id,S.corp).then(function(r){
     if(ep!==S.epoch || token!==S.token)return;
     if(!r || !r.ok){
@@ -8123,13 +8134,13 @@ function commitTaskDelete(id){
       toast(msg);return;
     }
     if(root===$('modal').firstElementChild){BACK_TASK=null;closeOk();}
-    forgetTask(id);WORK_CONTEXT={};renderBoard();saveSnap();toast('삭제되었습니다');softRefresh();
+    forgetTask(id);WORK_CONTEXT={};renderBoard();saveSnap();toast('삭제되었습니다');softRefresh(12000);
   }).catch(function(){
     if(ep!==S.epoch || token!==S.token)return;
     var msg='삭제 결과를 확인하지 못했습니다. 목록을 새로 확인해 주세요.';
     if(box.isConnected && $('taskDeleteStatus'))$('taskDeleteStatus').textContent=msg;toast(msg);
   }).finally(function(){
-    delete TASK_DELETING[id];
+    delete TASK_DELETING[id];renderBoard();
     controls.forEach(function(w){if('disabled' in w.el)w.el.disabled=w.disabled;if(w.editable!==null)w.el.setAttribute('contenteditable',w.editable);});
     if(btn.isConnected)btn.textContent='삭제하기';
   });
@@ -8191,6 +8202,11 @@ function modalDirty(){
 
 /** 사용자가 [닫기]·[취소] 를 누른 경우 — 쓰던 게 있으면 물어본다 */
 function closeModal(force){
+  if(WRITE_FORM&&!WRITE_FORM.parked&&$('modal').contains(WRITE_FORM.root)){
+    if(WRITE_FORM.state==='pending'||force){writeFormPark(WRITE_FORM);return;}
+    if(!force&&modalDirty()&&!confirm('보관 중인 입력을 닫을까요?'))return;
+    writeFormClear(WRITE_FORM);
+  }
   var box=$('modal'); if(!box) return;
   if(!force && box.querySelector('[data-saving="1"]')){toast('저장 결과를 확인 중입니다. 잠시 기다려 주세요.');return;}
   if(!force && box.innerHTML && modalDirty()){
@@ -8351,9 +8367,9 @@ document.addEventListener('focusin', function(e){
      다른 직원의 새 업무 창에 앞사람이 적은 업무명·현장·금액이 채워지면 안 된다 (resetUserCaches 도 비운다) */
 /* 새 업무의 파일은 업무 번호가 확인된 뒤 한 장씩 저장한다. 응답 유실은 조회만 한다. */
 var TF_FILES=null;
-function tfFilesReset(){TF_FILES=null;}
+function tfFilesReset(){if(!WRITE_FORM||TF_FILES!==WRITE_FORM.files)TF_FILES=null;}
 function tfFilesDraw(){
-  var q=TF_FILES,box=$('tfFiles');if(!q||!box||q.root!==document.querySelector('#modal .tform'))return;
+  var q=TF_FILES,box=$('tfFiles');if(!q||!box||q.root!==document.querySelector('#modal .tform')&&!(WRITE_FORM&&WRITE_FORM.files===q))return;
   box.innerHTML=q.items.map(function(f,i){return '<div class="tf-file"><div><strong>'+esc(f.file.name)+'</strong><small>'+esc(f.file.size<1024*1024?Math.max(1,Math.round(f.file.size/1024))+' KB':(f.file.size/1024/1024).toFixed(1)+' MB')+' · '+esc(f.state==='saved'?'첨부 완료':f.state==='unknown'?'결과 확인 필요':f.state==='failed'?'다시 올릴 수 있습니다':'등록 시 첨부')+'</small></div>'+(f.state==='ready'||f.state==='failed'?'<button type="button" class="btn sm" aria-label="'+esc(f.file.name)+' 첨부 취소" onclick="tfFileRemove('+i+')">빼기</button>':'')+'</div>';}).join('');
 }
 function tfFileRemove(index){
@@ -8442,6 +8458,7 @@ function tfDraw(p, msg){
   var m=$('tfMsg'); if(m && msg) m.textContent=msg;
 }
 function openTaskForm(id){
+  if(writeFormGuard())return;
   tdKeepDraft();                           // 상세의 적는 칸에 쓰던 글은 초안으로 (취소하고 돌아오면 그대로)
   BACK_TASK = id || null;                  // 수정 창은 상세에서만 엽니다 — 취소하면 상세로
   if(TF_DRAFT){
@@ -8783,6 +8800,54 @@ function syncDemo(){
   $('tfDemo').classList.toggle('hide', t!=='DEMO');
 }
 /* 저장 응답을 받은 뒤에만 완료 처리한다. 입력은 보존하고 쓰기는 재전송하지 않는다. */
+var WRITE_FORM=null;
+function writeFormStart(root,label,id){
+  if(WRITE_FORM)return null;
+  var w={root:root,host:$('modal').firstElementChild,epoch:S.epoch,token:S.token,label:label,id:id||'',state:'pending',files:TF_FILES};
+  if(root.querySelector('#dfSave')){w.locked=Array.from(root.querySelectorAll('input,select,textarea,button:not(#dfSave),[contenteditable]')).map(function(el){var old={el:el,disabled:el.disabled,editable:el.getAttribute('contenteditable')};if('disabled' in el)el.disabled=true;if(old.editable!==null)el.setAttribute('contenteditable','false');return old;});root.dataset.saving='1';}
+  WRITE_FORM=w;writeFormPark(w);return w;
+}
+function writeFormPark(w){
+  if(!w||w!==WRITE_FORM||!w.host||!$('modal').contains(w.root))return;
+  var park=$('writeParking');if(!park){park=document.createElement('div');park.id='writeParking';park.hidden=true;document.body.appendChild(park);}
+  park.appendChild(w.host);w.parked=true;
+  MODAL_ROOT=null;MODAL_SIG=null;MODAL_TOUCHED=false;MODAL_DRAWN=false;BACK_TASK=null;BACK_BOX='';S.openTask=null;S.openTaskFromBoard=false;panelSync();
+  writeFormPaint();
+}
+function writeFormPaint(){
+  var dock=$('writeDock');if(!dock){dock=document.createElement('div');dock.id='writeDock';dock.className='write-dock';document.body.appendChild(dock);}
+  var w=WRITE_FORM;if(!w){dock.hidden=true;return;}
+  if(w.epoch!==S.epoch||w.token!==S.token){writeFormClear(w);return;}
+  dock.hidden=false;dock.innerHTML='<span role="status">'+esc(w.state==='pending'?w.label+' 중 · 다른 화면을 볼 수 있습니다':w.message||'처리 결과를 확인해 주세요')+'</span><button type="button" class="btn" onclick="writeFormResume()">'+(w.state==='pending'?'내용 보기':'입력 확인')+'</button>';
+  document.querySelectorAll('[data-tid],[data-cid]').forEach(function(el){var busy=w.state==='pending'&&(el.dataset.tid||el.dataset.cid)===w.id;el.classList.toggle('write-pending',busy);if(busy)el.setAttribute('aria-busy','true');else el.removeAttribute('aria-busy');});
+}
+function writeFormResume(){
+  var w=WRITE_FORM;if(!w||w.epoch!==S.epoch||w.token!==S.token)return;
+  if(!w.parked)return;
+  if($('modal').innerHTML&&modalDirty()){toast('현재 작성 중인 내용을 먼저 저장하거나 닫아 주세요.');return;}
+  closeOk();$('modal').appendChild(w.host);TF_FILES=w.files;w.parked=false;modalWatch();panelSync();
+}
+function writeFormClear(w){
+  if(!w||w!==WRITE_FORM)return;
+  if(w.parked&&w.host)w.host.remove();
+  WRITE_FORM=null;if(TF_FILES===w.files)TF_FILES=null;
+  var dock=$('writeDock');if(dock)dock.hidden=true;
+  document.querySelectorAll('.write-pending').forEach(function(el){el.classList.remove('write-pending');el.removeAttribute('aria-busy');});
+}
+function writeFormFinish(w,r){
+  if(!w||w!==WRITE_FORM)return;
+  if(w.locked){w.locked.forEach(function(x){if('disabled' in x.el)x.el.disabled=x.disabled;if(x.editable!==null)x.el.setAttribute('contenteditable',x.editable);});delete w.root.dataset.saving;}
+  if(w.epoch!==S.epoch||w.token!==S.token||r&&r.ok){writeFormClear(w);return;}
+  w.state='failed';w.message=writeResultMessage(r);writeFormPaint();
+  if(!$('modal').innerHTML)writeFormResume();
+}
+function writeFormGuard(){
+  if(!WRITE_FORM)return false;
+  if(WRITE_FORM.epoch!==S.epoch||WRITE_FORM.token!==S.token){writeFormClear(WRITE_FORM);return false;}
+  writeFormResume();toast('보관 중인 입력을 먼저 확인해 주세요.');return true;
+}
+window.addEventListener('beforeunload',function(e){if(WRITE_FORM){e.preventDefault();e.returnValue='';}});
+
 var FORM_WRITES=Object.create(null);
 function writeResultMessage(r){
   return !r || r.net ? '저장 결과를 확인하지 못했습니다. 입력은 남겨 두었습니다. 다시 저장하기 전에 목록에서 반영 여부를 확인해 주세요.'
@@ -8803,7 +8868,7 @@ function submitFormSave(buttonId, messageId, key, send, saved, failed){
   ['click','keydown','beforeinput','paste','drop'].forEach(function(name){root.addEventListener(name,stopEdit,true);});
   root.dataset.saving='1'; root.setAttribute('aria-busy','true');
   msg.setAttribute('role','status'); msg.textContent='저장 중입니다. 서버 확인을 기다려 주세요.';
-  var current=function(){return root.isConnected && $(buttonId)===btn;};
+  var current=function(){return $('modal').contains(root) && $(buttonId)===btn;};
   var same=function(){return epoch===S.epoch && token===S.token;};
   var unlocked=false;
   var unlock=function(){
@@ -8812,18 +8877,22 @@ function submitFormSave(buttonId, messageId, key, send, saved, failed){
     fields.forEach(function(w){if('disabled' in w.el)w.el.disabled=w.disabled;if(w.editable!==null)w.el.setAttribute('contenteditable',w.editable);});
     delete root.dataset.saving;root.removeAttribute('aria-busy');
   };
+  if(WRITE_FORM&&WRITE_FORM.root===root){var keptFiles=WRITE_FORM.files;writeFormClear(WRITE_FORM);TF_FILES=keptFiles;}
   FORM_WRITES[key]=true;
+  var background=buttonId==='tfSave'?writeFormStart(root,'저장',$('tfId').value):null;
   var request;try{request=send();}catch(e){request=Promise.reject(e);}
   return Promise.resolve(request).catch(function(){return {ok:false,net:true};}).then(function(r){
     unlock();
-    if(!same()) return;
+    if(!same()){writeFormClear(background);return;}
     if(!r || !r.ok){
+      writeFormFinish(background,r);
       if(failed)failed(r,current());
       if(current()){msg.textContent=writeResultMessage(r);msg.setAttribute('role','alert');}
       else if(!r || !r.denied) toast(writeResultMessage(r));
       return;
     }
-    saved(r,current());
+    var visible=current();writeFormFinish(background,r);
+    saved(r,visible);
   }).finally(function(){unlock();delete FORM_WRITES[key];});
 }
 
@@ -8920,11 +8989,12 @@ function saveTask(){
   },function(r,current){
     p.id=r.id||p.id;
     if(r.editVersion)p.editVersion=r.editVersion;
-    applyTaskLocal(p);
+    if(r.taskRemoved){forgetTask(p.id);renderBoard();}
+    else {applyTaskLocal(p);if(r.taskPatch){var actual=taskOf_(p.id);if(actual)Object.assign(actual,r.taskPatch);renderBoard();saveSnap();}}
     if(p.id) delete S.taskCache[p.id];
     if(current){TF_DRAFT=null;closeOk();}
     toast(p.progress>=100?'업무를 완료했습니다 · 수고하셨습니다':'저장되었습니다',p.progress>=100?'done':'ok');
-    softRefresh();
+    if(!r.taskPatch||queue&&queue.items.length)softRefresh(12000);
   },function(r,current){
     if(current && queue && queue.taskId){tfFilesLock(queue);$('tfSave').textContent=r&&r.code==='ATTACH_UNCONFIRMED'?'첨부 결과 확인':'첨부 다시 올리기';}
     if(current && r && r.code==='WRITE_UNCONFIRMED')$('tfSave').textContent='저장 결과 확인';
@@ -12575,6 +12645,7 @@ function formList(){
 /* prefill — 달력에서 '휴가 신청' 을 누르면 그 날짜를 시작일·종료일로 채워서 연다.
    { 항목명: 값 } 모양. 결재 흐름 자체는 그대로다. */
 function openDocForm(code, prefill, workTaskId){
+  if(writeFormGuard())return;
   BACK_TASK=workTaskId||null;
   if(code==='PUR'){toast('구매요청서는 더 이상 작성하지 않습니다. 지출결의서를 이용해주세요.');return;}
   var forms=formList();
@@ -12943,17 +13014,20 @@ function saveDoc(){
   p.photos = shots;
   p.files = pdfs;
 
-  call('api_saveDoc', S.token, p, S.corp).then(function(r){
+  if(WRITE_FORM&&WRITE_FORM.root===btn.closest('.sheet'))writeFormClear(WRITE_FORM);
+  var background=writeFormStart(btn.closest('.sheet'),'상신','');
+  return call('api_saveDoc', S.token, p, S.corp).then(function(r){
     clearTimeout(progressTimer);
     btn.disabled=false; btn.textContent='상신';
-    if(ep!==S.epoch||token!==S.token)return;
-    if(!r.ok){ msg.textContent=r.net?'상신 결과를 확인하지 못했습니다. 다시 올리기 전에 결재 목록을 확인해 주세요.':r.msg; return; }
+    if(ep!==S.epoch||token!==S.token){writeFormClear(background);return;}
+    if(!r.ok){writeFormFinish(background,r);if(r.net||r.code==='SERVER_ERROR'||r.code==='WRITE_UNCONFIRMED'){btn.disabled=true;btn.textContent='결재 목록에서 결과 확인';} msg.textContent=r.net?'상신 결과를 확인하지 못했습니다. 다시 올리기 전에 결재 목록을 확인해 주세요.':r.msg; return; }
     WORK_CONTEXT={};
-    if($('dfSave')===btn)closeOk();
+    var visible=$('modal').contains(btn);writeFormFinish(background,r);
+    if(visible)closeOk();
     toast(r.sealNo? '상신되었습니다 · 인감 날인 품의서도 같이 올라갔습니다' : '상신되었습니다');
     addDocLocal(r);                       // 결재 목록은 화면이 가진 값으로 먼저 갱신
     if(S.view==='doc') renderDocs();
-    softRefresh();                        // 진짜 데이터는 뒤에서 조용히
+    softRefresh(12000);                   // 서버 확인한 결과를 먼저 반영, 전체 조회는 뒤로
   });
 }
 
