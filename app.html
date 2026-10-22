@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v136">
+<meta name="uo-version" content="v137">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -6490,6 +6490,8 @@ function rowDue(t){
 /** PC 오른쪽 대기 · 완료 칸의 작은 줄 — 업무명 + (담당 ·) 마감/시작/완료 한 마디
     + 큰 줄과 같은 규칙의 표시 하나(`topFlag`) · 새 댓글 (검수 1차 — 작은 줄에서 경고 · 새 댓글이 사라졌다) */
 function compactRow(t){
+  var pending=TASK_DELETING[t.id]?'삭제 중…':WRITE_FORM&&WRITE_FORM.state==='pending'&&WRITE_FORM.id===t.id?'저장 중…':'';
+  if(pending)return '<div class="crow write-pending" data-cid="'+esc(t.id)+'" aria-busy="true"><strong>'+esc(t.title)+'</strong><small role="status">'+pending+'</small></div>';
   var w=dueWord(t), 급=dueState(t), hot=(급==='late' || 급==='today');
   var 아래=[], 표시=[], f=topFlag(t);
   if(t.ownerName && !ownScope()) 아래.push(esc(t.ownerName));
@@ -8812,7 +8814,7 @@ function writeFormPark(w){
   var park=$('writeParking');if(!park){park=document.createElement('div');park.id='writeParking';park.hidden=true;document.body.appendChild(park);}
   park.appendChild(w.host);w.parked=true;
   MODAL_ROOT=null;MODAL_SIG=null;MODAL_TOUCHED=false;MODAL_DRAWN=false;BACK_TASK=null;BACK_BOX='';S.openTask=null;S.openTaskFromBoard=false;panelSync();
-  writeFormPaint();
+  if(w.id&&S.data)renderBoard();writeFormPaint();
 }
 function writeFormPaint(){
   var dock=$('writeDock');if(!dock){dock=document.createElement('div');dock.id='writeDock';dock.className='write-dock';document.body.appendChild(dock);}
@@ -8838,7 +8840,7 @@ function writeFormFinish(w,r){
   if(!w||w!==WRITE_FORM)return;
   if(w.locked){w.locked.forEach(function(x){if('disabled' in x.el)x.el.disabled=x.disabled;if(x.editable!==null)x.el.setAttribute('contenteditable',x.editable);});delete w.root.dataset.saving;}
   if(w.epoch!==S.epoch||w.token!==S.token||r&&r.ok){writeFormClear(w);return;}
-  w.state='failed';w.message=writeResultMessage(r);writeFormPaint();
+  w.state='failed';w.message=writeResultMessage(r);if(w.id&&S.data)renderBoard();writeFormPaint();
   if(!$('modal').innerHTML)writeFormResume();
 }
 function writeFormGuard(){
