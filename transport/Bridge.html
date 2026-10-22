@@ -1,0 +1,14 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"></head><body><script>
+(function(){
+ 'use strict';
+ var channel=<?= channel ?>,origin='https://work.unionone8868.com',host=null,seen=Object.create(null);
+ function ancestor(w){try{for(var p=window.parent,i=0;i<6;i++){if(p===w)return true;if(p===p.parent)break;p=p.parent;}}catch(e){}return false;}
+ window.addEventListener('message',function(e){
+  var d=e.data;if(e.origin!==origin||!ancestor(e.source)||!d||d.channel!==channel||d.type!=='uo-call'||typeof d.id!=='string'||d.id.indexOf(channel+'-')!==0||typeof d.payload!=='string')return;
+  if(host&&host!==e.source)return;host=e.source;if(seen[d.id])return;seen[d.id]=true;
+  function reply(text,error){host.postMessage({type:'uo-result',channel:channel,id:d.id,text:text,error:error},origin);}
+  google.script.run.withSuccessHandler(function(text){reply(text,false);}).withFailureHandler(function(){reply('',true);}).request(d.payload);
+ });
+ try{for(var p=window.parent,i=0;i<6;i++){if(!location.ancestorOrigins||location.ancestorOrigins[i]===origin)p.postMessage({type:'uo-ready',channel:channel},origin);if(p===p.parent)break;p=p.parent;}}catch(e){}
+})();
+</script></body></html>

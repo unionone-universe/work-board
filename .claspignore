@@ -21,3 +21,6 @@ support/**
 support-state/**
 support-data/**
 .github/**
+
+# Isolated RPC project; deployed separately, never into the data server.
+transport/**
