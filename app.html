@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v145">
+<meta name="uo-version" content="v146">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -5303,7 +5303,8 @@ function applyBoard(b){
   UPDATE_NOTICE_AUTH=updateNoticeAccount();
   scheduleUpdateNotice();
   outboxResume();                           // 이 기기에 남은 보내는 함을 마저 보낸다 (2026-10-22)
-  settingsPrefetch();                       // 관리자는 설정을 미리 한 번 (2026-10-26)
+  settingsPrefetch();
+  monthlyPrefetch();                       // 관리자는 설정을 미리 한 번 (2026-10-26)
 
   return true;
 }
@@ -7265,17 +7266,23 @@ function loadWorkContext(force){
   var box=$('workContext'),id=S.openTask;if(!box || !id)return;
   var key=S.epoch+'|'+id,tk=taskTicket(id),token=S.token,old=WORK_CONTEXT[key];
   if(!force && old && old.g===tk.g && old.result && Date.now()-old.at<30000){box.innerHTML=workContextHtml(old.result);return;}
-  if(old && old.g===tk.g && old.pending)return;
-  var entry={pending:true,g:tk.g};WORK_CONTEXT[key]=entry;box.innerHTML='<p class="muted" role="status">연결된 자료를 확인하고 있습니다…</p>';
+  if(old && old.g===tk.g && old.pending){if(old.result)box.innerHTML=workContextHtml(old.result);return;}
+  /* 10분 안에 받아 둔 것이 있으면 그것을 바로 보여 주고 뒤에서 새로 받는다 (2026-10-26) — 같은 계정 · 같은 권한 세대일 때만 */
+  var stale=!force && old && old.g===tk.g && old.result && Date.now()-old.at<600000 ? old : null;
+  var entry={pending:true,g:tk.g,result:stale?stale.result:null,at:stale?stale.at:0};WORK_CONTEXT[key]=entry;
+  box.innerHTML=stale?workContextHtml(stale.result):'<p class="muted" role="status">연결된 자료를 확인하고 있습니다…</p>';
   return callWithOptions({quiet:true},'api_workContext',token,id).then(function(r){
     if(WORK_CONTEXT[key]!==entry)return;
     if(!ticketOk(tk) || token!==S.token){delete WORK_CONTEXT[key];return;}
-    if(r && r.ok && r.context && Array.isArray(r.docs))WORK_CONTEXT[key]={result:r,at:Date.now(),g:tk.g};else delete WORK_CONTEXT[key];
+    var good=r && r.ok && r.context && Array.isArray(r.docs);
+    if(good)WORK_CONTEXT[key]={result:r,at:Date.now(),g:tk.g};
+    else if(stale && !(r && r.denied)){WORK_CONTEXT[key]={result:stale.result,at:stale.at,g:tk.g};return;}   // 새로 못 받았다 — 보여 준 것을 그대로 둔다
+    else delete WORK_CONTEXT[key];
     if(S.openTask!==id || !$('workContext'))return;
     box=$('workContext');
     if(r && r.denied){accessLost(id,r.msg);return;}
     box.innerHTML=r && r.ok && r.context && Array.isArray(r.docs)?workContextHtml(r):'<p class="muted" role="status">연결 자료를 확인하지 못했습니다. 작성 중인 내용은 유지됩니다.</p><button class="btn sm" onclick="loadWorkContext(true)">다시 확인</button>';
-  }).catch(function(){if(WORK_CONTEXT[key]!==entry)return;delete WORK_CONTEXT[key];if(ticketOk(tk) && token===S.token && S.openTask===id && $('workContext'))$('workContext').innerHTML='<p class="muted">연결 자료를 확인하지 못했습니다.</p><button class="btn sm" onclick="loadWorkContext(true)">다시 확인</button>';});
+  }).catch(function(){if(WORK_CONTEXT[key]!==entry)return;if(stale){WORK_CONTEXT[key]={result:stale.result,at:stale.at,g:tk.g};return;}delete WORK_CONTEXT[key];if(ticketOk(tk) && token===S.token && S.openTask===id && $('workContext'))$('workContext').innerHTML='<p class="muted">연결 자료를 확인하지 못했습니다.</p><button class="btn sm" onclick="loadWorkContext(true)">다시 확인</button>';});
 }
 function chooseWorkDoc(id){
   var r=WORK_CONTEXT[S.epoch+'|'+id];if(!r || !r.result){toast('연결 자료를 다시 확인해주세요.');return;}
@@ -7492,6 +7499,26 @@ function guestLink(taskId, on, quiet){
   if(on && !quiet && !confirm('이 현장의 진행률과 사진을 고객이 볼 수 있게 됩니다.\n' +
                     '금액과 내부 기록은 나가지 않습니다. 만들까요?')) return;
 
+  if(!on){
+    /* 끄기는 화면 먼저 — 서버는 보내는 함이 뒤에서 (2026-10-26). 안 되면 이유를 남기고 서버 값으로 */
+    var t0=taskOf_(taskId), was=t0?t0.guest:'';
+    if(t0) t0.guest='';
+    var box0=$('tfGuest');
+    if(box0 && t0) box0.innerHTML=guestRow_(t0, '');
+    toast('링크 끄기를 보내는 중입니다');
+    reliableCall({kind:'guestOff',ref:taskId,task:taskId,title:'고객 링크'},'api_guestLink',[taskId,false]).then(function(r){
+      if(r && r.stale) return;
+      if(!r || !r.ok){
+        var t1=taskOf_(taskId); if(t1 && t1.guest==='') t1.guest=was;
+        var b1=$('tfGuest'); if(b1 && t1) b1.innerHTML=guestRow_(t1, '');
+        deleteNoticeShow('고객 링크를 끄지 못했습니다: '+((r&&(r.msg||r.message))||'통신을 확인해 주세요.'),!r||!!r.net);
+        return;
+      }
+      boardInvalidate(); toast('링크를 껐습니다'); softRefresh();
+      if(!$('tfGuest') && S.openTask===taskId) openTask(taskId, true);
+    });
+    return;
+  }
   call('api_guestLink', S.token, taskId, on).then(function(r){
     if(!r || !r.ok){ toast((r&&r.msg)||'만들지 못했습니다'); return; }
     var t=taskOf_(taskId); if(t) t.guest = on ? 'Y' : '';
@@ -7664,8 +7691,10 @@ function dropTaskFile(id, taskId){
     S.data.filesByTask[taskId] = S.data.filesByTask[taskId].filter(function(f){ return f.id!==id; });
   }
   refreshTaskFiles_(taskId);
-  call('api_dropTaskFile', S.token, id).then(function(r){
-    if(!r || !r.ok){ toast((r&&r.msg)||'떼지 못했습니다'); }
+  reliableCall({kind:'fileDrop',ref:id,task:taskId,title:'자료'},'api_dropTaskFile',[id]).then(function(r){
+    if(r && r.stale) return;
+    if(!r || !r.ok) deleteNoticeShow('자료를 떼지 못했습니다: '+((r&&(r.msg||r.message))||'통신을 확인해 주세요.'),!r||!!r.net);
+    else boardInvalidate();
     softRefresh();
   });
 }
@@ -8004,25 +8033,28 @@ function saveSettle(taskId, kind){
     var ep=S.epoch;
     var backup=applySettleLocal(taskId, { id:'', kind:'차감', amount:amt, memo:memo,
                                           date:date||todayStr(), docNo:'', tax:'' });
-    closeOk(); toast('차감이 등록되었습니다');
+    closeOk(); toast('차감을 보내는 중입니다');
     FOLD={}; FOLD['settle:'+taskId]=1;
     openTask(taskId, true);
 
-    call('api_addSettle', S.token, send, S.corp).then(function(r){
-      if(!r.ok){
-        toast('차감 저장 실패: '+r.msg);
+    /* 보내는 함으로 — 통신이 끊기면 같은 요청 번호로 다시 보내고 서버가 한 번만 처리한다 (2026-10-26) */
+    reliableCall({kind:'settleCut',ref:taskId,task:taskId,title:'차감 '+amt},'api_addSettle',[send, S.corp]).then(function(r){
+      if(r && r.stale) return;
+      if(!r || !r.ok){
+        r=r||{};
+        deleteNoticeShow('차감을 저장하지 못했습니다: '+(r.msg||r.message||'통신을 확인해 주세요.'),!!r.net);
         if(!sameAccess(ep)) return;          // 보낸 뒤 권한이 줄었으면 되돌리지도 다시 열지도 않는다 (검수 2차)
         if(backup && S.data && S.data.settle) S.data.settle[taskId]=backup;
-        renderBoard();
-        FOLD={}; FOLD['settle:'+taskId]=1;
-        openTask(taskId, true);
+        renderBoard(); softRefresh(0);                    // 떠 둔 값이 그사이 낡았을 수 있다 — 서버 값으로 맞춘다
+        if(S.openTask===taskId){ FOLD={}; FOLD['settle:'+taskId]=1; openTask(taskId, true); }
         return;
       }
       delete S.taskCache[taskId];
+      boardInvalidate();
       applySettleRows(taskId, r.sum, r.rows);
       softRefresh();
-      FOLD={}; FOLD['settle:'+taskId]=1;
-      openTask(taskId, true);
+      toast('차감이 등록되었습니다');
+      if(S.openTask===taskId){ FOLD={}; FOLD['settle:'+taskId]=1; openTask(taskId, true); }
     });
     return;
   }
@@ -8084,21 +8116,25 @@ function delSettle(settleId, taskId){
     S.data.tasks.forEach(function(t){ if(t.id===taskId) t.amount=s.supply; });
   }
   delete S.taskCache[taskId];
-  toast('삭제되었습니다');
+  toast('삭제를 보내는 중입니다');
   FOLD={}; FOLD['settle:'+taskId]=1;
   openTask(taskId, true);
   var ep=S.epoch;
 
-  call('api_deleteSettle', S.token, settleId, taskId, S.corp).then(function(r){
-    if(!r.ok){
-      toast('삭제하지 못했습니다: '+r.msg);
+  reliableCall({kind:'settleDelete',ref:settleId,task:taskId,title:'정산 항목'},'api_deleteSettle',[settleId, taskId, S.corp]).then(function(r){
+    if(r && r.stale) return;
+    if(!r || !r.ok){
+      r=r||{};
+      deleteNoticeShow('정산 항목을 삭제하지 못했습니다: '+(r.msg||r.message||'통신을 확인해 주세요.'),!!r.net);
       if(!sameAccess(ep)) return;            // 보낸 뒤 권한이 줄었으면 되돌리지 않는다 (검수 2차)
       if(back && S.data && S.data.settle) S.data.settle[taskId]=back;
-      FOLD={}; FOLD['settle:'+taskId]=1;
-      openTask(taskId, true);
+      renderBoard(); softRefresh(0);
+      if(S.openTask===taskId){ FOLD={}; FOLD['settle:'+taskId]=1; openTask(taskId, true); }
       return;
     }
+    boardInvalidate();                                   // 삭제 전에 출발한 판이 늦게 와도 되살아나지 않게
     applySettleRows(taskId, r.sum, r.rows);
+    toast('삭제되었습니다');
     softRefresh();
   });
 }
@@ -8841,7 +8877,8 @@ var OUTBOX_LIVE=Object.create(null),OUTBOX_RETRY=Object.create(null),OUTBOX_MEM=
 var OUTBOX_NAMES={taskSave:'업무 저장',log:'업무 기록',event:'일정',post:'공지',comment:'댓글',doc:'결재 상신',taskDelete:'업무 삭제',
   logDelete:'기록 삭제',commentDelete:'댓글 삭제',eventDelete:'일정 삭제',leaveDelete:'휴가 삭제',postDelete:'공지 삭제',docDelete:'결재 삭제',
   docAct:'결재 승인·반려',docActMany:'결재 여러 건',docRead:'열람 확인',staffSave:'직원 정보',staffApprove:'가입 승인',staffReject:'가입 거절',
-  pinReset:'PIN 초기화',settingSave:'설정',vendorSave:'거래처',costCat:'비용 분류'};
+  pinReset:'PIN 초기화',settingSave:'설정',vendorSave:'거래처',costCat:'비용 분류',
+  settleCut:'차감',settleDelete:'정산 삭제',fileDrop:'자료 떼기',guestOff:'고객 링크 끄기',roomWrite:'글',roomDelete:'글 삭제'};
 /* ★ 요청 하나 = 저장 칸 하나 (uo_outbox_v1:요청번호 · 2026-10-26).
    예전에는 목록 하나를 읽고 고쳐 통째로 다시 썼다 — 탭 두 개가 동시에 쓰면 늦게 쓴 탭의 옛 목록이
    다른 탭이 방금 적은 요청을 지웠다(Astra 지적). 이제 적기 · 지우기는 그 요청의 칸 하나만 건드린다.
@@ -8993,6 +9030,17 @@ function outboxLocal(x){
     if(dd) ['toAct','drafts','others'].forEach(function(k){ (dd[k]||[]).forEach(function(v){ if(v && nos.indexOf(v.no)>=0) v[key]=false; }); });
     if(key==='canAct') S.data.approvals=(S.data.approvals||[]).filter(function(a){ return nos.indexOf(a.no)<0; });
   }
+  else if(x.kind==='settleDelete'&&x.task){            // 보내는 중인 정산 줄 삭제 — 다시 받은 판에서도 뺀다
+    var st=S.data.settle&&S.data.settle[x.task];
+    if(st&&(st.rows||[]).some(function(v){return v&&v.id===x.ref;})){
+      st.rows=st.rows.filter(function(v){return !v||v.id!==x.ref;});recalcSettle(st);
+      (S.data.tasks||[]).forEach(function(tt){if(tt.id===x.task)tt.amount=st.supply;});
+    }
+  }
+  else if(x.kind==='fileDrop'&&x.task){                 // 보내는 중인 자료 떼기
+    if(S.data.filesByTask&&S.data.filesByTask[x.task])S.data.filesByTask[x.task]=gone(S.data.filesByTask[x.task],'id');
+  }
+  else if(x.kind==='guestOff'){var gt=taskOf_(x.ref);if(gt)gt.guest='';}
   else if(x.kind==='costCat'){                     // 보내는 중인 비용 분류 — 다시 받은 판에서도 고른 분류로
     var by={}; (Array.isArray(x.args[1])?x.args[1]:[]).forEach(function(v){ if(v) by[Number(v.seq)]=v.cat||''; });
     (S.data.costItems||[]).forEach(function(it){ if(it && it.no===x.ref && by.hasOwnProperty(Number(it.seq))){ it.cat=by[Number(it.seq)]; it.sug=''; } });
@@ -14804,6 +14852,22 @@ function monthNow(){
   return d.getFullYear() + '-' + p2(d.getMonth()+1);
 }
 
+/** 임원 이상은 첫 판 뒤 이번 달 한 장을 한 번 미리 받아 둔다 (열 때 기다리지 않게 · 2026-10-26) */
+var MONTHLY_PREFETCHED='';
+function monthlyPrefetch(){
+  if(!S.me || Number(S.me.grade)<3 || !S.token) return;
+  var tag=tokenTag(S.token); if(MONTHLY_PREFETCHED===tag) return;
+  MONTHLY_PREFETCHED=tag;
+  setTimeout(function(){
+    if(tokenTag(S.token)!==tag || document.hidden) return;
+    var ym=monthNow(); if(MON.cache[ym]) return;
+    var tk=taskTicket('');
+    callWithOptions({quiet:true},'api_monthly',S.token,ym).then(function(r){
+      if(!ticketOk(tk) || !r || !r.ok || MON.cache[ym]) return;
+      MON.cache[ym]=r;
+    });
+  },6000);
+}
 function openMonthly(ym){
   MON.ym = ym || MON.ym || monthNow();
   drawMonthly();
@@ -15553,27 +15617,58 @@ function noteSave(id){
     });
   }
 
+  /* ★ 파일을 읽은 뒤 창을 바로 닫고 목록에 먼저 보인다 — 서버 답(약 5초 + 다시 받기 3초)을 기다리지 않는다 (2026-10-26).
+       ★★ 이 글은 이 기기(localStorage)에 적지 않는다(persist:false) — 기록장 내용을 기기에 남기지 않는 규칙.
+       화면이 열려 있는 동안만 같은 번호로 다시 보낸다. 안 되면 적던 글로 창을 다시 연다 */
+  var account=accountStamp();
   Promise.all((NOTE.pick||[]).map(noteRead)).then(function(files){
+    if(!sameAccount(account)) return null;
     var 보낼것 = files.filter(function(x){ return x && x.data; });
-    return call('api_noteSave', S.token,
-                { id:id||'', title:title, body:body, files:보낼것, dropFiles:버릴것 });
-  }).then(function(res){
-    if(btn){ btn.disabled = false; btn.textContent = '저장'; }
-    if(!res || !res.ok){ toast((res && res.msg) || '저장하지 못했습니다'); return; }
+    var tmp = id ? null : { id:'_tmp'+Date.now(), title:title, body:body, who:(S.me&&S.me.name)||'', at:noteNow(), files:[], comments:[] };
+    var was = id ? JSON.parse(JSON.stringify(noteById(id)||null)) : null;
+    if(tmp) NOTE.rows = [tmp].concat(NOTE.rows||[]);
+    else { var r1=noteById(id); if(r1){ r1.title=title; r1.body=body; } }
     NOTE.pick = [];
     closeOk();
-    noteLoad(true).then(function(){ if(S.view === 'note') renderNote(); });
-  });
+    if(S.view === 'note') renderNote();
+    toast('저장하는 중입니다');
+    return reliableCall({kind:'roomWrite',ref:id||(tmp&&tmp.id)||'',persist:false},'api_noteSave',
+                        [{ id:id||'', title:title, body:body, files:보낼것, dropFiles:버릴것 }]).then(function(res){
+      if(!sameAccount(account) || (res && res.stale)) return;
+      if(!res || !res.ok){
+        if(tmp) NOTE.rows=(NOTE.rows||[]).filter(function(x){ return x!==tmp; });
+        else if(was){ NOTE.rows=(NOTE.rows||[]).map(function(x){ return x.id===id ? was : x; }); }
+        if(S.view === 'note') renderNote();
+        deleteNoticeShow('글을 저장하지 못했습니다: '+((res&&(res.msg||res.message))||'통신을 확인해 주세요.')+' 적던 글은 다시 열어 두었습니다.',!res||!!res.net);
+        if(!($('modal') && $('modal').innerHTML)){
+          noteForm(id||'');
+          if($('ntTitle')) $('ntTitle').value=title;
+          var ed=$('ntBody'); if(ed){ ed.innerHTML=''; ed.innerHTML=fmt(body); }
+        }
+        return;
+      }
+      toast('저장되었습니다');
+      noteLoad(true).then(function(){ if(S.view === 'note') renderNote(); });
+    });
+  }).then(function(){ if(btn && btn.isConnected){ btn.disabled = false; btn.textContent = '저장'; } });
 }
 
 function noteDelete(id){
   if(!confirm('이 글을 지울까요?')) return;
-  call('api_noteDelete', S.token, id).then(function(r){
-    if(!r || !r.ok){ toast((r && r.msg) || '지우지 못했습니다'); return; }
-    NOTE.rows = (NOTE.rows||[]).filter(function(x){ return x.id !== id; });
-    closeOk();
-    renderNote();
-    roomBadge();
+  /* 누르는 즉시 목록에서 빼고 창을 닫는다 — 안 되면 서버 목록으로 되돌린다 (2026-10-26 · 이 기기에는 적지 않는다) */
+  var account=accountStamp(), back=(NOTE.rows||[]).slice();
+  NOTE.rows = (NOTE.rows||[]).filter(function(x){ return x.id !== id; });
+  closeOk(); renderNote(); roomBadge();
+  toast('삭제를 보내는 중입니다');
+  reliableCall({kind:'roomDelete',ref:id,persist:false},'api_noteDelete',[id]).then(function(r){
+    if(!sameAccount(account) || (r && r.stale)) return;
+    if(!r || !r.ok){
+      NOTE.rows = back; if(S.view === 'note') renderNote(); roomBadge();
+      deleteNoticeShow('글을 지우지 못했습니다: '+((r&&(r.msg||r.message))||'통신을 확인해 주세요.'),!r||!!r.net);
+      noteLoad(true);
+      return;
+    }
+    toast('삭제되었습니다');
   });
 }
 

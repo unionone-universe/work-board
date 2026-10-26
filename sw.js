@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v145';  // 2026-10-26 다른 탭 삭제 표시 · 설정 입력 지키기
+const CACHE = 'unionone-launcher-v146';  // 2026-10-26 차감 · 자료 · 링크 · 기록장 즉시, 연결 탭 · 이번 달 미리
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;
