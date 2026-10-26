@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v146">
+<meta name="uo-version" content="v147">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -4558,8 +4558,9 @@ function resetUserCaches(){
   tfFilesReset();
   if(WRITE_FORM)writeFormDiscard(WRITE_FORM);
   TF_DRAFT=null;                               // 앞사람의 저장 실패 글 (2026-09-30 검수 1차)
-  STAFF_MEM=Object.create(null); STAFF_CHAIN=Object.create(null); CFG_MEM=Object.create(null); VENDORS=null;
-  SETTINGS_FETCH=null; SETTINGS_FETCH_ACCT=null; SETTINGS_GEN++; VENDOR_MEM=[]; VENDOR_BASE=null; VENDOR_GEN++;              // 앞사람의 조회에 합치지 않는다   // 앞사람의 관리자 고침 · 거래처 (2026-10-26)
+  STAFF_MEM=Object.create(null); STAFF_CHAIN=Object.create(null); CFG_MEM=Object.create(null); VENDORS=null;   // 앞사람의 관리자 고침 · 거래처 (2026-10-26)
+  SETTINGS_FETCH=null; SETTINGS_FETCH_ACCT=null; SETTINGS_GEN++; VENDOR_MEM=[]; VENDOR_BASE=null; VENDOR_GEN++;              // 앞사람의 조회에 합치지 않는다
+  NOTE_PENDING=Object.create(null); NOTE_DELETING=Object.create(null); NOTE.drafts=[]; NOTE.server=null; NOTE.rows=null; NOTE.pick=[]; NOTE_GEN++; NOTE.loading=null;   // 앞사람의 기록장 초안 · 보내는 중 · 조회
 }
 
 /** ★ 업무 한 건을 이 기기에서 잊는다 (2026-09-30 검수 1차).
@@ -6966,7 +6967,7 @@ function settleHtml(r, t){
          '</div></div>'+
          '<div style="text-align:right;white-space:nowrap">'+
          '<span class="num">'+(x.kind==='차감'?'-':'')+won(x.amount)+'</span>'+
-         (canDel? ' <button class="del icodel" onclick="delSettle(\''+x.id+'\',\''+tid+'\')" aria-label="정산 줄 삭제">'+ic('x')+'</button>':'')+
+         (canDel && x.id? ' <button class="del icodel" onclick="delSettle(\''+x.id+'\',\''+tid+'\')" aria-label="정산 줄 삭제">'+ic('x')+'</button>':'')+
          '</div></div>';
     });
   }
@@ -7503,26 +7504,26 @@ function guestLink(taskId, on, quiet){
     /* 끄기는 화면 먼저 — 서버는 보내는 함이 뒤에서 (2026-10-26). 안 되면 이유를 남기고 서버 값으로 */
     var t0=taskOf_(taskId), was=t0?t0.guest:'';
     if(t0) t0.guest='';
-    var box0=$('tfGuest');
+    var box0=guestBox_(taskId);
     if(box0 && t0) box0.innerHTML=guestRow_(t0, '');
     toast('링크 끄기를 보내는 중입니다');
     reliableCall({kind:'guestOff',ref:taskId,task:taskId,title:'고객 링크'},'api_guestLink',[taskId,false]).then(function(r){
       if(r && r.stale) return;
       if(!r || !r.ok){
         var t1=taskOf_(taskId); if(t1 && t1.guest==='') t1.guest=was;
-        var b1=$('tfGuest'); if(b1 && t1) b1.innerHTML=guestRow_(t1, '');
+        var b1=guestBox_(taskId); if(b1 && t1) b1.innerHTML=guestRow_(t1, '');
         deleteNoticeShow('고객 링크를 끄지 못했습니다: '+((r&&(r.msg||r.message))||'통신을 확인해 주세요.'),!r||!!r.net);
         return;
       }
       boardInvalidate(); toast('링크를 껐습니다'); softRefresh();
-      if(!$('tfGuest') && S.openTask===taskId) openTask(taskId, true);
+      if(!guestBox_(taskId) && !$('tfGuest') && S.openTask===taskId) openTask(taskId, true);
     });
     return;
   }
   call('api_guestLink', S.token, taskId, on).then(function(r){
     if(!r || !r.ok){ toast((r&&r.msg)||'만들지 못했습니다'); return; }
     var t=taskOf_(taskId); if(t) t.guest = on ? 'Y' : '';
-    var box=$('tfGuest');
+    var box=guestBox_(taskId);
     if(!on){
       toast('링크를 껐습니다'); softRefresh();
       if(box && t) box.innerHTML=guestRow_(t, ''); else openTask(taskId, true);
@@ -7537,6 +7538,8 @@ function guestLink(taskId, on, quiet){
   });
 }
 
+/** 지금 열린 수정 창이 그 업무의 것일 때만 고객 링크 칸을 돌려준다 (다른 업무 창에 엉뚱한 링크가 들어가지 않게) */
+function guestBox_(taskId){ var b=$('tfGuest'), f=$('tfId'); return (b && f && f.value===taskId) ? b : null; }
 /** 수정 창의 '고객 진행 링크' 칸 — 주소를 받았으면 그 자리에 보여준다 */
 function guestRow_(t, url){
   var id=esc(t.id);
@@ -8030,8 +8033,8 @@ function saveSettle(taskId, kind){
   /* 차감은 낙관 처리 — 즉시 반영하고 창을 닫는다.
      입금은 돈이 걸린 것이라 서버 확인 후에 닫는다. */
   if(kind==='차감'){
-    var ep=S.epoch;
-    var backup=applySettleLocal(taskId, { id:'', kind:'차감', amount:amt, memo:memo,
+    var ep=S.epoch, localKey='_cut'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+    var backup=applySettleLocal(taskId, { id:'', local:localKey, kind:'차감', amount:amt, memo:memo,
                                           date:date||todayStr(), docNo:'', tax:'' });
     closeOk(); toast('차감을 보내는 중입니다');
     FOLD={}; FOLD['settle:'+taskId]=1;
@@ -8044,8 +8047,9 @@ function saveSettle(taskId, kind){
         r=r||{};
         deleteNoticeShow('차감을 저장하지 못했습니다: '+(r.msg||r.message||'통신을 확인해 주세요.'),!!r.net);
         if(!sameAccess(ep)) return;          // 보낸 뒤 권한이 줄었으면 되돌리지도 다시 열지도 않는다 (검수 2차)
-        if(backup && S.data && S.data.settle) S.data.settle[taskId]=backup;
-        renderBoard(); softRefresh(0);                    // 떠 둔 값이 그사이 낡았을 수 있다 — 서버 값으로 맞춘다
+        /* 그 차감 줄만 뺀다 — 통째로 떠 둔 값(backup)으로 되돌리면 그사이 보낸 다른 차감 · 삭제까지 사라진다 */
+        if(backup) settleFix_(taskId, function(rows){ return rows.filter(function(x){ return x.local!==localKey; }); });
+        renderBoard(); softRefresh(0);                    // 서버 값으로도 맞춘다
         if(S.openTask===taskId){ FOLD={}; FOLD['settle:'+taskId]=1; openTask(taskId, true); }
         return;
       }
@@ -8073,6 +8077,11 @@ function saveSettle(taskId, kind){
 }
 
 /** 정산 줄 하나를 화면에 먼저 더한다. 되돌릴 수 있게 원래 값을 돌려준다 */
+function settleFix_(taskId, change){
+  var s=S.data && S.data.settle && S.data.settle[taskId]; if(!s) return;
+  s.rows=change(s.rows||[]); recalcSettle(s);
+  (S.data.tasks||[]).forEach(function(t){ if(t.id===taskId) t.amount=s.supply; });
+}
 function applySettleLocal(taskId, row){
   if(!S.data || !S.data.settle || !S.data.settle[taskId]) return null;
   var backup=JSON.parse(JSON.stringify(S.data.settle[taskId]));
@@ -8107,10 +8116,11 @@ function delSettle(settleId, taskId){
   if(!confirm('이 정산 항목을 삭제할까요?\n계약금액이 다시 계산됩니다.')) return;
 
   // 화면에서 먼저 빼고 합계를 다시 계산한다 (서버 계산식과 같은 식)
-  var back=null;
+  var back=null, removed=null;
   if(S.data && S.data.settle && S.data.settle[taskId]){
     back=JSON.parse(JSON.stringify(S.data.settle[taskId]));
     var s=S.data.settle[taskId];
+    removed=(s.rows||[]).filter(function(x){ return x.id===settleId; })[0]||null;
     s.rows=(s.rows||[]).filter(function(x){ return x.id!==settleId; });
     recalcSettle(s);
     S.data.tasks.forEach(function(t){ if(t.id===taskId) t.amount=s.supply; });
@@ -8127,7 +8137,8 @@ function delSettle(settleId, taskId){
       r=r||{};
       deleteNoticeShow('정산 항목을 삭제하지 못했습니다: '+(r.msg||r.message||'통신을 확인해 주세요.'),!!r.net);
       if(!sameAccess(ep)) return;            // 보낸 뒤 권한이 줄었으면 되돌리지 않는다 (검수 2차)
-      if(back && S.data && S.data.settle) S.data.settle[taskId]=back;
+      /* 그 줄만 다시 넣는다 — 그사이 바뀐 다른 줄은 그대로 */
+      if(removed) settleFix_(taskId, function(rows){ return rows.some(function(x){ return x.id===settleId; }) ? rows : rows.concat([removed]); });
       renderBoard(); softRefresh(0);
       if(S.openTask===taskId){ FOLD={}; FOLD['settle:'+taskId]=1; openTask(taskId, true); }
       return;
@@ -15236,6 +15247,21 @@ boot();
 
 var ROOM = { on:false, timer:null, tick:null, tapN:0, tapAt:0 };
 var NOTE = { rows:null, grade:0, loading:null, pick:[] };
+/* 보내는 중인 기록장 글 · 삭제 (2026-10-26) — 그사이 목록을 다시 받아도 먼저 보인 것이 사라지거나 되살아나지 않게.
+   NOTE_PENDING[키] = {tmp: 새 글 임시 줄 | null, id, title, body} · NOTE_DELETING[글번호] = true
+   NOTE.draft — 저장이 안 된 글(제목 · 본문 · 고른 파일 · 남길 첨부). 같은 글의 작성창을 열면 다시 채운다 */
+var NOTE_PENDING = Object.create(null), NOTE_DELETING = Object.create(null), NOTE_GEN = 0, NOTE_REQ = 0;
+/* NOTE_GEN — 저장 · 삭제가 서버에 반영될 때마다 올린다. 그 전에 출발한 목록 조회의 답은 버리고 새로 받는다.
+   NOTE.drafts — 저장이 안 된 글을 요청마다 따로 (새 글 둘이 연달아 실패해도 둘 다 남는다) */
+function notePendingApply(rows){
+  rows = (rows||[]).filter(function(x){ return !NOTE_DELETING[x.id]; });
+  Object.keys(NOTE_PENDING).forEach(function(k){
+    var p = NOTE_PENDING[k];
+    if(p.tmp){ if(!rows.some(function(x){ return x === p.tmp; })) rows = [p.tmp].concat(rows); }
+    else rows.forEach(function(x){ if(x.id === p.id){ x.title = p.title; x.body = p.body; } });
+  });
+  return rows;
+}
 var ROOM_SHOW_MS = 5000;
 
 /** 서버가 이 사람에게 탭을 열어 줬나 */
@@ -15335,18 +15361,22 @@ function roomBadge(){
 function noteLoad(force){
   if(NOTE.loading) return NOTE.loading;
   if(NOTE.rows && !force) return Promise.resolve();
-  NOTE.loading = call('api_noteAll', S.token).then(function(r){
-    NOTE.loading = null;
+  var gen = NOTE_GEN, account = accountStamp(), job;
+  job = NOTE.loading = call('api_noteAll', S.token).then(function(r){
+    if(NOTE.loading === job) NOTE.loading = null;
+    if(!sameAccount(account)) return;
+    if(gen !== NOTE_GEN) return noteLoad(true);   // 받는 사이 저장 · 삭제가 반영됐다 — 옛 목록이다
     if(!r || !r.ok) return;
-    NOTE.rows = r.rows || [];
+    NOTE.server = JSON.parse(JSON.stringify(r.rows || []));   // 서버가 확인한 목록 — 실패한 고침을 되돌릴 기준
+    NOTE.rows = notePendingApply(r.rows || []);
     NOTE.grade = Number(r.grade || 0);
     /* 목록을 받아 왔으면 서버도 '봤다' 로 남깁니다. 로고의 점을 바로 끕니다 */
     if(S.data && S.data.note) S.data.note.dot = false;
     roomDot();
     if(S.view === 'note') renderNote();
     roomBadge();
-  });
-  return NOTE.loading;
+  }, function(){ if(NOTE.loading === job) NOTE.loading = null; });
+  return job;
 }
 
 function noteById(id){
@@ -15547,6 +15577,16 @@ function noteForm(id){
         '<button class="btn sm" onclick="closeModal()">취소</button>'+
         '<button class="btn pri" id="ntSave" onclick="noteSave(\''+(id||'')+'\')">저장</button></div>'+
     '</div></div>';
+  var di = (NOTE.drafts||[]).findIndex(function(x){ return x.id === (id||''); }), d = di >= 0 ? NOTE.drafts[di] : null;
+  if(d){
+    /* 저장이 안 된 글 — 제목 · 본문 · 고른 파일 · 남길 첨부까지 그대로 (2026-10-26). 꺼낸 초안만 지운다 */
+    NOTE.drafts.splice(di, 1);
+    if($('ntTitle')) $('ntTitle').value = d.title;
+    if($('ntBody')) $('ntBody').innerHTML = fmt(d.body);
+    NOTE.keep = d.keep.slice();
+    if($('ntFiles')) $('ntFiles').innerHTML = noteKeepHtml(붙은것.filter(function(f){ return NOTE.keep.indexOf(f.id) >= 0; }));
+    NOTE.pick = d.pick.slice(); notePickPaint(NOTE.pick);
+  }
   var t = $('ntTitle'); if(t) t.focus();
 }
 
@@ -15577,14 +15617,16 @@ function notePicked(input){
     return;
   }
   NOTE.pick = fs;
-  /* ★ 무엇이 붙는지 눈에 보여야 합니다. 파일 고르는 칸은 브라우저가 그리는 것이라
-     여러 개를 고르면 `3개 파일` 같은 말만 나오고 무엇인지 알 수 없습니다. */
-  if(box){
-    box.innerHTML = fs.map(function(f){
-      return '<span class="tag gy" style="margin:6px 6px 0 0;display:inline-block">'+
-             esc(f.name)+' <span class="muted">'+esc(noteSize(f.size))+'</span></span>';
-    }).join('');
-  }
+  notePickPaint(fs);
+}
+/* ★ 무엇이 붙는지 눈에 보여야 합니다. 파일 고르는 칸은 브라우저가 그리는 것이라
+   여러 개를 고르면 `3개 파일` 같은 말만 나오고 무엇인지 알 수 없습니다. */
+function notePickPaint(fs){
+  var box = $('ntPickBox'); if(!box) return;
+  box.innerHTML = (fs||[]).map(function(f){
+    return '<span class="tag gy" style="margin:6px 6px 0 0;display:inline-block">'+
+           esc(f.name)+' <span class="muted">'+esc(noteSize(f.size))+'</span></span>';
+  }).join('');
 }
 
 function noteRead(file){
@@ -15620,31 +15662,47 @@ function noteSave(id){
   /* ★ 파일을 읽은 뒤 창을 바로 닫고 목록에 먼저 보인다 — 서버 답(약 5초 + 다시 받기 3초)을 기다리지 않는다 (2026-10-26).
        ★★ 이 글은 이 기기(localStorage)에 적지 않는다(persist:false) — 기록장 내용을 기기에 남기지 않는 규칙.
        화면이 열려 있는 동안만 같은 번호로 다시 보낸다. 안 되면 적던 글로 창을 다시 연다 */
-  var account=accountStamp();
-  Promise.all((NOTE.pick||[]).map(noteRead)).then(function(files){
+  var account=accountStamp(), pick=(NOTE.pick||[]).slice(), keep=(NOTE.keep||[]).slice();
+  Promise.all(pick.map(noteRead)).then(function(files){
     if(!sameAccount(account)) return null;
     var 보낼것 = files.filter(function(x){ return x && x.data; });
     var tmp = id ? null : { id:'_tmp'+Date.now(), title:title, body:body, who:(S.me&&S.me.name)||'', at:noteNow(), files:[], comments:[] };
     var was = id ? JSON.parse(JSON.stringify(noteById(id)||null)) : null;
-    if(tmp) NOTE.rows = [tmp].concat(NOTE.rows||[]);
-    else { var r1=noteById(id); if(r1){ r1.title=title; r1.body=body; } }
+    /* 보내는 중 표시는 요청마다 따로 (같은 글을 연달아 고쳐도 앞 요청의 답이 뒤 요청의 표시를 지우지 않는다) */
+    var pkey = (id || tmp.id) + '#' + (++NOTE_REQ);
+    NOTE_PENDING[pkey] = { tmp:tmp, id:id||'', title:title, body:body };     // 그사이 목록을 다시 받아도 먼저 보인 것을 지킨다
+    NOTE.rows = notePendingApply(NOTE.rows||[]);
     NOTE.pick = [];
     closeOk();
     if(S.view === 'note') renderNote();
     toast('저장하는 중입니다');
-    return reliableCall({kind:'roomWrite',ref:id||(tmp&&tmp.id)||'',persist:false},'api_noteSave',
-                        [{ id:id||'', title:title, body:body, files:보낼것, dropFiles:버릴것 }]).then(function(res){
+    /* 같은 글의 고침 · 삭제는 앞의 것이 끝난 뒤에 보낸다 (늦게 간 옛 고침이 새 고침을 덮지 않게) */
+    var qk = id ? 'note:'+id : '';
+    var sent = reliableCall({kind:'roomWrite',ref:id||(tmp&&tmp.id)||'',persist:false,after:qk?staffAfter(qk):null},'api_noteSave',
+                        [{ id:id||'', title:title, body:body, files:보낼것, dropFiles:버릴것 }]);
+    if(qk) staffQueue(qk, sent);
+    return sent.then(function(res){
       if(!sameAccount(account) || (res && res.stale)) return;
+      if(res && res.ok) NOTE_GEN++;                 // 먼저 올려야 그 전에 출발한 조회가 임시 줄을 지운 목록으로 덮지 않는다
+      delete NOTE_PENDING[pkey];
       if(!res || !res.ok){
         if(tmp) NOTE.rows=(NOTE.rows||[]).filter(function(x){ return x!==tmp; });
-        else if(was){ NOTE.rows=(NOTE.rows||[]).map(function(x){ return x.id===id ? was : x; }); }
-        if(S.view === 'note') renderNote();
-        deleteNoticeShow('글을 저장하지 못했습니다: '+((res&&(res.msg||res.message))||'통신을 확인해 주세요.')+' 적던 글은 다시 열어 두었습니다.',!res||!!res.net);
-        if(!($('modal') && $('modal').innerHTML)){
-          noteForm(id||'');
-          if($('ntTitle')) $('ntTitle').value=title;
-          var ed=$('ntBody'); if(ed){ ed.innerHTML=''; ed.innerHTML=fmt(body); }
+        else {
+          /* 되돌리는 기준은 서버가 확인한 그 글 (없으면 처음 열었을 때의 것) — 화면에 먼저 얹은 앞 고침을 기준으로 삼지 않는다.
+             그 위에 아직 보내는 중인 같은 글의 고침만 차례대로 다시 얹는다 */
+          var confirmed=(NOTE.server||[]).filter(function(x){ return x.id===id; })[0];
+          var basis=confirmed ? JSON.parse(JSON.stringify(confirmed)) : was;
+          if(basis) NOTE.rows=(NOTE.rows||[]).map(function(x){ return x.id===id ? basis : x; });
         }
+        NOTE.rows = notePendingApply(NOTE.rows||[]);   // 뒤에 보낸 같은 글의 고침은 그대로 얹는다
+        noteLoad(true);                                // 서버 목록으로도 맞춘다
+        if(S.view === 'note') renderNote();
+        /* 적던 글 — 고른 파일 · 남길 첨부까지 초안으로 둔다. 다른 창이 열려 있지 않으면 바로 다시 연다 */
+        NOTE.drafts = (NOTE.drafts||[]).concat([{ key:pkey, id:id||'', title:title, body:body, pick:pick, keep:keep }]);
+        var opened = !($('modal') && $('modal').innerHTML);
+        if(opened) noteForm(id||'');
+        deleteNoticeShow('글을 저장하지 못했습니다: '+((res&&(res.msg||res.message))||'통신을 확인해 주세요.')+
+          (opened ? ' 적던 글은 다시 열어 두었습니다.' : ' 적던 글은 '+(id?'그 글의 [수정]':'[새 글]')+'을 누르면 그대로 다시 나옵니다.'),!res||!!res.net);
         return;
       }
       toast('저장되었습니다');
@@ -15656,18 +15714,24 @@ function noteSave(id){
 function noteDelete(id){
   if(!confirm('이 글을 지울까요?')) return;
   /* 누르는 즉시 목록에서 빼고 창을 닫는다 — 안 되면 서버 목록으로 되돌린다 (2026-10-26 · 이 기기에는 적지 않는다) */
-  var account=accountStamp(), back=(NOTE.rows||[]).slice();
-  NOTE.rows = (NOTE.rows||[]).filter(function(x){ return x.id !== id; });
+  var account=accountStamp();
+  NOTE_DELETING[id] = true;                       // 보내는 동안 다시 받은 목록에서도 뺀다
+  NOTE.rows = notePendingApply(NOTE.rows||[]);
   closeOk(); renderNote(); roomBadge();
   toast('삭제를 보내는 중입니다');
-  reliableCall({kind:'roomDelete',ref:id,persist:false},'api_noteDelete',[id]).then(function(r){
+  var qk = 'note:'+id, sent = reliableCall({kind:'roomDelete',ref:id,persist:false,after:staffAfter(qk)},'api_noteDelete',[id]);
+  staffQueue(qk, sent);
+  sent.then(function(r){
     if(!sameAccount(account) || (r && r.stale)) return;
+    if(r && r.ok) NOTE_GEN++;                       // 삭제 전에 출발한 목록 조회의 답은 버린다 (되살아나지 않게)
+    delete NOTE_DELETING[id];
     if(!r || !r.ok){
-      NOTE.rows = back; if(S.view === 'note') renderNote(); roomBadge();
       deleteNoticeShow('글을 지우지 못했습니다: '+((r&&(r.msg||r.message))||'통신을 확인해 주세요.'),!r||!!r.net);
-      noteLoad(true);
+      noteLoad(true);                             // 서버 목록으로 되돌린다
       return;
     }
+    NOTE.rows = (NOTE.rows||[]).filter(function(x){ return x.id !== id; });
+    if(S.view === 'note') renderNote(); roomBadge();
     toast('삭제되었습니다');
   });
 }
