@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v150">
+<meta name="uo-version" content="v151">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -938,7 +938,7 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
   background-image:linear-gradient(45deg,transparent 50%,var(--t2) 50%),linear-gradient(135deg,var(--t2) 50%,transparent 50%);
   background-position:calc(100% - 18px) calc(50% - 1px),calc(100% - 13px) calc(50% - 1px);background-size:5px 5px,5px 5px;background-repeat:no-repeat}
 .fsel select:hover{border-color:var(--fieldline)}
-.fsel select.on{border:2px solid var(--pri);background-color:var(--soft);font-weight:700;padding-left:11px}
+.fsel select.on{border:2px solid var(--pri);background-color:var(--soft);font-weight:700;padding-left:11px;padding-right:33px}   /* 테두리가 1px 두꺼워진 만큼 안쪽을 줄여 칸 폭이 그대로 (2026-10-27) */
 .fgap{display:none}
 #corpFilter .chip{flex:none;white-space:nowrap;height:var(--tap);font-size:var(--fs-sm)}
 .fsum{display:flex;align-items:center;flex-wrap:wrap;gap:8px;min-width:0}
@@ -948,7 +948,15 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .fsum .fcond .ic{width:16px;height:16px}
 .fsum .freset{border-color:transparent;background:transparent;color:var(--t2)}
 .fsum .freset:hover{background:var(--panel);color:var(--t1)}
-@media (min-width:1024px){ .fsum .fcond{display:none} }
+@media (min-width:1024px){
+  .fsum .fcond{display:none}
+  /* ★ [초기화] 는 거르기 칸 **왼쪽**에 나타난다 (2026-10-27 대표님 지시 — 종류를 고르면 칸이 왼쪽으로 밀려 헷갈렸다).
+       거르기 칸 · 새로고침은 오른쪽 끝에 그대로 있고, [초기화] 는 그 앞 빈자리에만 생긴다.
+       비어 있어도 자리(오른쪽 정렬의 기준)는 남긴다 */
+  .lbar .fsum{margin-left:auto}
+  .lbar .fsum:empty{display:flex}
+  .lbar .filterbar{margin-left:0}
+}
 .ftoggle{display:none;flex:none}
 .ftoggle[aria-expanded="true"]{background:var(--soft);border-color:var(--pri);color:var(--pri)}
 .fbadge{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 6px;border-radius:99px;
@@ -2313,8 +2321,8 @@ body:has(#modal .veil:not(.tdveil)) #writeDock,body:has(#modal .veil:not(.tdveil
               <button role="tab" data-col="colDone" aria-selected="false" aria-controls="colDone" onclick="boardTab('colDone')">완료 <span class="n" id="tDone">0</span></button>
             </div>
             <button class="btn ftoggle" id="fToggle" onclick="toggleFilters()" aria-expanded="false" aria-controls="corpFilter" aria-label="거르기"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-filter"/></svg><span class="flbl">거르기</span><span class="fbadge hide" id="fBadge"></span></button>
-            <div class="filterbar" id="corpFilter" role="group" aria-label="업무 거르기"></div>
             <div class="fsum" id="fSum"></div>
+            <div class="filterbar" id="corpFilter" role="group" aria-label="업무 거르기"></div>
             <button class="refbtn" id="refBtn" onclick="refresh(true)" title="마지막으로 받아온 시각 · 누르면 다시 받아옵니다"><span class="rico"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-refresh"/></svg></span><span class="clock" id="atTime"></span><span class="sronly">새로고침</span></button>
           </div>
           <div class="board" data-tab="colRun">
@@ -6393,7 +6401,7 @@ var ICO_DOTS=ICO_SVG('<circle cx="5.5" cy="12" r="1.2"/><circle cx="12" cy="12" 
    ★ 줄마다 상자 · 색 띠 · 진행 막대를 복제하지 않는다 (v92 의 표 칸 · 종류 아이콘 기둥 · 진행 막대를 뺐다).
      급한 것은 마감 글자를 빨갛게 + 사람 동그라미의 빨간 점. '오늘 마감' · '마감 지남' 은 글로도 적는다.
    ★ 표시(flags) 판정은 서버가 합니다. 법인명은 법인이 둘 이상일 때만. 다음 할 일을 지어내지 않는다. */
-var TYPE_ICO={ SYS:'monitor', MKT:'trend', DEMO:'hammer', SALE:'brief', WASTE:'truck', SHOW:'star', ETC:'box' };
+var TYPE_ICO={ SYS:'monitor', MKT:'trend', DEMO:'hammer', SALE:'brief', WASTE:'truck', SHOW:'star', MTG:'users', ETC:'box' };
 function typeIco(t){
   var c=String((t && t.type) || ''), n=String((t && t.typeName) || '');
   if(TYPE_ICO[c]) return TYPE_ICO[c];
@@ -6403,6 +6411,7 @@ function typeIco(t){
   if(/마케팅|홍보/.test(n)) return 'trend';
   if(/폐기물/.test(n)) return 'truck';
   if(/공연|행사/.test(n)) return 'star';
+  if(/회의/.test(n)) return 'users';
   return 'box';
 }
 /** 사람 — 이름 첫 글자 동그라미 (사진이 아니라 누가 맡았는지 갈라 보는 표시) */
