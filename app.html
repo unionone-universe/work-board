@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v148">
+<meta name="uo-version" content="v149">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -13611,6 +13611,9 @@ function saveDoc(){
     var visible=$('modal').contains(btn);writeFormFinish(background,r);
     if(visible)closeOk();
     toast(r.sealNo? '상신되었습니다 · 인감 날인 품의서도 같이 올라갔습니다' : '상신되었습니다');
+    /* 승인자가 폰 알림을 켜지 않았으면 결재 요청이 폰에 바로 안 뜬다 — 올린 사람이 알 수 있게 (2026-10-27) */
+    if(r.pushOff) deleteNoticeShow('폰 알림이 서버에서 꺼져 있어 결재 요청이 누구에게도 폰으로 가지 않습니다. 관리자에게 알려 주시고, 급하면 직접 알려 주세요.',false);
+    else if(r.noPush && r.noPush.length) deleteNoticeShow(r.noPush.join(', ')+'님은 폰 알림이 꺼져 있어 결재 요청이 폰에 바로 뜨지 않습니다. 급하면 직접 알려 주세요.',false);
     if(r.no) addDocLocal(r);              // 결재 목록은 화면이 가진 값으로 먼저 갱신 ('이미 반영됐다' 만 온 경우는 판을 기다린다)
     if(S.view==='doc') renderDocs();
     softRefresh(12000);                   // 서버 확인한 결과를 먼저 반영, 전체 조회는 뒤로

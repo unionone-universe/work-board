@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v148';  // 2026-10-27 결재 알림 즉시 · 결제 상태 구분
+const CACHE = 'unionone-launcher-v149';  // 2026-10-27 결재 알림 급히 · 알림마다 따로 · 못 받는 승인자 안내
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;
@@ -114,8 +114,11 @@ self.addEventListener('push', (e) => {
     body: body,
     icon: './icon-192.png',
     badge: './badge-96.png',
-    tag: 'unionone',          /* 같은 표를 달아 알림이 쌓이지 않게 */
+    /* ★ 알림마다 따로 (2026-10-27). 예전에는 모두 같은 표('unionone')라 새 알림이 앞 알림을 덮어
+         결재 요청이 댓글 알림 하나에 가려 사라질 수 있었다 */
+    tag: n.tag || ('uo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6)),
     renotify: true,
+    requireInteraction: /결재|열람/.test(String(title || '')),   /* 결재 · 열람 요청은 누르거나 닫을 때까지 남긴다 */
     data: { url: link }
   }));
 });
