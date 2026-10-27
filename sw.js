@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v153';  // 2026-10-27 글 안 사진 2560px · 화면 선명도에 맞춰 보기
+const CACHE = 'unionone-launcher-v154';  // 2026-10-27 연결 탭 미리 받기 · 서버 읽기 줄임 · 단추 간격
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;

@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v153">
+<meta name="uo-version" content="v154">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -2144,6 +2144,10 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 /* 업무 연결: 별도 큰 홈 카드 없이 상세 탭 안에서 이어서 처리 */
 .tdsheet[data-tab="flow"] .tdpane[data-pane="flow"]{display:block}
 .work-actions{display:flex;gap:10px;flex-wrap:wrap}.work-actions .btn{min-width:180px}
+/* 연결 탭 — 안내 상자 · 글 바로 밑의 단추가 상자에 붙어 겹쳐 보였다 (2026-10-27) */
+#workContext .tdsec > .btn,#workContext .tdsec > .actions{margin-top:12px}
+#workContext .site-sources{margin-top:12px}#workContext .site-sources > .btn{margin-top:8px}
+#workContext .tdsec > p + p{margin-top:4px}
 .work-source{font-size:13px;margin:12px 0}.work-linked{padding:12px 14px;border:1px solid var(--line);border-left:3px solid var(--pri);border-radius:8px;background:var(--bg);color:var(--t1);line-height:1.5;overflow-wrap:anywhere}
 .work-back{width:100%;text-align:left;margin:0 0 16px;cursor:pointer}.work-forms{display:grid;gap:10px;margin-top:18px}.work-forms .btn{justify-content:space-between;text-align:left;white-space:normal}
 @media(max-width:600px){.tdtabs{overflow-x:auto;flex-wrap:nowrap}.tdtabs button{flex-shrink:0;white-space:nowrap}.work-actions .btn{min-height:44px}}
@@ -6890,7 +6894,7 @@ function openTask(id, keepFold){
     $('modal').innerHTML = taskSheetHtml(t, r);
     S.openTask=id; S.openTaskFromBoard=true;   // 어느 업무 창이 열려 있나 (권한이 바뀌면 닫으려고)
     panelSync();
-    if(TD_TAB[id]==='flow')loadWorkContext();
+    if(TD_TAB[id]==='flow')loadWorkContext(); else prefetchWorkContext(id);
     markCommentsSeen(id);
     paintReaders(id);
     sendRead(id, hadDot);        // 뒤에서 조용히. 창은 기다리지 않는다
@@ -6908,7 +6912,7 @@ function openTask(id, keepFold){
     panelSync();
     if(r.readers) S.readers[id]={up:taskEditOf(id), names:r.readers};
     $('modal').innerHTML = taskSheetHtml(r.task, r);
-    if(TD_TAB[id]==='flow')loadWorkContext();
+    if(TD_TAB[id]==='flow')loadWorkContext(); else prefetchWorkContext(id);
     markCommentsSeen(id);
     paintReaders(id);
     sendRead(id, true);
@@ -7485,6 +7489,19 @@ function loadWorkContext(force){
     if(r && r.denied){accessLost(id,r.msg);return;}
     box.innerHTML=r && r.ok && r.context && Array.isArray(r.docs)?workContextHtml(r):'<p class="muted" role="status">연결 자료를 확인하지 못했습니다. 작성 중인 내용은 유지됩니다.</p><button class="btn sm" onclick="loadWorkContext(true)">다시 확인</button>';
   }).catch(function(){if(WORK_CONTEXT[key]!==entry)return;if(stale){WORK_CONTEXT[key]={result:stale.result,at:stale.at,g:tk.g};return;}delete WORK_CONTEXT[key];if(ticketOk(tk) && token===S.token && S.openTask===id && $('workContext'))$('workContext').innerHTML='<p class="muted">연결 자료를 확인하지 못했습니다.</p><button class="btn sm" onclick="loadWorkContext(true)">다시 확인</button>';});
+}
+/* 연결 탭 미리 받기 (2026-10-27 대표님 — 연결 탭이 뜨는 데 너무 오래 걸림).
+   업무 창이 그려진 뒤 조금 있다가 한 번만 받아 둔다. 10분 안에 받아 둔 것이 있거나 받는 중이면 다시 묻지 않는다 (가볍게).
+   탭을 누르면 받아 둔 것을 바로 그리고, 30초가 지났으면 그때 뒤에서 새로 받는다 (loadWorkContext 그대로) */
+var WORK_PREFETCH=null;
+function prefetchWorkContext(id){
+  clearTimeout(WORK_PREFETCH);
+  WORK_PREFETCH=setTimeout(function(){
+    if(!id || S.openTask!==id || !$('workContext') || document.hidden) return;
+    var old=WORK_CONTEXT[S.epoch+'|'+id], tk=taskTicket(id);
+    if(old && old.g===tk.g && (old.pending || (old.result && Date.now()-old.at<600000))) return;
+    loadWorkContext();
+  }, 400);
 }
 function chooseWorkDoc(id){
   var r=WORK_CONTEXT[S.epoch+'|'+id];if(!r || !r.result){toast('연결 자료를 다시 확인해주세요.');return;}
