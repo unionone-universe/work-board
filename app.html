@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v149">
+<meta name="uo-version" content="v150">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -1782,7 +1782,7 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
 .costv .cvrow .a i{font-style:normal;font-weight:400;color:var(--t3);font-size:var(--wb-fs-meta)}
 .costv .cvhdr{display:none;cursor:default}
 @media (min-width:720px){
-  .costv .cvrow{grid-template-columns:minmax(0,1fr) 116px 58px 92px 76px 128px;
+  .costv .cvrow{grid-template-columns:minmax(0,1fr) 116px 58px 92px 84px 128px;
     grid-template-areas:"n c d w s a";gap:var(--sp-3)}
   .costv .cvrow .meta{display:contents}
   .costv .cvrow .meta .c{grid-area:c} .costv .cvrow .meta .d{grid-area:d;font-variant-numeric:tabular-nums}
@@ -1795,6 +1795,8 @@ span.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;font
   .costv .cvhdr .a{text-align:right}
 }
 .costv .cvbasis{margin-top:var(--sp-3)}
+.costv .cvpay{margin:0 0 var(--sp-3);color:var(--t2)}
+.costv .cvpay b{color:var(--t1);font-variant-numeric:tabular-nums}
 /* 딱지(상태·중복 의심·추천)는 판과 같은 12px — 한 화면 글자 크기 세 가지 */
 .costv .tag{font-size:var(--wb-fs-label)}
 .costv .fold{margin-top:var(--sp-4)}
@@ -5134,9 +5136,10 @@ function dayChanged(){
 }
 var POLL_BUSY=null, POLL_BOUND=false;
 function pollBoard(){
-  if(ACTIVE_WRITES)return;
   if(document.hidden || navigator.onLine===false || !S.me || !S.token || POLL_BUSY || SOFT) return;
-  if($('modal') && $('modal').innerHTML) return;
+  /* ★ 창이 열려 있거나 저장 중이면 판은 그대로 두고 **알림만** 새로 본다 (2026-10-27 — 결재 알림은 꼭 보여야 한다).
+       판을 다시 그리면 쓰던 창이 흔들리므로 판은 창을 닫은 뒤에 받는다 */
+  if(ACTIVE_WRITES || ($('modal') && $('modal').innerHTML)){ pollNoti(); return; }
   if(Date.now()-(S.lastCheck||0)<20000) return;
   var ep=S.epoch,token=S.token,rev=READ_REV;
   S.lastCheck=Date.now();
@@ -5146,6 +5149,26 @@ function pollBoard(){
     if(v!==S.lastUpdate) return refresh(false);
   })).finally(function(){if(POLL_BUSY===job)POLL_BUSY=null;});
   POLL_BUSY=job;
+}
+/** 판은 건드리지 않고 알림 숫자만 — 서버에 무엇이든 바뀌었을 때만 알림을 받아 온다 (바뀐 게 없으면 lastUpdate 한 번) */
+var NOTI_BUSY=null;
+function pollNoti(){
+  if(NOTI_BUSY || Date.now()-(S.notiCheck||0)<20000) return;
+  var ep=S.epoch, token=S.token;
+  S.notiCheck=Date.now();
+  var job=callWithOptions({quiet:true},'api_lastUpdate').then(function(v){
+    if(ep!==S.epoch || token!==S.token || !v || v.net) return;
+    if(v===S.lastUpdate || v===S.notiUpdate) return;      // 판을 받은 뒤로 · 지난번 알림을 받은 뒤로 바뀐 게 없다
+    return callWithOptions({quiet:true},'api_notifications').then(function(r){
+      if(ep!==S.epoch || token!==S.token || !r || !r.ok || !Array.isArray(r.rows)) return;
+      S.notiUpdate=v;
+      var 전={}; (S.noti||[]).forEach(function(n){ if(n) 전[n.id]=1; });
+      var 새결재=r.rows.filter(function(n){ return n && !전[n.id] && /결재|열람/.test(String(n.kind||'')); });
+      showNoti(r.rows);
+      if(새결재.length) toast(새결재.length===1 ? '새 알림 · '+String(새결재[0].text||'').split('\n')[0] : '새 결재 알림 '+새결재.length+'건');
+    });
+  }).catch(function(){}).finally(function(){ if(NOTI_BUSY===job) NOTI_BUSY=null; });
+  NOTI_BUSY=job;
 }
 function startPolling(){
   if(S.timer) clearInterval(S.timer);
@@ -11619,6 +11642,17 @@ function paintCost(){
     else { 대기.n+=1; 대기.s+=x.it.amt; }
   });
   var 합=0; 고른.forEach(function(c){ 합+=승인[c]||0; });
+  /* 결제 확인 (2026-10-27) — 승인 금액 중 대표 · 전무 · 관리자가 실제 결제를 확인해 표시한 것.
+     결제 기록을 쓰기 전(2026-10-01 전)에 승인된 문서는 따로 셉니다 — 결제 대기로 우기지 않습니다 */
+  var 결제={ 완료:0, 대기:0, 대기건:{}, 없음:0 };
+  대상.forEach(function(x){
+    if(x.st!=='승인완료' || x.it.amt==null) return;
+    var p=x.d.pay;
+    if(!p) 결제.없음+=x.it.amt;
+    else if(p.state==='완료') 결제.완료+=x.it.amt;
+    else { 결제.대기+=x.it.amt; 결제.대기건[x.d.no]=1; }
+  });
+  var 결제대기건=Object.keys(결제.대기건).length;
 
   var 목록=대상.filter(function(x){ return 들어오나(x.st); }).sort(function(a,b){
     if(a.day!==b.day) return a.day<b.day ? 1 : -1;
@@ -11653,6 +11687,11 @@ function paintCost(){
   if(금액없음) 보조.push('금액이 비어 있는 품목 '+금액없음+'건');
   if(제외) 보조.push('반려·취소 '+제외+'건 제외');
   if(보조.length) h+='<p class="note t2 cvnote">'+esc(보조.join(' · '))+'</p>';
+  if(결제.완료 || 결제.대기){
+    h+='<p class="note cvpay">결제 확인 · 완료 <b>'+won(결제.완료)+'원</b>'+
+       (결제.대기? ' · <span class="wnv">결제 대기 '+결제대기건+'건 '+won(결제.대기)+'원</span>' : '')+
+       (결제.없음? ' · 결제 기록 없음 '+won(결제.없음)+'원' : '')+'</p>';
+  }
 
   if(!목록.length){
     h+='<p class="none cvnone">해당 기간에 등록된 비용이 없습니다</p>';
@@ -11676,7 +11715,8 @@ function paintCost(){
          '<span class="meta"><span class="c">'+esc(x.it.cat)+'</span>'+
            '<span class="d">'+esc(shortDate(x.day))+'</span>'+
            '<span class="w">'+esc(x.d.who||'')+'</span></span>'+
-         '<span class="s">'+docBadge(x.st)+'</span>'+
+         /* 승인된 지출은 결제 상태가 더 앞선 사실입니다 — 결제 완료 · 결제 대기로 보여 줍니다 */
+         '<span class="s">'+(x.d.pay? payTag(x.d.pay) : docBadge(x.st))+'</span>'+
          '<span class="a">'+(x.it.amt==null? '<i>금액 없음</i>' : won(x.it.amt)+'원')+'</span>'+
          '</button>'+(구독칸? costSubAct(x, 연결) : '')+'</div>';
     });
@@ -11687,7 +11727,8 @@ function paintCost(){
        '합치지 않았으니 문서를 열어 확인하세요 (합계에는 둘 다 들어 있습니다)</p>';
   }
   h+='<p class="note cvbasis">기준일은 품목의 사용일자(비어 있으면 기안일)입니다 · '+
-     '승인 금액은 최종 승인된 문서의 품목 금액입니다 (실제 지급 여부는 여기서 알 수 없습니다)</p>';
+     '승인 금액은 최종 승인된 문서의 품목 금액입니다 · '+
+     '결제 완료는 대표 · 전무 · 관리자가 실제 결제를 확인해 표시한 것입니다</p>';
 
   /* 미분류 — 임의로 넣거나 빼지 않고 사람이 확인하게 */
   if(미분류.length){
@@ -12688,6 +12729,11 @@ function payBadge(p){
   return p.state==='완료'
     ? '<span class="tag gy">결제 완료'+(p.date? ' '+esc(shortDate(p.date)) : '')+'</span>'
     : '<span class="tag wn">결제 대기</span>';
+}
+/** 비용 목록의 상태 칸처럼 좁은 자리용 — 날짜 없이 짧게 (날짜는 문서를 열면) */
+function payTag(p){
+  if(!p) return '';
+  return p.state==='완료' ? '<span class="tag gy">결제 완료</span>' : '<span class="tag wn">결제 대기</span>';
 }
 function payAll(){
   var src=docSource(), out=[];
