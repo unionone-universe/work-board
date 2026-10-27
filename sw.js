@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v147';  // 2026-10-26 기록장 초안(첨부 포함) · 삭제 중 목록 지키기
+const CACHE = 'unionone-launcher-v148';  // 2026-10-27 결재 알림 즉시 · 결제 상태 구분
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;

@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v147">
+<meta name="uo-version" content="v148">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -2195,6 +2195,12 @@ body:has(#writeDock:not([hidden])) #requestActivity{bottom:calc(158px + env(safe
 /* 다른 창(입력 · 목록)이 떠 있는 동안에는 보내는 중 줄을 숨긴다 — 그 창의 단추를 가리지 않게. 업무 상세에서는 그대로 보인다 (2026-10-22) */
 body:has(#modal .veil:not(.tdveil)) #writeDock,body:has(#modal .veil:not(.tdveil)) #outboxBar{display:none}
 @media(max-width:540px){#deleteNotice{flex-wrap:wrap}#deleteNotice>span{flex:1 0 100%}}
+/* 결제 칸 (2026-10-27) — 결재 상세 안 · 결재 상태와 따로 */
+.paybox{margin:14px 0;padding:12px 14px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--card)}
+.paybox .t{margin:0;font-weight:600;color:var(--t1);display:flex;align-items:center;gap:6px}
+.paybox .b{margin:4px 0 0;font-size:var(--fs-sm);color:var(--t3)}
+.paybox .field{margin-top:10px}
+.paybox .actions{margin-top:10px}
 </style>
 </head>
 <body>
@@ -4560,6 +4566,7 @@ function resetUserCaches(){
   TF_DRAFT=null;                               // 앞사람의 저장 실패 글 (2026-09-30 검수 1차)
   STAFF_MEM=Object.create(null); STAFF_CHAIN=Object.create(null); CFG_MEM=Object.create(null); VENDORS=null;   // 앞사람의 관리자 고침 · 거래처 (2026-10-26)
   SETTINGS_FETCH=null; SETTINGS_FETCH_ACCT=null; SETTINGS_GEN++; VENDOR_MEM=[]; VENDOR_BASE=null; VENDOR_GEN++;              // 앞사람의 조회에 합치지 않는다
+  PAY_TRACK=Object.create(null);                                                                           // 앞사람의 결제 표시 차례
   NOTE_PENDING=Object.create(null); NOTE_DELETING=Object.create(null); NOTE.drafts=[]; NOTE.server=null; NOTE.rows=null; NOTE.pick=[]; NOTE_GEN++; NOTE.loading=null;   // 앞사람의 기록장 초안 · 보내는 중 · 조회
 }
 
@@ -5142,7 +5149,7 @@ function pollBoard(){
 }
 function startPolling(){
   if(S.timer) clearInterval(S.timer);
-  S.timer=setInterval(pollBoard,60000);
+  S.timer=setInterval(pollBoard,30000);   // 30초 (2026-10-27 — 결재 알림이 늦게 보인다는 지시). 확인은 가벼운 lastUpdate 한 번
   if(!POLL_BOUND){document.addEventListener('visibilitychange',pollBoard);POLL_BOUND=true;}
 }
 
@@ -8889,7 +8896,8 @@ var OUTBOX_NAMES={taskSave:'업무 저장',log:'업무 기록',event:'일정',po
   logDelete:'기록 삭제',commentDelete:'댓글 삭제',eventDelete:'일정 삭제',leaveDelete:'휴가 삭제',postDelete:'공지 삭제',docDelete:'결재 삭제',
   docAct:'결재 승인·반려',docActMany:'결재 여러 건',docRead:'열람 확인',staffSave:'직원 정보',staffApprove:'가입 승인',staffReject:'가입 거절',
   pinReset:'PIN 초기화',settingSave:'설정',vendorSave:'거래처',costCat:'비용 분류',
-  settleCut:'차감',settleDelete:'정산 삭제',fileDrop:'자료 떼기',guestOff:'고객 링크 끄기',roomWrite:'글',roomDelete:'글 삭제'};
+  settleCut:'차감',settleDelete:'정산 삭제',fileDrop:'자료 떼기',guestOff:'고객 링크 끄기',roomWrite:'글',roomDelete:'글 삭제',
+  docPay:'결제 확인'};
 /* ★ 요청 하나 = 저장 칸 하나 (uo_outbox_v1:요청번호 · 2026-10-26).
    예전에는 목록 하나를 읽고 고쳐 통째로 다시 썼다 — 탭 두 개가 동시에 쓰면 늦게 쓴 탭의 옛 목록이
    다른 탭이 방금 적은 요청을 지웠다(Astra 지적). 이제 적기 · 지우기는 그 요청의 칸 하나만 건드린다.
@@ -9052,6 +9060,10 @@ function outboxLocal(x){
     if(S.data.filesByTask&&S.data.filesByTask[x.task])S.data.filesByTask[x.task]=gone(S.data.filesByTask[x.task],'id');
   }
   else if(x.kind==='guestOff'){var gt=taskOf_(x.ref);if(gt)gt.guest='';}
+  else if(x.kind==='docPay'){                      // 보내는 중인 결제 표시 — 다시 받은 판에서도 그 상태로
+    var pp=x.args&&x.args[0]||{};
+    docPayLocal(x.ref, pp.paid===false ? {state:'대기'} : {state:'완료',date:pp.date||'',by:(S.me&&S.me.name)||'',memo:pp.memo||''}, true);
+  }
   else if(x.kind==='costCat'){                     // 보내는 중인 비용 분류 — 다시 받은 판에서도 고른 분류로
     var by={}; (Array.isArray(x.args[1])?x.args[1]:[]).forEach(function(v){ if(v) by[Number(v.seq)]=v.cat||''; });
     (S.data.costItems||[]).forEach(function(it){ if(it && it.no===x.ref && by.hasOwnProperty(Number(it.seq))){ it.cat=by[Number(it.seq)]; it.sug=''; } });
@@ -11481,6 +11493,11 @@ function paintDocs(r){
   h+=docSec('내가 결재할 것', r.toAct, true, true);
   h+=docSec('내가 올린 것', drafts.filter(살아있나), false, true);
   h+=docSec('열람할 것', others.filter(function(d){ return 살아있나(d) || d.canRead; }), false, true);
+  /* 결제 대기 — 승인됐지만 실제 결제를 아직 표시하지 않은 지출 (표시할 수 있는 사람에게만, 2026-10-27) */
+  if(S.data && S.data.docBox){
+    var 결제대기=payAll().filter(function(d){ return d.pay.state==='대기'; });
+    if(결제대기.length) h+=docSec('결제 대기', 결제대기, false, true);
+  }
   if(done.length){
     h+=foldBox('docDone', '끝난 문서 <span class="n">'+done.length+'</span>',
                docSec('', done, false, true));
@@ -12651,9 +12668,95 @@ function docSec(title, arr, hot, 종류표시){
        '<div class="r">'+
          (d.amount? '<span class="v">'+won(d.amount)+'원</span>':'')+
          (st==='반려'? '<span class="s">'+docBadge(st)+'</span>' : '')+
+         (d.pay? '<span class="s">'+payBadge(d.pay)+'</span>' : '')+
        '</div></div>';
   });
   return h;
+}
+
+/* ===================== 결제 확인 (2026-10-27 대표님 지시) =====================
+   결재 상태(승인완료)와 결제 상태(결제 대기 → 결제 완료)를 나눠 보인다.
+   ★ 결제 상태는 서버가 정해 보낸다(d.pay — 승인완료된 지출결의서 · 구매요청서만). 화면이 승인=결제로 짐작하지 않는다
+   ★ 표시 · 취소는 대표 · 전무 · 관리자(서버가 d.canPay 로 알려 주고, 저장할 때 다시 본다)
+   ★ 누르는 즉시 화면에 반영하고 보내는 함이 같은 요청 번호로 보낸다. 안 되면 이유를 남기고 되돌린다 */
+/* 문서마다 결제 표시 차례 (2026-10-27 Astra 지적) — PAY_TRACK[문서번호] = {seq: 마지막으로 누른 차례, confirmed: 서버가 확인한 상태}.
+   완료를 누르고 답이 오기 전에 취소를 누르면, 앞 요청의 답이 뒤 표시를 덮지 않게 마지막 차례의 답만 화면에 반영한다.
+   안 되면 서버가 마지막으로 확인한 상태로 되돌린다 (그사이 앞 요청이 성공했으면 그 상태) */
+var PAY_TRACK=Object.create(null);
+function payBadge(p){
+  if(!p) return '';
+  return p.state==='완료'
+    ? '<span class="tag gy">결제 완료'+(p.date? ' '+esc(shortDate(p.date)) : '')+'</span>'
+    : '<span class="tag wn">결제 대기</span>';
+}
+function payAll(){
+  var src=docSource(), out=[];
+  if(src) ['toAct','drafts','others'].forEach(function(k){ (src[k]||[]).forEach(function(d){ if(d && d.pay) out.push(d); }); });
+  return out;
+}
+/** 문서 한 건의 결제 상태를 화면이 들고 있는 곳(목록 · 받아 둔 상세)에 반영 */
+function docPayLocal(no, pay, quiet){
+  var src=docSource();
+  if(src) ['toAct','drafts','others'].forEach(function(k){ (src[k]||[]).forEach(function(d){ if(d && d.no===no && d.pay) d.pay=pay; }); });
+  [S.docCache && S.docCache[no], S.data && S.data.docPack && S.data.docPack[no]].forEach(function(r){
+    if(r && r.doc && r.doc.pay) r.doc.pay=pay;
+  });
+  if(quiet) return;
+  if(S.view==='doc') renderDocs();
+  var body=$('ddBody'); if(body && body.dataset.no===no && S.docCache[no]) body.innerHTML=docDetailBody(S.docCache[no]);
+}
+/** 상세의 결제 칸 */
+function payBoxHtml(d){
+  var p=d.pay; if(!p) return '';
+  var 완료=p.state==='완료';
+  var 줄=완료 ? ['결제 완료', p.date? shortDate(p.date) : '', p.by||''].filter(function(x){return x;}).join(' · ') : '결제 대기';
+  var h='<div class="paybox" id="dpBox"><p class="t">'+(완료? ic('check') : '')+esc(줄)+'</p>'+
+    (완료 && p.memo? '<p class="b">'+esc(p.memo)+'</p>' : (!완료? '<p class="b">승인됐어도 실제 결제를 확인해 표시하기 전까지는 결제 대기입니다</p>' : ''));
+  if(d.canPay){
+    h+= 완료
+      ? '<div class="actions"><button class="btn sm" onclick="docPay(\''+esc(d.no)+'\',false)">결제 완료 취소</button></div>'
+      : '<div class="field"><label class="fl" for="dpDate">실제 결제일</label><input type="date" id="dpDate" value="'+todayStr()+'" max="'+todayStr()+'"></div>'+
+        '<div class="field"><label class="fl" for="dpMemo">메모</label><input type="text" id="dpMemo" maxlength="200"></div>'+
+        '<div class="actions"><button class="btn pri" onclick="docPay(\''+esc(d.no)+'\',true)">결제 완료로 표시</button></div>';
+  }
+  return h+'</div>';
+}
+function docPay(no, paid){
+  var r=S.docCache[no], d=r&&r.doc, brief=findDocBrief(no);
+  var was=(d&&d.pay) || (brief&&brief.pay) || null;
+  if(!was) return;
+  var date='', memo='';
+  if(paid){
+    date=String(($('dpDate')||{}).value||'').trim(); memo=String(($('dpMemo')||{}).value||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ toast('실제 결제일을 넣어 주세요'); return; }
+    if(date>todayStr()){ toast('결제일이 오늘보다 뒤입니다'); return; }
+  } else if(!confirm('결제 완료 표시를 취소할까요? 기록은 남습니다.')) return;
+  var next=paid ? {state:'완료',date:date,by:(S.me&&S.me.name)||'',memo:memo} : {state:'대기'};
+  var account=accountStamp(), qk='pay:'+no;
+  var tr=PAY_TRACK[no]||(PAY_TRACK[no]={seq:0,confirmed:was,pending:0});
+  if(!tr.pending) tr.confirmed=was;                         // 보내는 중인 것이 없으면 지금 보이는 것이 서버 값 (그사이 다른 사람이 바꿨어도)
+  tr.pending++;
+  var mySeq=++tr.seq;
+  docPayLocal(no, next);
+  toast(paid ? '결제 완료 표시를 보내는 중입니다' : '결제 완료 취소를 보내는 중입니다');
+  var sent=reliableCall({kind:'docPay',ref:no,title:(brief&&brief.title)||(d&&d.title)||'',after:staffAfter(qk)},'api_docPaid',
+                        [{no:no,paid:!!paid,date:date,memo:memo,reqId:newRid()}]);
+  staffQueue(qk, sent);
+  sent.then(function(res){
+    if(!sameAccount(account) || (res && res.stale)) return;
+    tr.pending=Math.max(0,tr.pending-1);
+    var latest=PAY_TRACK[no]===tr && tr.seq===mySeq;          // 뒤에 누른 것이 없을 때만 화면을 바꾼다
+    if(!res || !res.ok){
+      if(latest) docPayLocal(no, tr.confirmed);                // 서버가 마지막으로 확인한 상태로
+      deleteNoticeShow((paid?'결제 완료로 표시하지':'결제 완료를 취소하지')+' 못했습니다: '+((res&&(res.msg||res.message))||'통신을 확인해 주세요.'),!res||!!res.net);
+      if(res && (res.code==='DONE' || res.code==='NOTDONE' || res.code==='NOT_APPROVED')) softRefresh(0);
+      return;
+    }
+    tr.confirmed=res.pay||next;
+    boardInvalidate();
+    if(latest) docPayLocal(no, tr.confirmed);
+    toast(paid ? '결제 완료로 표시했습니다' : '결제 완료를 취소했습니다', 'ok');
+  });
 }
 
 /** 목록이 이미 가진 값으로 창을 즉시 띄우고 내역·결재선만 뒤에서 채운다 */
@@ -12799,6 +12902,8 @@ function docDetailBody(r){
     });
     h+='</div>';
   }
+
+  h+=payBoxHtml(d);                                // 결제 대기 / 결제 완료 (2026-10-27)
 
   /* 비용 분류 바꾸기 — 올린 사람·관리자만 (d.canCat 은 서버 판정, 저장할 때 서버가 다시 봅니다) */
   if(비용문서 && d.canCat && r.items.length){
@@ -14036,6 +14141,7 @@ function outboxTarget(x){
   if(x.kind==='settingSave') return 'cfg:'+x.ref;
   if(x.kind==='vendorSave') return 'vendors';
   if(x.kind==='costCat') return 'cost:'+x.ref;
+  if(x.kind==='docPay') return 'pay:'+x.ref;
   return '';
 }
 function settingsWithPending(r){
