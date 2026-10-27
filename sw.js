@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v151';  // 2026-10-27 업무 종류 회의록 · 거르기 칸 제자리
+const CACHE = 'unionone-launcher-v152';  // 2026-10-27 업무 내용 · 공지 글 안 사진 (가볍게 1280px)
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;

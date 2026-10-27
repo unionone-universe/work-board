@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v151">
+<meta name="uo-version" content="v152">
 <title>UNION ONE WORK BOARD</title>
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
@@ -791,6 +791,21 @@ table.mk-tb .al-c{text-align:center} table.mk-tb .al-r{text-align:right}
 .mkbar .mkmore{margin-left:auto;width:auto;padding:0 9px;white-space:nowrap;
   font-size:var(--fs-sm);font-weight:600}
 .mkbar .mkmore.on{background:var(--panel2);color:var(--t1);border-color:var(--t3)}
+/* 글 안 사진 (2026-10-27) — 글 사이에 화면 폭에 맞춰. 사진에 꼭 맞는 상자라 지우기 단추가 사진 모서리에 붙는다 */
+.mk-img{position:relative;display:block;width:fit-content;max-width:min(100%,720px);margin:10px 0;line-height:0}
+.mk-img img{display:block;max-width:100%;height:auto;max-height:75vh;border-radius:var(--r-md);background:var(--field);cursor:zoom-in}
+.mk-img.bad{min-width:200px;min-height:64px;border-radius:var(--r-md);background:var(--field)}
+.mk-img.bad img{opacity:0;min-width:200px;min-height:64px}
+.mk-img.bad::before{content:"사진을 불러오지 못했습니다";position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  line-height:1.4;font-size:var(--fs-sm);color:var(--t3)}
+.mkin .mk-img img{max-height:280px;cursor:default}
+.mkin .mk-img::after{content:"";position:absolute;top:6px;right:6px;width:28px;height:28px;border-radius:50%;cursor:pointer;
+  background:rgba(0,0,0,.62) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Cpath d='M4.5 4.5l7 7M11.5 4.5l-7 7' stroke='white' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E") center/14px no-repeat}
+.mkin .mk-img.up img{opacity:.45}
+.mkin .mk-img.up::before{content:"올리는 중";position:absolute;left:8px;bottom:8px;z-index:1;padding:4px 8px;border-radius:6px;
+  background:rgba(0,0,0,.66);color:#fff;font-size:12px;line-height:1.2}
+.mkbar .mkimgbtn{width:auto;padding:0 9px;gap:4px;white-space:nowrap;font-size:var(--fs-sm);font-weight:600;display:inline-flex;align-items:center}
+.mkbar .mkimgbtn .ic{width:16px;height:16px}
 
 /* 펼친 줄 · 색판 · 표판 — 모두 같은 모양의 '판' 이다.
    ★ 묶음마다 왼쪽에 이름을 붙인다. 버튼만 늘어놓으면 무엇이 무엇인지 알 수 없다. */
@@ -2844,6 +2859,9 @@ function fmt(s){
     if(/^:!\s?/.test(t)){ block('<div class="mk-cal warn">'+mkInline(t.replace(/^:!\s?/,''))+'</div>'); continue; }
     if(/^:i\s?/.test(t)){ block('<div class="mk-cal info">'+mkInline(t.replace(/^:i\s?/,''))+'</div>'); continue; }
 
+    /* 글 안 사진 (2026-10-27) — {img:드라이브 파일 번호} 한 줄 */
+    var 사진=mkImgLine(t);
+    if(사진){ block(mkImgHtml(사진)); continue; }
     if(/^\s*---+\s*$/.test(t)){ block('<hr class="mk-hr">'); continue; }
     if(/^##\s+/.test(t)){ block('<h4 class="mk-h2">'+mkInline(t.replace(/^##\s+/,''))+'</h4>'); continue; }
     if(/^#\s+/.test(t)){  block('<h3 class="mk-h1">'+mkInline(t.replace(/^#\s+/,''))+'</h3>'); continue; }
@@ -2912,7 +2930,7 @@ var MK_BTNS=[
      사이에 세로줄을 넣어 '글자 / 색 / 목록' 으로 눈에 갈라 보이게 했습니다.
    ★ 나머지는 [＋ 더보기] 를 눌렀을 때만, **묶음마다 이름을 붙여서** 나옵니다.
      버튼만 스무 개 늘어놓으면 무엇이 무엇인지 알 수 없습니다. */
-function mkBar(id){
+function mkBar(id, img){
   var h='<div class="mkbar" data-for="'+id+'">';
 
   h+=mkIcon(id,'bold')+mkIcon(id,'underline');
@@ -2925,6 +2943,9 @@ function mkBar(id){
        '<span class="mkga mkga-h">가</span></button>';
   h+='<span class="mkdiv"></span>';
   h+=mkIcon(id,'insertUnorderedList')+mkIcon(id,'insertOrderedList');
+  /* 글 안 사진 (2026-10-27) — 커서 자리에 넣는다 */
+  if(img) h+='<span class="mkdiv"></span><button type="button" class="mkimgbtn" title="사진 넣기" '+
+       'onmousedown="event.preventDefault()" onclick="mkImgPick(&#39;'+id+'&#39;)">'+ic('camera')+'사진</button>';
   h+='<button type="button" class="mkmore" '+
        'onmousedown="event.preventDefault()" onclick="mkMore(&#39;'+id+'&#39;)">'+ic('plus')+'더보기</button>';
   h+='</div>';
@@ -3292,6 +3313,12 @@ function mkClosest(el, tag){
 
 /** 할 일 앞의 ☐ 를 눌러 ☑ 로 바꾼다 */
 function mkClick(e, id){
+  var 사진=e.target && e.target.closest ? e.target.closest('figure.mk-img') : null;
+  if(사진){
+    var 칸=사진.getBoundingClientRect();
+    if(e.clientX>=칸.right-40 && e.clientY<=칸.top+40){ 사진.parentNode.removeChild(사진); e.preventDefault(); }
+    return;
+  }
   var li=e.target;
   if(!li || li.tagName!=='LI') return;
   var ul=li.parentNode;
@@ -3699,6 +3726,11 @@ function mkPaste(e){
   e.preventDefault();
   var dt=e.clipboardData||window.clipboardData;
   if(!dt) return;
+  var ed=e.target && e.target.closest ? e.target.closest('.mkin') : null;
+  if(ed && ed.getAttribute('data-img-ok')==='1'){
+    var 사진들=[].filter.call(dt.files||[], function(f){ return /^image\//.test(f.type||''); });
+    if(사진들.length){ mkImgAt(ed.id); mkImgFiles(ed.id, 사진들); return; }
+  }
   var html=dt.getData('text/html')||'';
   var text=dt.getData('text/plain')||'';
   var clean = html ? mkClean(html) : esc(text).replace(/\r?\n/g,'<br>');
@@ -3720,6 +3752,13 @@ function mkClean(html){
     [].slice.call(node.childNodes).forEach(function(n){
       if(n.nodeType===3) return;                    // 글자는 그대로
       if(n.nodeType!==1){ if(n.parentNode) n.parentNode.removeChild(n); return; }
+      /* 우리 글 안 사진만 살린다 — 바깥 그림(남의 주소)은 넣지 않는다.
+         ★ 번호 없는 FIGURE(바깥 글의 코드 예제 · 인용 · 사진 설명)는 아래 길로 — 껍데기만 벗기고 글은 남긴다 (Astra 3차) */
+      if(n.tagName==='FIGURE' || n.tagName==='IMG'){
+        var iid=mkImgIdOf(n);
+        if(iid){ var 틀=n.ownerDocument.createElement('div'); 틀.innerHTML=mkImgHtml(iid); n.parentNode.replaceChild(틀.firstChild, n); return; }
+        if(n.tagName==='IMG'){ if(n.parentNode) n.parentNode.removeChild(n); return; }
+      }
       walk(n);
       if(!MK_KEEP[n.tagName]){
         while(n.firstChild) n.parentNode.insertBefore(n.firstChild, n);   // 태그만 벗긴다
@@ -3784,6 +3823,9 @@ function mkValue(id){
       if(n.nodeType!==1) return;
       var t=n.tagName;
       if(t==='BR'){ s+= inCell ? '{br}' : '\n'; return; }
+      /* 글 안 사진 — 문단 안에 끼어 있어도 제 줄로.
+         ★ 표 칸 안에 들어간 사진(붙여넣기 등)은 버리지 않고 표 바로 뒤에 제 줄로 꺼낸다 (Astra 4차 — 저장 때 조용히 사라졌다) */
+      if(t==='FIGURE' || t==='IMG'){ var 번호=mkImgIdOf(n); if(번호){ if(inCell) 뒤사진.push(번호); else s+='\n{img:'+번호+'}\n'; } return; }
       if(t==='HR'){ return; }
 
       /* ★★ 표 칸 안의 목록 (2026-09-02).
@@ -3837,7 +3879,12 @@ function mkValue(id){
     return s;
   }
 
-  function oneLine(node){ return inline(node).replace(/\n/g,' ').trim(); }
+  /* ★ 글 안 사진이 목록 · 제목 · 인용 줄 안으로 밀려 들어가 있으면(편집 중 줄이 합쳐질 때) 그 줄 뒤에 제 줄로 꺼낸다 —
+       한 줄짜리 덩어리 안에서는 사진 표시가 글자로 보이므로 */
+  var 뒤사진=[];
+  function 사진빼기(s){ return String(s).replace(/\n?\{img:([A-Za-z0-9_-]{20,100})\}\n?/g, function(m, id){ 뒤사진.push(id); return ' '; }); }
+  function 사진내기(){ while(뒤사진.length){ out.push('{img:'+뒤사진.shift()+'}'); out.push(''); } }
+  function oneLine(node){ return 사진빼기(inline(node)).replace(/\n/g,' ').trim(); }
 
   /* 표 칸 하나. 줄바꿈은 {br} 로 살리고, 사람이 친 `|` 만 `/` 로 바꾼다 */
   function cellText(node){ return inline(node, true).replace(/\n/g,'{br}').trim(); }
@@ -3906,6 +3953,7 @@ function mkValue(id){
 
   (function block(node){
     [].slice.call(node.childNodes).forEach(function(n){
+      사진내기();                                   // 앞 덩어리에서 꺼낸 사진을 그 덩어리 바로 뒤에
       if(n.nodeType===3){ if(n.nodeValue.replace(/\u200B/g,'').trim()) out.push(n.nodeValue); return; }
       if(n.nodeType!==1) return;
       var t=n.tagName;
@@ -3914,11 +3962,12 @@ function mkValue(id){
          화면(DOM)에는 문단 사이 빈 줄이 남지 않으므로, 여기서 넣어 주지 않으면
          공지를 한 번 고칠 때마다 문단이 모두 붙어 버린다. */
       if(t==='TABLE'){ table(n); return; }
+      if(t==='FIGURE' || t==='IMG'){ var 번호=mkImgIdOf(n); if(번호){ out.push('{img:'+번호+'}'); out.push(''); } return; }
       if(t==='HR'){ out.push('---'); out.push(''); return; }
       if(t==='H3'){ out.push('# '+oneLine(n)); out.push(''); return; }
       if(t==='H4'){ out.push('## '+oneLine(n)); out.push(''); return; }
       if(t==='BLOCKQUOTE'){
-        inline(n).split('\n').forEach(function(x){ out.push('> '+x.trim()); });
+        사진빼기(inline(n)).split('\n').forEach(function(x){ out.push('> '+x.trim()); });
         out.push('');
         return;
       }
@@ -3940,7 +3989,7 @@ function mkValue(id){
       /* 주의 상자 · 참고 상자 (2026-09-02) — 일반 DIV 로 넘어가기 전에 잡는다 */
       if(t==='DIV' && String(n.className||'').indexOf('mk-cal')>=0){
         var 표 = String(n.className).indexOf('warn')>=0 ? ':! ' : ':i ';
-        inline(n).split('\n').forEach(function(x){ out.push(표+x.trim()); });
+        사진빼기(inline(n)).split('\n').forEach(function(x){ out.push(표+x.trim()); });
         out.push('');
         return;
       }
@@ -3949,11 +3998,12 @@ function mkValue(id){
 
       var body=inline(n);
       var pre=alignOf(n);
-      if(pre) body.split('\n').forEach(function(x){ out.push(pre+x); });
+      if(pre) body.split('\n').forEach(function(x){ out.push(mkImgLine(x)? x : pre+x); });
       else out.push(body);
       out.push('');
     });
   })(el);
+  사진내기();
 
   return out.join('\n').replace(/\u200B/g,'').replace(/\n{3,}/g,'\n\n').trim();
 }
@@ -3966,10 +4016,13 @@ function mkValue(id){
    업무 등록·작업기록 창에서 아이콘 일곱 개가 빈 칸 위에 늘 떠 있어
    등록 창이 글쓰기 도구처럼 보였습니다. 공지·기록장은 그대로 늘 보입니다.
    툴바 버튼은 mousedown 에서 preventDefault 하므로 눌러도 커서가 칸을 떠나지 않습니다. */
-function mkEditor(id, value, minPx, slim){
+function mkEditor(id, value, minPx, slim, img){
   var min=minPx||86;
-  return '<div class="mked'+(slim?' slim':'')+'">'+mkBar(id)+
+  return '<div class="mked'+(slim?' slim':'')+'">'+mkBar(id, img)+
+    (img? '<input type="file" accept="image/*" multiple hidden id="'+id+'ImgIn" '+
+          'onchange="mkImgFiles(\''+id+'\',this.files);this.value=\'\'">' : '')+
     '<div id="'+id+'" class="mkin" contenteditable="true" spellcheck="false" '+
+      (img? 'data-img-ok="1" ondragover="mkImgDrag(event)" ondrop="mkImgDrop(event,\''+id+'\')" ' : '')+
       'style="min-height:'+min+'px" '+
       'onkeydown="mkKey(event,\''+id+'\')" '+
       'onkeyup="mkState(\''+id+'\');atKey(event,this)" '+
@@ -3986,6 +4039,109 @@ function mkShow(el, on){
     if(!w.contains(document.activeElement)) w.classList.remove('on');
   }, 150);
 }
+
+
+/* ===================== 글 안 사진 (2026-10-27 대표님 — 네이버 블로그처럼, 가볍게) =====================
+   업무 내용 · 공지에서만. 사진은 넣는 순간 긴 변 1280px · JPEG 로 줄여(보통 100~300KB) 한 장씩 올리고,
+   글에는 {img:드라이브 파일 번호} 한 줄만 남긴다. 원본을 다 올리지 않는다 — 가볍게가 먼저 (대표님 지시).
+   ★ 보여 줄 때는 구글이 줄여 주는 그림(w1000)을 화면에 보일 때만 받는다 (loading=lazy).
+   ★ 올리는 동안은 **그 칸의** 저장을 막는다 (mkImgBusy — 저장할 때 그 칸에 아직 안 올라간 사진이 있나).
+     앱 전체의 사진 잠금(photoBusy)은 쓰지 않는다 — 창이 바뀌어도 다른 창의 저장을 막지 않게 (Astra 2차). 못 올리면 그 사진만 빠지고 알린다. */
+var MK_IMG_MAX=20, MK_IMG_PX=1280, MK_IMG_Q=0.8, MK_IMG_AT={};
+function mkImgOk(id){ return /^[A-Za-z0-9_-]{20,100}$/.test(String(id||'')); }
+function mkImgHtml(id){
+  return '<figure class="mk-img" contenteditable="false" data-img="'+id+'">'+
+    '<img data-img="'+id+'" loading="lazy" decoding="async" alt="사진" '+
+    'src="https://drive.google.com/thumbnail?id='+id+'&amp;sz=w1000" '+
+    'onclick="mkImgOpen(this)" onerror="mkImgBad(this)"></figure>';
+}
+function mkImgIdOf(n){
+  var id=n && n.getAttribute ? n.getAttribute('data-img') : '';
+  if(!id && n && n.closest){ var f=n.closest('figure[data-img]'); id=f? f.getAttribute('data-img') : ''; }
+  return mkImgOk(id)? id : '';
+}
+/** 눌러서 크게 — 쓰는 칸 안에서는 열지 않는다 */
+function mkImgOpen(img){
+  if(!img || (img.closest && img.closest('.mkin'))) return;
+  var id=mkImgIdOf(img); if(id) openReceipt(id, '');
+}
+function mkImgBad(img){ var f=img && img.parentNode; if(f && f.classList) f.classList.add('bad'); }
+/** 지금 커서 자리를 기억한다 — 사진 고르는 창이 열리면 커서가 칸을 떠나므로 */
+function mkImgAt(id){
+  var ed=$(id), sel=window.getSelection ? window.getSelection() : null;
+  MK_IMG_AT[id]=null;
+  if(ed && sel && sel.rangeCount && ed.contains(sel.getRangeAt(0).startContainer)) MK_IMG_AT[id]=sel.getRangeAt(0).startContainer;
+}
+function mkImgPick(id){ mkImgAt(id); var i=$(id+'ImgIn'); if(i) i.click(); }
+/** 사진은 글 사이의 한 덩어리 — 커서가 있던 줄 바로 뒤에 (빈 줄이면 그 자리에) */
+function mkImgPlace(ed, fig, at){
+  var b=(at && at!==ed && ed.contains(at)) ? at : null;
+  while(b && b.parentNode!==ed) b=b.parentNode;
+  if(!b) ed.appendChild(fig);
+  else if(b.nodeType===1 && b.tagName!=='FIGURE' && !String(b.textContent||'').replace(/\u200B/g,'').trim() && !b.querySelector('img,table,hr')) ed.replaceChild(fig, b);
+  else ed.insertBefore(fig, b.nextSibling);
+  if(!fig.nextSibling || fig.nextSibling.tagName==='FIGURE'){ var d=document.createElement('div'); d.innerHTML='<br>'; ed.insertBefore(d, fig.nextSibling); }
+  return fig;
+}
+function mkImgShrink(file){
+  return photoDecode_(file).then(function(img){
+    var w=img.naturalWidth||img.width, h=img.naturalHeight||img.height;
+    var c=photoCanvas_(img, Math.min(1, MK_IMG_PX/Math.max(w,h,1)));
+    if(img.close){ try{ img.close(); }catch(e){} }
+    return c.toDataURL('image/jpeg', MK_IMG_Q);
+  });
+}
+var MK_IMG_CHAIN=Promise.resolve();
+function mkImgFiles(id, files){
+  var ed=$(id); if(!ed) return;
+  var list=[].filter.call(files||[], function(f){ return f && (/^image\//.test(f.type||'') || /\.(heic|heif)$/i.test(f.name||'')); });
+  if(!list.length){ toast('사진만 넣을 수 있습니다'); return; }
+  var room=MK_IMG_MAX-ed.querySelectorAll('figure.mk-img').length;
+  if(list.length>room){ toast('사진은 한 글에 '+MK_IMG_MAX+'장까지 넣을 수 있습니다'); list=list.slice(0, Math.max(0, room)); }
+  var at=MK_IMG_AT[id];
+  list.forEach(function(file){
+    var url=URL.createObjectURL(file), fig=document.createElement('figure'), img=document.createElement('img');
+    fig.className='mk-img up'; fig.setAttribute('contenteditable','false');
+    img.alt='사진'; img.src=url; img.setAttribute('onclick','mkImgOpen(this)'); fig.appendChild(img);
+    at=mkImgPlace(ed, fig, at);
+    /* 한 장씩 차례로 — 서버에 몰리지 않게 */
+    MK_IMG_CHAIN=MK_IMG_CHAIN.then(function(){
+      /* ★ 원본 사진(Blob 주소)은 줄인 그림을 만들자마자 놓아 준다 — 넣고 빼기를 되풀이해도 원본이 쌓이지 않게 (Astra 1차) */
+      if(!mkImgLive(fig)){ URL.revokeObjectURL(url); return; }      // 올리기 전에 지웠거나 창이 바뀌었다
+      return mkImgShrink(file).then(function(data){
+        img.src=data; URL.revokeObjectURL(url);                     // 미리보기는 줄인 그림으로 (원본보다 훨씬 작다)
+        if(!mkImgLive(fig)) return { ok:true, gone:true };            // 줄이는 사이에 지웠거나 창이 바뀌었다 — 올리지 않는다
+        return call('api_inlineImage', {data:data});
+      }).then(function(r){
+        if(r && r.gone) return;
+        if(!r || !r.ok || !mkImgOk(r.id)) throw new Error((r && r.msg) || '');
+        fig.setAttribute('data-img', r.id); img.setAttribute('data-img', r.id); fig.classList.remove('up');
+      }).catch(function(e){
+        if(fig.parentNode) fig.parentNode.removeChild(fig);
+        URL.revokeObjectURL(url);
+        toast((e && e.message) || '사진을 넣지 못했습니다. 다시 넣어 주세요');
+      });
+    });
+  });
+  MK_IMG_AT[id]=at;
+}
+function mkImgDrag(e){ if(e.dataTransfer && [].indexOf.call(e.dataTransfer.types||[],'Files')>=0) e.preventDefault(); }
+function mkImgDrop(e, id){
+  var fs=e.dataTransfer && e.dataTransfer.files;
+  if(!fs || !fs.length) return;
+  e.preventDefault();
+  var r=document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null;
+  MK_IMG_AT[id]= r ? r.startContainer : null;
+  mkImgFiles(id, fs);
+}
+/** 그 사진이 아직 화면의 쓰는 칸에 붙어 있나 — 빼거나 창이 바뀌면(편집기째 떨어져 나가면) 아니다 (Astra 2차) */
+function mkImgLive(fig){ return !!fig && (fig.isConnected!==undefined ? fig.isConnected : document.documentElement.contains(fig)); }
+/** 아직 올라가지 않은 사진이 있나 (있으면 저장하지 않는다 — 글에서 빠진다) */
+function mkImgBusy(id){ var ed=$(id); return !!(ed && ed.querySelector('figure.mk-img.up')); }
+/** 저장 글의 한 줄이 글 안 사진이면 그 파일 번호 */
+function mkImgLine(s){ var m=/^\{img:([A-Za-z0-9_-]{20,100})\}$/.exec(String(s==null?'':s).trim()); return m? m[1] : ''; }
+/** 찾기 · 보내지 못한 목록 미리보기에서 사진 표시를 걷어낸다 */
+function mkNoImg(s, put){ return String(s==null?'':s).replace(/\{img:[A-Za-z0-9_-]{20,100}\}/g, put||' '); }
 
 /* ===================== 짧은 날짜 · 누가 언제 한 줄 (v42) ===================== */
 
@@ -8660,7 +8816,7 @@ function drawTaskForm(id, t, files){
     '<div class="fmorebox">'+
       '<div class="fgrp"><p class="fgh">'+ic('list')+'자세한 내용</p>'+
         '<div class="field"><label class="fl">업무 내용</label>'+
-          mkEditor('tfContent', (t&&t.content)?t.content:'', 64, true)+'</div>'+
+          mkEditor('tfContent', (t&&t.content)?t.content:'', 64, true, true)+'</div>'+
       '</div>'+
       /* 철거를 고르면 현장 · 계약금액 (고른 뒤에야 보인다 — syncDemo) */
       '<div class="fgrp" id="tfDemo"><p class="fgh">'+ic('pin')+'현장</p>'+
@@ -8998,7 +9154,7 @@ document.addEventListener('visibilitychange',function(){if(!document.hidden)outb
 /** o: {kind, ref, task, title, preview, persist, form, rid, timeoutMs, cap} · args: 토큰 뒤의 인자들 (토큰은 적어 두지 않는다) */
 function reliableCall(o,fn,args){
   var account=accountStamp(),item={rid:o.rid||newRid(),fn:fn,args:args,kind:o.kind||'',ref:String(o.ref||''),task:String(o.task||''),
-    title:String(o.title||'').slice(0,80),preview:String(o.preview||'').slice(0,200),who:account.who,tag:tokenTag(account.token),at:Date.now(),state:'send',tab:TAB_ID};
+    title:String(o.title||'').slice(0,80),preview:mkNoImg(o.preview,'[사진]').slice(0,200),who:account.who,tag:tokenTag(account.token),at:Date.now(),state:'send',tab:TAB_ID};
   if(o.needs) item.needs=String(o.needs);                     // 앞선 요청(번호)이 성공해야 보내는 것 — 다시 접속해 보낼 때도 본다
   var kept=false;
   if(o.persist!==false){try{kept=JSON.stringify(item).length<=OUTBOX_ITEM_MAX&&outboxPut(item);}catch(e){kept=false;}}
@@ -9466,6 +9622,7 @@ function saveTask(){
   }
   /* ★ 유형을 미리 골라 두지 않으므로, 안 고르면 여기서 막는다 (2026-09-01).
      예전에는 '철거' 가 미리 켜져 있어서, 다른 유형인데 그대로 저장되는 일이 있었습니다. */
+  if(PHOTO_BUSY > 0 || mkImgBusy('tfContent')){ tfFail('사진을 올리는 중입니다. 잠시만 기다려 주세요.', $('tfContent')); return; }
   if(!type){ tfFail('업무 종류를 골라주세요.', $('tfType')); return; }
   if(!p.title){ tfFail('업무명을 입력해주세요.', $('tfTitle')); return; }
   var version=$('tfId').dataset.editVersion;
@@ -11108,7 +11265,7 @@ function openPostForm(no){
     '<div class="field"><label class="fl req">제목</label>'+
       '<input type="text" id="pfTitle" value="'+esc(p?p.title:'')+'"></div>'+
     '<div class="field"><label class="fl req">내용</label>'+
-      mkEditor('pfBody', p?p.body:'', 110)+'</div>'+
+      mkEditor('pfBody', p?p.body:'', 110, false, true)+'</div>'+
     photoField('pfPhoto', '사진')+
     '<div class="actions"><button class="btn" onclick="closeModal()">취소</button>'+
     '<button class="btn pri" id="pfSave" onclick="savePost(\''+(p?p.no:'')+'\')">'+
@@ -11140,6 +11297,7 @@ function savePost(no, confirmed){
   var body=mkValue('pfBody');
   var msg=$('pfMsg');
   if(PHOTO_BUSY > 0){ msg.textContent='사진을 정리하는 중입니다. 잠시만 기다려 주세요.'; return; }
+  if(mkImgBusy('pfBody')){ msg.textContent='사진을 올리는 중입니다. 잠시만 기다려 주세요.'; return; }
   var shots=photoValues('pfPhoto');
   if(!title){ msg.textContent='제목을 입력해주세요.'; return; }
   if(!body){ msg.textContent='내용을 입력해주세요.'; return; }
@@ -15156,7 +15314,7 @@ var SEARCH_IDX = null;
 var SEARCH_Q = '';
 
 function searchNorm(s){
-  return String(s==null?'':s).toLowerCase().replace(/[\s\-.,()·]/g,'');
+  return mkNoImg(s).toLowerCase().replace(/[\s\-.,()·]/g,'');
 }
 
 /** 창을 열 때 한 번. 화면이 이미 가진 것만 모은다 */
