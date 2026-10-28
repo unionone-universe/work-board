@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v158">
+<meta name="uo-version" content="v159">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -4728,6 +4728,13 @@ function tokenTag(t){
 
 /** 본인 업무만 보는 사람인가 — **서버가 보낸 값(scope)만** 본다. 화면이 등급으로 스스로 정하지 않는다 */
 function ownScope(){ return !!(S.data && S.data.scope === 'own'); }
+/* ★ 실장 — 본인 + 아래 직급 직원 업무를 본다 (서버 범위 'team' · 2026-10-28). 판정은 서버가 하고 화면은 보이는 것만 맞춘다.
+     아래 직원 업무는 **보기 · 댓글만**: [업무 수정] · [기록 남기기] · 정산 · 결재 연결을 그리지 않는다 (서버도 막는다) */
+function teamScope(){ return !!(S.data && S.data.scope === 'team'); }
+/** 담당자를 본인만 정할 수 있나 — 본인 업무 직원 · 실장 */
+function selfOnly(){ return ownScope() || teamScope(); }
+/** 보이기만 하는 업무인가 (실장이 보는 아래 직원 업무) */
+function taskRO(t){ return teamScope() && !!t && !myPhone(t.owner); }
 
 /** 사람·권한이 바뀌었을 때 이 화면이 들고 있던 것을 전부 버린다 (2026-09-30) */
 function resetUserCaches(){
@@ -4769,7 +4776,7 @@ function forgetTask(id){
   /* ★ 본인 업무만 보는 사람의 현장(견적) 목록은 '본인 업무에 연결된 현장' 입니다 (검수 2차).
      잊은 업무에만 걸려 있던 현장은 이름 · 주소 · 견적금액까지 화면과 저장본에서 숨긴다 — 다시 확인받을 때(판)까지.
      어느 현장이었는지 모르면 남은 업무에 연결된 현장만 남긴다 (좁게). 전체를 보는 사람은 손대지 않는다 */
-  if(d.scope==='own' && S.meta && Array.isArray(S.meta.sites)){
+  if((d.scope==='own' || d.scope==='team') && S.meta && Array.isArray(S.meta.sites)){
     var 남은={};
     (Array.isArray(d.tasks) ? d.tasks : []).forEach(function(t){ if(t && t.site) 남은[String(t.site).trim()]=1; });
     S.meta.sites=S.meta.sites.filter(function(x){
@@ -5590,8 +5597,11 @@ function renderFilters(){
     /* ★ '나' 가 맨 위 (워크보드 2.0) — 예전 '내 업무' 화면을 여기로 합쳤습니다 */
     var 나=(S.me && S.me.phone) || '';
     if(나) h+='<option value="'+esc(나)+'"'+(S.owner===나?' selected':'')+'>나 ('+esc(S.me.name||'')+')</option>';
+    /* 실장은 볼 수 있는 업무의 담당자만 (고르면 빈 판이 되는 사람은 빼고) */
+    var 있는담당={};((S.data && S.data.tasks) || []).forEach(function(x){ if(x && x.owner) 있는담당[x.owner]=1; });
     staffSorted().forEach(function(x){
       if(x.phone===나) return;
+      if(teamScope() && !있는담당[x.phone]) return;
       h+='<option value="'+esc(x.phone)+'"'+(S.owner===x.phone?' selected':'')+'>'+esc(x.name)+'</option>';
     });
     h+='</select></label>';
@@ -6012,7 +6022,7 @@ function openStateAll(k){
 /** 업무 제목 — 본인 업무만 보는 사람은 '내 업무 현황', 그 밖에는 거른 담당에 따라 */
 function scopeTitle(){
   if(ownScope()) return '내 업무 현황';
-  if(!S.owner) return '전체 업무';
+  if(!S.owner) return teamScope() ? '팀 업무' : '전체 업무';
   if(S.me && S.owner===S.me.phone) return '내 업무';
   return ownerNameOf(S.owner)+' 업무';
 }
@@ -7459,7 +7469,7 @@ async function checkCustomerLink(){
 var WORK_CONTEXT={};
 function workContextHtml(r){
   var c=r.context,t=c.task,s=c.site;
-  var h='<section class="tdsec"><h4 class="tdh">업무에서 이어서</h4><div class="work-actions">'+
+  var h=taskRO(taskOf_(t.id)) ? '' : '<section class="tdsec"><h4 class="tdh">업무에서 이어서</h4><div class="work-actions">'+
     '<button class="btn pri" data-task="'+esc(t.id)+'" onclick="chooseWorkDoc(this.dataset.task)">결재 작성</button></div></section>';
   h+=masterSummaryHtml(c);
   h+='<details class="work-more"><summary>기존 업무 자료 · 상담</summary><section class="tdsec"><h4 class="tdh">담당자 · 연결 견적</h4><dl class="tdinfo">'+
@@ -7513,6 +7523,7 @@ function prefetchWorkContext(id){
   }, 400);
 }
 function chooseWorkDoc(id){
+  if(taskRO(taskOf_(id))){ toast('이 업무는 볼 수만 있습니다. 결재 연결은 담당자가 합니다'); return; }
   var r=WORK_CONTEXT[S.epoch+'|'+id];if(!r || !r.result){toast('연결 자료를 다시 확인해주세요.');return;}
   var forms=formList().filter(function(f){return f.code!=='LEAVE' && f.code!=='PUR' && (f.code!=='ADD' || r.result.context.task.type==='DEMO');});
   if(!forms.length){toast('사용할 결재 양식이 없습니다.');return;}
@@ -7619,7 +7630,8 @@ function taskSheetHtml(t, r){
     /* 도구 줄 — [← 업무 목록] · [수정] (삭제는 되돌릴 수 없어 수정 창 맨 아래) */
     '<div class="tdbar"><div class="tdwrapbar">'+
       '<button class="btn tdclose" onclick="closeModal()">'+ic('chev-l')+'업무 목록</button>'+
-      '<button class="btn sm tdedit" onclick="openTaskForm(\''+t.id+'\')">'+ic('pen')+'업무 수정</button>'+
+      (taskRO(t) ? '<span class="tag gy tdro" title="담당자만 고칠 수 있습니다">보기 전용</span>'
+                 : '<button class="btn sm tdedit" onclick="openTaskForm(\''+t.id+'\')">'+ic('pen')+'업무 수정</button>')+
       (canDeleteTask(t)? '<button type="button" class="btn sm dg" data-task-delete="'+esc(t.id)+'" onclick="deleteTask(this.dataset.taskDelete)">업무 삭제</button>' : '')+
     '</div></div>'+
     '<div class="tdwrap">'+
@@ -7640,7 +7652,7 @@ function taskSheetHtml(t, r){
         '<aside class="tdside" data-pane="log" aria-label="활동"><div id="tdBody">'+(r? taskDetailBody(r) : '')+'</div></aside>'+
       '</div>'+
       /* 폰 · 태블릿 아래 — [기록 남기기](기록 창: 오늘 한 일 · 진행률 · 사진) · [댓글](기록 탭의 댓글 칸). 이름과 하는 일을 맞췄다 (15 지시) */
-      '<div class="tdquick">'+(t.status==='완료' ? '' :
+      '<div class="tdquick">'+((t.status==='완료' || taskRO(t)) ? '' :
         '<button class="btn pri" onclick="tdLogWith(\''+t.id+'\',\'\')">'+ic('pen')+'기록 남기기</button>')+
         '<button class="btn" onclick="tdWriteNow()">'+ic('cmt')+'댓글</button></div>'+
     '</div>'+
@@ -7978,7 +7990,7 @@ function taskDetailBody(r){
        아래 칸은 댓글(엔터로 등록). 예전에는 칸 이름이 '기록 남기기' 인데 실제로는 댓글로 저장됐다.
        칸에 쓰던 글은 [기록 남기기] 를 누르면 기록 창으로 들고 간다. 기록 창은 완료 업무를 고를 수 없어 완료 업무에는 단추가 없다 */
   h+='<section class="tdsec"><div class="tdlhead"><h4 class="tdh">'+ic('clock')+'기록'+(건수? ' <span class="n">'+건수+'</span>' : '')+'</h4>'+
-       (t.status==='완료' ? '' : '<button type="button" class="btn sm tdlog" onclick="tdLogWith(\''+t.id+'\',\'\')">'+ic('pen')+'기록 남기기</button>')+
+       ((t.status==='완료' || taskRO(t)) ? '' : '<button type="button" class="btn sm tdlog" onclick="tdLogWith(\''+t.id+'\',\'\')">'+ic('pen')+'기록 남기기</button>')+
      '</div>';
   h+='<div class="tdcompose">'+
        '<textarea id="tdWrite" rows="1" spellcheck="false" placeholder="댓글을 남겨주세요" '+
@@ -8035,6 +8047,7 @@ function tdLogWith(taskId, focus){
   var t=null;
   ((S.data && S.data.tasks) || []).forEach(function(x){ if(x.id===taskId) t=x; });
   if(!t || t.status==='완료'){ toast('완료된 업무에는 기록을 더할 수 없습니다'); return; }
+  if(taskRO(t)){ toast('이 업무는 볼 수만 있습니다. 기록은 담당자가 남깁니다'); return; }
   openLogForm(taskId, { text:text, focus:focus, seq:seq });
 }
 
@@ -8758,6 +8771,7 @@ function tfDraw(p, msg){
   var m=$('tfMsg'); if(m && msg) m.textContent=msg;
 }
 function openTaskForm(id){
+  if(id && taskRO(taskOf_(id) || (S.taskCache[id] && S.taskCache[id].task))){ toast('이 업무는 볼 수만 있습니다. 고치는 것은 담당자가 합니다'); return; }
   if(writeFormGuard('task'))return;
   tdKeepDraft();                           // 상세의 적는 칸에 쓰던 글은 초안으로 (취소하고 돌아오면 그대로)
   BACK_TASK = id || null;                  // 수정 창은 상세에서만 엽니다 — 취소하면 상세로
@@ -8822,7 +8836,7 @@ function drawTaskForm(id, t, files){
       '<div class="grid2">'+
         /* ★ 본인 업무만 보는 사람은 담당자를 본인으로만 (2026-09-30) — 서버(api_saveTask)도 같은 규칙으로 막습니다 */
         '<div class="field"><label class="fl req" for="tfOwner">담당자</label>'+
-          (ownScope()
+          (selfOnly()
             ? '<select id="tfOwner" disabled aria-describedby="tfOwnerNote"><option value="'+esc(S.me.phone)+'" selected>'+
                 esc(S.me.name||'나')+' (본인)</option></select>'+
               '<p class="fhelp" id="tfOwnerNote">본인 업무만 올리고 고칠 수 있습니다</p></div>'
@@ -9686,9 +9700,11 @@ function saveTask(){
 /* ===================== 업무일지 ===================== */
 var LOG_SEQ=0;      /* 이 기록 창이 들고 온 초안의 번호표 (상세의 [사진 첨부]·[진행률 변경] 에서만) */
 function openLogForm(taskId, opt){
+  /* 보기만 하는 업무(실장이 보는 아래 직원 업무)로 직접 열면 멈춘다 — 다른 업무가 골라진 채 열려 엉뚱한 업무에 기록되지 않게 (Astra 1차) */
+  if(taskId && taskRO(taskOf_(taskId) || (S.taskCache[taskId] && S.taskCache[taskId].task))){ toast('이 업무는 볼 수만 있습니다. 기록은 담당자가 남깁니다'); return; }
   LOG_SEQ = (opt && opt.seq) || 0;
   ATT_FILLED = null;          /* 창을 새로 열면 '내가 채운 값' 기억을 지운다 */
-  var tasks=(S.data? S.data.tasks:[]).filter(function(t){ return t.status!=='완료'; });
+  var tasks=(S.data? S.data.tasks:[]).filter(function(t){ return t.status!=='완료' && !taskRO(t); });   // 아래 직원 업무에는 기록하지 않는다
   if(!tasks.length){
     $('modal').innerHTML='<div class="veil"><div class="sheet">'+
       '<div class="none big">'+HELPER+'<p class="emsg">기록할 업무가 없습니다</p></div>'+
@@ -13716,7 +13732,7 @@ function openDocForm(code, prefill, workTaskId){
   forms.forEach(function(x){ if(x.code===(code||forms[0].code)) f=x; });
   if(!f) f=forms[0];
 
-  var corps=S.meta.corps, tasks=(S.data? S.data.tasks:[]);
+  var corps=S.meta.corps, tasks=(S.data? S.data.tasks:[]).filter(function(t){ return !taskRO(t); });   // 결재는 고칠 수 있는 업무에만 잇는다
   var h='<div class="veil"><div class="sheet">'+
     '<div class="sheethead"><h3 class="tt">'+esc(f.name)+'</h3></div>';
 
