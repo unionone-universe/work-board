@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v156">
+<meta name="uo-version" content="v157">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -5030,6 +5030,9 @@ function boot(){
     navCount(); showNoti(S.data.noti);
     markStale(true);
     hideBooting();
+    /* ★ 판(api_start · 2~3초)을 기다리지 않는다 (2026-10-28 3차 — 앱을 열자마자 결재를 누르면 아직 기다렸다).
+         저장본에 있는 결재의 사진을 바로 받고, 저장본 목록에서 빠진 내역도 바로 묻는다. 권한은 서버가 다시 본다 */
+    prefetchDocsSoon(150);
   } else {
     showSkeleton();
   }
@@ -13041,8 +13044,11 @@ function findDocBrief(no){
 var DOC_PREFETCH=null, DOC_PREFETCH_T=null, DOC_PREFETCH_MAX=60, DOC_PREFETCH_CHUNK=30;
 /* 받는 중인 문서 — 문서번호 → 그 요청 (2026-10-28 2차). 미리 받기 · 문서 열기가 같이 본다:
    미리 받기가 받는 중인 문서를 열면 따로 묻지 않고 그 답을 기다리고, 열어서 받는 중인 문서는 미리 받기가 다시 묻지 않는다 */
-var DOC_FETCHING=Object.create(null);
-function prefetchDocsSoon(){ clearTimeout(DOC_PREFETCH_T); DOC_PREFETCH_T=setTimeout(prefetchDocs, 800); }
+var DOC_FETCHING=Object.create(null), DOC_SHARE_WAIT=6000;
+/* 판을 받으면 0.3초 뒤, 앱을 연 직후 저장본을 그렸으면 0.15초 뒤 (2026-10-28 3차 — 예전엔 판을 받고 0.8초 뒤에야 시작했다) */
+function prefetchDocsSoon(ms){ clearTimeout(DOC_PREFETCH_T); DOC_PREFETCH_T=setTimeout(prefetchDocs, ms==null?300:ms); }
+/* 서버가 '없다 · 볼 수 없다' 고 답한 문서 — 같은 접속 · 같은 권한(epoch)에서는 다시 묻지 않는다 (3차) */
+var DOC_MISS=Object.create(null);
 function docPrefetchList(){
   var src=docSource(), nos=[], seen={};
   if(!src) return nos;
@@ -13050,7 +13056,7 @@ function docPrefetchList(){
     (src[k]||[]).forEach(function(d){
       if(!d || !d.no || seen[d.no] || nos.length>=DOC_PREFETCH_MAX) return;
       seen[d.no]=1;
-      if(!S.docCache[d.no]) nos.push(d.no);
+      if(!S.docCache[d.no] && DOC_MISS[d.no]!==S.epoch) nos.push(d.no);
     });
   });
   return nos;
@@ -13066,7 +13072,12 @@ function prefetchDocs(){
     if(ep!==S.epoch || token!==S.token){ stop(); return; }                  // 계정 · 권한이 바뀌었다 — 그만 받는다
     /* 그사이 열어서 받은 것 · 받는 중인 것 · 이미 물어본 것은 빼고 다음 묶음 */
     var part=nos.filter(function(no){ return !tried[no] && !S.docCache[no] && !DOC_FETCHING[no]; }).slice(0, DOC_PREFETCH_CHUNK);
-    if(!part.length){ stop(); scheduleSnap(); return; }                     // 다 받았다 — 저장본에도
+    if(!part.length){                                                         // 다 받았다 — 저장본에도
+      stop(); scheduleSnap();
+      /* 받는 사이 판이 새로 와서 안 받은 문서가 생겼으면 한 번 더 (3차). 물어본 것 · 없다는 것은 빼므로 되풀이되지 않는다 */
+      if(docPrefetchList().some(function(no){ return !tried[no] && !DOC_FETCHING[no]; })) prefetchDocsSoon(0);
+      return;
+    }
     part.forEach(function(no){ tried[no]=1; });
     docFetchBatch(part).then(function(ok){ if(ok) next(); else stop(); });
   })();
@@ -13091,12 +13102,14 @@ function docFetchBatch(nos, first){
       S.docCache[k]=r.docs[k]; S.docCacheAt[k]=at;
       docPaintIfWaiting(k);
     });
+    want.forEach(function(no){ if(!(r.docs||{})[no]) DOC_MISS[no]=ep; });   // 서버가 안 준 문서는 다시 묻지 않는다
     warmDocShots(first);                        // 이 묶음이 오자마자 사진부터
     return true;
   }, function(){ return false; }).then(function(ok){
     want.forEach(function(no){ if(DOC_FETCHING[no]===job) delete DOC_FETCHING[no]; });
     return ok;
   });
+  job.__at=Date.now();                          // 언제 떠났나 — 같이 기다리는 한도(DOC_SHARE_WAIT)를 잰다
   want.forEach(function(no){ DOC_FETCHING[no]=job; });
   return job;
 }
@@ -13130,12 +13143,17 @@ function warmDocShots(first){
       var im=new Image(); im.decoding='async'; im.src=s; SHOT_WARM[s]=im; n++; if(cap) cap.left--;
     });
   }
-  var 보는것={left:12}, 그밖={left:6};
+  var 보는것={left:12}, 그밖={left:6}, 앞={};
   (first||[]).forEach(function(no){ warmDoc(no, 보는것); });
-  [].concat(src.toAct||[], (src.drafts||[]).filter(function(d){ return d && d.status==='진행중'; }))
-    .forEach(function(d){ warmDoc(d && d.no, null); });
-  [].concat((src.drafts||[]).filter(function(d){ return d && d.status!=='진행중'; }), src.others||[]).slice(0, 15)
-    .forEach(function(d){ warmDoc(d && d.no, 그밖); });
+  /* ★ 결재 화면에서 펼치지 않아도 보이는 문서는 모두 앞 차례 (3차) — 결재할 것 · 내가 올린 진행 중 · 열람할 것 ·
+       결제 대기(승인됐지만 결제 표시 전인 지출 — 대표 · 전무가 바로 연다). 예전엔 결제 대기 · 열람할 것이 '그 밖 6장' 에 묶였다 */
+  function 살아(d){ return !!d && String(d.status||'진행중')==='진행중'; }
+  [].concat(src.toAct||[], (src.drafts||[]).filter(살아),
+            (src.others||[]).filter(function(d){ return 살아(d) || (d && d.canRead); }),
+            (S.data && S.data.docBox) ? payAll().filter(function(d){ return d.pay && d.pay.state==='대기'; }) : [])
+    .forEach(function(d){ if(d && !앞[d.no]){ 앞[d.no]=1; warmDoc(d.no, null); } });
+  [].concat(src.drafts||[], src.others||[]).filter(function(d){ return d && !앞[d.no]; }).slice(0, 15)
+    .forEach(function(d){ warmDoc(d.no, 그밖); });
   var keys=Object.keys(SHOT_WARM);
   keys.slice(0, Math.max(0, keys.length-SHOT_WARM_KEEP)).forEach(function(k){ delete SHOT_WARM[k]; });
 }
@@ -13185,9 +13203,14 @@ function openDoc(no){
 
   if(!b && !cached)$('modal').innerHTML=docSheetHtml({no:no,title:'결재 문서'},null);
   /* ★ 미리 받기가 이 문서를 받는 중이면 따로 묻지 않는다 (2026-10-28 2차) — 먼저 떠난 요청이라 대개 더 빨리 온다.
-       그 답에 이 문서가 없으면(실패 · 권한) 그때 한 건만 묻는다 */
+       그 답에 이 문서가 없으면(실패 · 권한) 그때 한 건만 묻는다.
+       ★ 같이 기다리는 데는 한도가 있다 (3차) — 그 요청이 떠난 지 6초가 지나도 안 오면(통신이 걸린 것) 이 문서만 바로 따로 묻는다.
+         한도가 없으면 걸린 요청이 끝날 때까지(최대 45초) 창이 '불러오는 중' 에 머문다 */
   if(!cached && DOC_FETCHING[no]){
-    DOC_FETCHING[no].then(function(){ if(!S.docCache[no] && $('ddBody') && $('ddBody').dataset.no===no) docFetchOne(no); });
+    var 같이=DOC_FETCHING[no], 따로=false;
+    var 혼자=function(){ if(따로) return; 따로=true; if(!S.docCache[no] && $('ddBody') && $('ddBody').dataset.no===no) docFetchOne(no); };
+    var 늦음=setTimeout(혼자, Math.max(0, DOC_SHARE_WAIT-(Date.now()-(같이.__at||Date.now()))));
+    같이.then(function(){ clearTimeout(늦음); if(!S.docCache[no]) 혼자(); });
     return;
   }
   docFetchOne(no);
