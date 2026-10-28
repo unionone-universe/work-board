@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v157">
+<meta name="uo-version" content="v158">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -4736,7 +4736,7 @@ function resetUserCaches(){
   deleteNoticeClose();outboxHide();
   if(SNAP_JOB!==null){clearTimeout(SNAP_JOB);SNAP_JOB=null;}
   POSTS_LOADING=null;
-  S.taskCache={}; S.docCache={}; S.docCacheAt={}; S.postCache=null; S.postCacheAt=null;
+  S.taskCache={}; S.docCache={}; S.docCacheAt={}; S.postCache=null; S.postCacheAt=null; POST_EDITING=Object.create(null);
   S.readers={}; S.readSent={}; S.setCache=null; SETTINGS_BASE=null; S.owner='';
   try{ MON.cache={}; }catch(e){}               // 월별 보고 (임원) — 사람이 바뀌면 버린다
   tfFilesReset();
@@ -11223,6 +11223,7 @@ function postListHtml(r){
 
 function postRow(p, r){
   var cn=((r.comments&&r.comments[p.no])||[]).length;
+  p=postView(p);
   return '<div class="lrow" onclick="openPost(\''+p.no+'\')">'+
     '<div class="m">'+
       '<p class="t">'+esc(p.title)+
@@ -11264,24 +11265,52 @@ function drawPost(no, src){
   var r=src||S.postCache;
   var p=null; (r.posts||[]).forEach(function(x){ if(x.no===no) p=x; });
   if(!p){ toast('글을 찾을 수 없습니다'); openBoard(); return; }
+  p=postView(p);
   var mine = S.me && (S.me.grade>=9 || myPhone(p.phone));
 
   /* ★ 수정·삭제는 ⋯ 안에 (2026-09-09). 본문과 댓글 사이에 단추 줄이 늘 있어서
      글쓴이와 남이 보는 첫 화면이 달랐습니다. 업무 상세와 같은 방식입니다. */
-  var h='<div class="veil"><div class="sheet">'+
-    '<div class="sheethead"><h3 class="tt">'+esc(p.title)+'</h3>'+
+  var h='<div class="veil"><div class="sheet" data-post="'+esc(p.no)+'">'+
+    '<div class="sheethead"><h3 class="tt" data-pt="1">'+esc(p.title)+'</h3>'+
       '<button class="btn sm" onclick="openBoard()">목록</button>'+
       (mine? '<button class="tdico" onclick="taskMenu()" title="수정·삭제" aria-label="수정·삭제">'+ic('dots')+'</button>':'')+
       '<button class="btn sm" onclick="closeModal()">닫기</button></div>'+
     (mine? '<div class="tdmenu" id="tdMenu">'+
       '<button class="btn sm" onclick="openPostForm(\''+p.no+'\')">수정</button>'+
       '<button class="btn sm dg" onclick="deletePost(\''+p.no+'\')">삭제</button></div>':'')+
-    byline([p.who, shortDate(p.at), p.edited? '수정 '+shortDate(p.edited) : ''])+
-    '<div style="margin-bottom:20px">'+fmt(p.body)+shotsHtml(p.photos)+'</div>'+
+    '<div id="pdMain">'+postMainHtml(p)+'</div>'+
     '<div id="pcBody">'+
       commentsHtml('게시글', p.no, (r.comments&&r.comments[p.no])||[], null, true)+
     '</div></div></div>';
   $('modal').innerHTML=h;
+}
+
+function postMainHtml(p){
+  return byline([p.who, shortDate(p.at), p.sending? {t:'수정 보내는 중', on:true} : (p.edited? '수정 '+shortDate(p.edited) : '')])+
+    '<div style="margin-bottom:20px">'+fmt(p.body)+shotsHtml(p.photos)+'</div>';
+}
+
+/* ★ 고친 공지는 서버 답을 기다리는 동안에도 고친 글로 보인다 (2026-10-28 대표님 — '게시글 수정에 렉').
+     예전에는 [수정 저장] 을 누르면 창은 바로 닫혔지만, 서버가 답할 때까지(보통 5초 안팎) 다시 열면 옛 글이었고
+     열어 둔 글도 답이 와도 바뀌지 않아 한 번 더 열어야 했다.
+     · 캐시는 건드리지 않고 그릴 때만 얹는다 — 그사이 공지 목록을 새로 받아도 옛 글로 돌아가지 않고,
+       실패하면 이 표만 지우면 서버 글이 그대로 나온다 (기록장 NOTE_PENDING 과 같은 방식)
+     · '수정 보내는 중' 으로 적어 서버 확인 전에 끝났다고 하지 않는다 */
+var POST_EDITING=Object.create(null);
+function postView(p){
+  var e=p && POST_EDITING[p.no];
+  if(!e || !sameAccount(e.account)) return p;
+  return Object.assign({}, p, {title:e.title, body:e.body, sending:true});
+}
+/** 그 공지를 열어 두었으면 제목 · 본문만 다시 그린다 — 댓글 칸에 쓰던 글이 날아가지 않게 */
+function postRedraw(no){
+  var sh=no && document.querySelector('#modal .sheet[data-post="'+String(no).replace(/["\\]/g,'')+'"]'); if(!sh) return;
+  var r=S.postCache||noticeStub(), p=null;
+  (r.posts||[]).forEach(function(x){ if(x.no===no) p=x; });
+  if(!p) return;
+  p=postView(p);
+  var h=sh.querySelector('[data-pt]'); if(h) h.textContent=p.title;
+  var m=sh.querySelector('#pdMain'); if(m) m.innerHTML=postMainHtml(p);
 }
 
 /** 공지 쓰기 / 수정 — 제목과 내용 두 칸뿐 */
@@ -11289,6 +11318,7 @@ function openPostForm(no){
   var p=null;
   var src=S.postCache||noticeStub();
   (src.posts||[]).forEach(function(x){ if(no && x.no===no) p=x; });
+  if(p) p=postView(p);
 
   $('modal').innerHTML='<div class="veil"><div class="sheet">'+
     '<div class="sheethead"><h3 class="tt">'+(p?'공지 수정':'공지 쓰기')+'</h3>'+
@@ -11346,33 +11376,57 @@ function savePost(no, confirmed){
   var np={no:no||'',corp:'',title:title,body:body,who:(S.me&&S.me.name)||'',
     phone:(S.me&&S.me.phone)||'',at:nowS,edited:no?nowS:''};
   var send={no:no||'',corp:'',title:title,body:body,photos:shots};
+  var edit=no? {title:title, body:body, account:accountStamp()} : null;
   return submitFormSave('pfSave','pfMsg','post:'+(no||'new'),function(w){
-    return reliableCall({kind:'post',ref:no||'',title:title,preview:body,persist:!shots.length,form:w,cap:w?0:OUTBOX_FORM_CAP},'api_savePost',[send,corp]);
+    var req=reliableCall({kind:'post',ref:no||'',title:title,preview:body,persist:!shots.length,form:w,cap:w?0:OUTBOX_FORM_CAP},'api_savePost',[send,corp]);
+    if(edit){
+      POST_EDITING[no]=edit;
+      if(w && !$('modal').innerHTML) openPost(no);    // 저장 창이 보관 칸으로 갔다 — 고친 그 공지로 돌아간다
+      else postRedraw(no);
+    }
+    return req;
   },function(r,current){
+    if(edit && POST_EDITING[no]===edit) delete POST_EDITING[no];
     np.no=r.no||no;np.at=r.at||nowS;np.photos=r.photos||[];
     if(np.no) putPostLocal(np,no);
-    if(current) closeOk();
+    if(current){ closeOk(); if(edit) openPost(np.no); }
+    else if(edit) postRedraw(np.no);
     toast(no?'공지가 수정되었습니다':'공지가 등록되었습니다');
     softRefresh();
+  },function(){
+    /* 못 했으면 서버 글로 되돌린다 — 입력은 보관 칸에 그대로 있다 ([입력 확인]) */
+    if(edit && POST_EDITING[no]===edit){ delete POST_EDITING[no]; postRedraw(no); }
   });
 }
 
 /** 공지를 상단 줄과 게시판 캐시에 즉시 반영 */
 function putPostLocal(np, isEdit){
+  /* ★ 수정 (2026-10-28) — 예전에는 고친 사람을 글쓴이로 바꿔 적고(관리자가 남의 글을 고치면 관리자 글로 보였다),
+       서버가 돌려준 '새로 붙인 사진' 만 남겨 이미 붙은 사진이 사라졌고, 고친 공지를 최근 공지 맨 앞으로 옮겼다.
+       서버는 셋 다 그대로 둔다 — 화면도 제목 · 본문 · 수정 시각만 바꾸고 사진은 이어 붙인다 */
   if(S.data){
-    var list=(S.data.notices||[]).filter(function(n){ return n.no!==np.no; });
-    list.unshift({ no:np.no, title:np.title, body:np.body, who:np.who,
-                   phone:np.phone, at:String(np.at).substring(0,10), edited:np.edited||'' });
-    S.data.notices=list.slice(0,3);
+    if(isEdit){
+      S.data.notices=(S.data.notices||[]).map(function(n){
+        return n.no!==np.no ? n : Object.assign({}, n, { title:np.title, body:np.body, edited:np.edited||'' });
+      });
+    }else{
+      var list=(S.data.notices||[]).filter(function(n){ return n.no!==np.no; });
+      list.unshift({ no:np.no, title:np.title, body:np.body, who:np.who,
+                     phone:np.phone, at:String(np.at).substring(0,10), edited:np.edited||'' });
+      S.data.notices=list.slice(0,3);
+    }
     renderNotices();
   }
   if(S.postCache){
     var found=false;
     S.postCache.posts=(S.postCache.posts||[]).map(function(x){
       if(x.no!==np.no) return x;
-      found=true; return np;
+      found=true;
+      /* 사진은 같은 링크를 두 번 넣지 않는다 — 저장 답보다 공지 목록을 먼저 새로 받았으면 새 사진이 이미 들어 있다 (Astra 1차) */
+      return isEdit ? Object.assign({}, x, { title:np.title, body:np.body, edited:np.edited||'',
+                                             photos:(x.photos||[]).concat((np.photos||[]).filter(function(u){ return (x.photos||[]).indexOf(u)<0; })) }) : np;
     });
-    if(!found) S.postCache.posts.unshift(np);
+    if(!found && !isEdit) S.postCache.posts.unshift(np);
   }
 }
 
