@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v161">
+<meta name="uo-version" content="v162">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -638,8 +638,7 @@ ul.mk li,ol.mk li{margin:2px 0}
 .mkbar{display:flex;gap:4px;margin:0 0 6px}
 /* slim 편집기는 커서가 들어갔을 때만 툴바를 보인다 (2026-09-09) */
 .mked.slim:not(.on) .mkbar,.mked.slim:not(.on) .mkbar2{display:none}
-/* 내역 줄 위 머리줄 — 품목·일자·금액이 어느 칸인지 (2026-09-09) */
-.ithead{margin:0 0 4px}
+/* 내역 줄 위 머리줄 — 품목·금액이 어느 칸인지 (2026-09-09 · 2026-10-28 두 칸) */
 .ithead span{font-size:var(--fs-xs);color:var(--t3);letter-spacing:.02em}
 .mkbar button{display:inline-flex;align-items:center;justify-content:center;min-width:var(--tap);min-height:var(--tap);
   border:1px solid var(--line2);background:var(--card);border-radius:var(--r);
@@ -1676,6 +1675,68 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
 .tform .tfoot .btn.pri{flex:1 1 auto;font-weight:800}
 .tform .tfoot .lgmsg{flex:1 1 100%;margin:0 0 4px;font-size:var(--fs-sm);font-weight:600;color:var(--t1)}
 .tform .tfoot .lgmsg:empty{display:none}
+/* ── 결재 올리기 창 (2026-10-28 대표님) — 새 업무 창과 같은 칸 모양 · 폰은 화면 전체 · [취소] · [상신] 은 늘 맨 아래 ── */
+.sheet.dform{--sh-px:var(--sp-5);padding-bottom:0}
+.dform .field{margin-bottom:18px}
+.dform label.fl,.dform span.fl{margin:0 0 8px;font-size:var(--fs-sm);font-weight:700;color:var(--t1)}
+.dform input[type=text],.dform input[type=number],.dform input[type=date],.dform select{height:var(--tap-main);padding-top:0;padding-bottom:0;font-size:var(--fs-body);border-radius:var(--r-md)}
+.dform select{padding-right:32px}
+.dform select.empty{color:var(--t3)}
+.dform select.empty option{color:var(--t1)}
+.dform .grid2{gap:12px}
+.dform .dfkind{max-width:360px}
+.dform .fmorebtn{margin:0 0 18px}
+.dform.more .fmorebox{display:block}
+.dform.more .fmorebtn{display:none}
+.dform .dfautot{margin:0;padding:12px 14px;border-radius:var(--r-md);background:var(--panel);font-weight:700;color:var(--t1);overflow-wrap:anywhere}
+.dform .dfautot:empty{display:none}
+.dform .photobtn.err{border-color:var(--dg) !important}
+.dform .actions.tfoot{position:sticky;bottom:0;z-index:4;flex-wrap:wrap;margin:8px calc(-1 * var(--sh-px)) 0;
+  padding:12px var(--sh-px) calc(12px + env(safe-area-inset-bottom));background:var(--sheet);border-top:1px solid var(--line)}
+.dform .tfoot .btn{min-height:var(--tap-main);font-size:var(--fs-body)}
+.dform .tfoot .btn:not(.pri){flex:0 0 auto;min-width:104px;background:transparent;color:var(--t2)}
+.dform .tfoot .btn.pri{flex:1 1 auto;font-weight:800}
+.dform .tfoot .lgmsg{flex:1 1 100%;margin:0 0 4px;font-size:var(--fs-sm);font-weight:600;color:var(--t1)}
+.dform .tfoot .lgmsg:empty{display:none}
+/* 품목 줄 — [품목 · 금액 · 빼기] / [일자 · 비용 분류]. 머리줄(.ithead)은 위 줄 두 칸과 같은 격자 */
+.itbox{margin:0 0 22px}
+.itbox .sech{margin:0 0 10px}
+.itbox .ithead,.itmain{display:grid;grid-template-columns:minmax(0,1fr) minmax(112px,36%) var(--tap);gap:8px;align-items:center}
+.itbox .ithead{margin:0 0 6px}
+.itrow{padding:0 0 12px}
+.itrow + .itrow{padding-top:12px;border-top:1px solid var(--line)}
+.itmain .itAmt{text-align:right;font-variant-numeric:tabular-nums}
+.itdel{display:inline-flex;align-items:center;justify-content:center;width:var(--tap);height:var(--tap);padding:0;border:0;border-radius:var(--r-md);
+  background:transparent;color:var(--t3);cursor:pointer}
+.itdel:hover{background:var(--panel);color:var(--dg)}
+.itdel:focus-visible{outline:3px solid var(--pri);outline-offset:2px}
+/* 한 줄뿐이면 빼기 단추 대신 금액 칸을 끝까지 */
+#dfItems > .itrow:only-child .itdel{display:none}
+#dfItems > .itrow:only-child .itAmt{grid-column:2 / 4}
+#dfItems > .itrow:only-child .itko{margin-right:0}
+.itko{margin:4px calc(var(--tap) + 8px) 0 0;text-align:right;font-size:var(--fs-sm);color:var(--t3)}
+.itko:empty{display:none}
+.itsub{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;margin:8px 0 0}
+.itsub label{display:flex;align-items:center;gap:8px;margin:0;min-width:0}
+.itsub label span{flex:none;font-size:var(--fs-sm);color:var(--t3)}
+.dform .itsub input[type=date],.dform .itsub select{height:var(--tap);width:auto;padding-top:0;padding-bottom:0}
+.itsub .itDate{width:170px}
+.itsub .itcat{margin:0}
+.itsub .itCat{max-width:200px}
+/* 폰 — 일자 · 비용 분류를 한 줄 두 칸으로 (이름은 칸 위에). 옆으로 놓으면 두 줄로 꺾였다 */
+@media (max-width:559px){
+  .itsub{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+  .itsub label{flex-direction:column;align-items:stretch;gap:4px}
+  .itsub .itDate,.itsub .itCat{width:100%;max-width:none}
+}
+.itfoot{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px 12px;padding:12px 0 0;border-top:1px solid var(--line)}
+.itfoot #dfTotal{margin-left:auto;text-align:right;font-size:var(--fs-sm);color:var(--t2)}
+.itfoot #dfTotal b{font-size:var(--fs-body);color:var(--t1)}
+@media (max-width:719px){
+  .veil.dfveil{align-items:stretch}
+  .sheet.dform{height:var(--vvh,100vh);max-height:none;border-radius:0;display:flex;flex-direction:column}
+  .sheet.dform > .actions.tfoot{margin-top:auto}
+}
 /* 기록 창 — 어느 업무인지(고정일 때 이름만) */
 .lgtaskname{margin:0;padding:12px 14px;border-radius:var(--r-md);background:var(--panel);font-weight:700;color:var(--t1);overflow-wrap:anywhere}
 /* 추가 — 폰 아래 탭 가운데 [추가] 를 누르면 고르는 두 가지 */
@@ -7547,10 +7608,6 @@ function openWorkDoc(code,id){
   if(c.master && c.master.customer){fields['고객명']=c.master.customer.name;fields['고객연락처']=c.master.customer.phone;if(c.master.site)fields['현장주소']=c.master.site.address;}
   else{if(c.site && c.site.available){fields['현장주소']=c.site.addr;fields['고객명']=c.customer.name;}if(c.customer.phone)fields['고객연락처']=c.customer.phone;}
   openDocForm(code,fields,id);
-}
-function switchDocForm(code,id){
-  var form=$('dfCode');if(form && form.dataset.dirty==='1' && !confirm('문서 종류를 바꾸면 작성 중인 내용이 초기화됩니다. 바꾸시겠습니까?'))return;
-  if(id && code!=='LEAVE')openWorkDoc(code,id);else openDocForm(code);
 }
 
 var TD_TAB={};
@@ -13739,6 +13796,32 @@ function formList(){
   return out;
 }
 
+/* ★★ 결재 올리기 창 (2026-10-28 대표님 — 새 업무 창처럼 손봄).
+     · 문서 종류는 드롭다운(#dfKind) — 바꾸면 그 양식으로 창을 새로 그린다 (pickDocKind)
+     · 품목 줄은 [품목 · 금액 · 빼기] / [일자 · 비용 분류] 두 줄 — 폰에서 일자가 '2026·' 으로 잘렸다
+     · 필수 고르기 칸(결제수단 · 고객 합의 · 인감종류 · 휴가종류 · 추가공사의 관련 업무)은 미리 골라 두지 않는다 —
+       안 건드리고 올리면 '법인카드' · '구두 합의 완료' 가 그대로 남았다. 흐린 '고르기' 로 시작하고 안 고르면 그 칸에서 막는다
+     · 고를 것이 없는 거래처 칸(거래처를 하나도 안 넣었을 때) · 법인이 하나뿐인 법인 칸은 그리지 않는다
+     · 막힌 이유는 그 칸 바로 아래 한 번만 (dfFail) · 반차면 종료일 칸을 감춘다 (leaveKindSync)
+     · 관련 업무 · 비고 · 인감 · (법인이 둘 이상이면) 법인은 [더 입력하기] · 폰은 화면 전체 · [취소] · [상신] 은 늘 맨 아래
+     칸 이름(id · data-name) · 막는 규칙 · 자동 제목 · 서버는 그대로다. */
+var DOC_LAYOUT={   // 양식마다 한 줄에 나란히 둘 칸 · 맨 앞에 둘 칸 (없는 칸은 건너뛴다)
+  EXP:{ pairs:[['결제수단','거래처']] }, PUR:{ pairs:[['결제수단','거래처']] },
+  SEAL:{ first:['날인 문서명'], pairs:[['인감종류','제출처']] },
+  LEAVE:{ pairs:[['시작일','종료일']] }
+};
+function docFieldsHtml(code, 칸, 순서){
+  var L=DOC_LAYOUT[code]||{}, 앞=L.first||[], out='', done={};
+  앞.filter(function(n){ return 칸[n]; }).concat(순서.filter(function(n){ return 앞.indexOf(n)<0; })).forEach(function(n){
+    if(done[n]) return;
+    var 짝=(L.pairs||[]).filter(function(p){ return p.indexOf(n)>=0; })[0]||[n];
+    var 칸들=짝.filter(function(m){ return 칸[m] && !done[m]; });
+    칸들.forEach(function(m){ done[m]=1; });
+    out+= 칸들.length>1 ? '<div class="grid2">'+칸들.map(function(m){ return 칸[m]; }).join('')+'</div>' : 칸[칸들[0]];
+  });
+  return out;
+}
+
 /* prefill — 달력에서 '휴가 신청' 을 누르면 그 날짜를 시작일·종료일로 채워서 연다.
    { 항목명: 값 } 모양. 결재 흐름 자체는 그대로다. */
 function openDocForm(code, prefill, workTaskId){
@@ -13752,123 +13835,132 @@ function openDocForm(code, prefill, workTaskId){
   forms.forEach(function(x){ if(x.code===(code||forms[0].code)) f=x; });
   if(!f) f=forms[0];
 
-  var corps=S.meta.corps, tasks=(S.data? S.data.tasks:[]).filter(function(t){ return !taskRO(t); });   // 결재는 고칠 수 있는 업무에만 잇는다
-  var h='<div class="veil"><div class="sheet">'+
-    '<div class="sheethead"><h3 class="tt">'+esc(f.name)+'</h3></div>';
+  var corps=S.meta.corps||[], tasks=(S.data? S.data.tasks:[]).filter(function(t){ return !taskRO(t); });   // 결재는 고칠 수 있는 업무에만 잇는다
+  var 여럿=forms.length>1, 한법인=corps.length<2;
+  var h='<div class="veil dfveil"><div class="sheet dform">'+
+    '<div class="sheethead"><h3 class="tt">'+esc(여럿? '결재 올리기' : f.name)+'</h3></div>';
 
-  if(forms.length>1){
-    h+='<div class="field"><label class="fl">문서 종류</label><div class="chks">'+
-      forms.map(function(x){
-        return '<label class="'+(x.code===f.code?'on':'')+'" onclick="switchDocForm(this.dataset.code,this.dataset.task)" data-code="'+esc(x.code)+'" data-task="'+esc(workTaskId||'')+'">'+esc(x.name)+'</label>';
-      }).join('')+'</div></div>';
+  /* 문서 종류 — 드롭다운 (2026-10-28). 예전 단추 넷은 폰에서 두 줄로 꺾이고 창 제목과 같은 말을 또 적었다 */
+  if(여럿){
+    h+='<div class="field dfkind"><label class="fl" for="dfKind">문서 종류</label>'+
+      '<select id="dfKind" data-task="'+esc(workTaskId||'')+'" onchange="pickDocKind(this)">'+
+      forms.map(function(x){ return '<option value="'+esc(x.code)+'"'+(x.code===f.code?' selected':'')+'>'+esc(x.name)+'</option>'; }).join('')+
+      '</select></div>';
   }
 
   // 휴가만 업무 연결을 사용하지 않는다. 인감은 해당 업무에서 이어서 작성할 수 있다.
   var useTask = f.code!=='LEAVE';
+  var 업무필수 = f.code==='ADD';
 
-  /* ★★ 칸의 자리는 '매번 적는 것이 위, 자동으로 채워지거나 드문 것은 아래 접기' (2026-09-09).
-       예전에는 종류 → 법인·관련 업무 → 제목 → 항목 → 내역 → 사진 → 비고 → 인감이
-       같은 크기로 늘어서서 한 화면 반을 내려야 [상신] 이 나왔습니다.
-       칸 이름(id)과 막는 규칙(saveDoc)은 그대로입니다. 자리만 옮겼습니다. */
-  var 법인칸 = '<div class="field"><label class="fl req">법인</label><select id="dfCorp">'+
-        corps.map(function(c){ return '<option value="'+c.code+'">'+esc(c.name)+'</option>'; }).join('')+
-      '</select></div>';
+  /* 법인 — 하나뿐이면 고를 것이 없으니 감춘 칸에 그 값만 둔다 (업무에서 열면 그 업무의 법인이 들어간다) */
+  var 법인목록 = corps.map(function(c){ return '<option value="'+esc(c.code)+'">'+esc(c.name)+'</option>'; }).join('');
+  var 법인칸 = 한법인
+      ? '<select id="dfCorp" hidden aria-hidden="true" tabindex="-1">'+법인목록+'</select>'
+      : '<div class="field"><label class="fl req" for="dfCorp">법인</label><select id="dfCorp">'+법인목록+'</select></div>';
+  /* 관련 업무 — 추가공사는 필수라 맨 위(미리 고르지 않는다), 그 밖에는 [더 입력하기] 안 ('없음' 이 기본) */
   var 업무칸 = workTaskId ? '<select id="dfTask" hidden aria-hidden="true" tabindex="-1"><option value="'+esc(workTaskId)+'"></option></select>' : useTask
-      ? '<div class="field"><label class="fl'+(f.code==='ADD'?' req':'')+'">관련 업무</label>'+
-        '<select id="dfTask">'+
-          (f.code==='ADD' ? '<option value=""></option>' : '<option value="">없음</option>')+
-          tasks.map(function(t){ return '<option value="'+t.id+'">'+esc(t.title)+'</option>'; }).join('')+
+      ? '<div class="field"><label class="fl'+(업무필수?' req':'')+'" for="dfTask">관련 업무</label>'+
+        '<select id="dfTask"'+(업무필수?' class="empty"':'')+'>'+
+          (업무필수 ? '<option value="" disabled selected>고르기</option>' : '<option value="">없음</option>')+
+          tasks.map(function(t){ return '<option value="'+esc(t.id)+'">'+esc(t.title)+'</option>'; }).join('')+
         '</select></div>'
       : '<input type="hidden" id="dfTask" value="">';
+  var 업무접기 = useTask && !workTaskId && !업무필수;
 
   /* ★ 제목 칸 (v42에서 되살림).
      자동 생성만 남겼더니 '지출 57,680원 · 콩나물 350g' 처럼 첫 품목만 남아
      무슨 지출인지 알 수 없었다. 판단이 틀렸으므로 되돌린다.
      빈칸으로 두지 않고 자동 제목을 미리 채워둔다 — 그대로 두면 그게 저장되고,
-     고치면 고친 것이 저장된다. 한 번이라도 직접 건드리면 그때부터 덮어쓰지 않는다. */
-  var 제목칸 = '<div class="field"><label class="fl req" for="dfTitle">제목</label>'+
-     '<input type="text" id="dfTitle" '+(f.code==='LEAVE'?'readonly aria-describedby="dfTitleHelp"':'oninput="DF_TITLE_TOUCHED=1"')+'>'+
-     (f.code==='LEAVE'?'<p class="muted" id="dfTitleHelp" style="margin-top:6px">휴가 시작일에 맞춰 자동으로 정해집니다.</p>':'')+'</div>';
+     고치면 고친 것이 저장된다. 한 번이라도 직접 건드리면 그때부터 덮어쓰지 않는다.
+     ★ 품목 · 칸을 다 채운 뒤 보도록 맨 아래에 둔다 (2026-10-28).
+       휴가는 시작 월 + 휴가종류로 정해져 고칠 수 없으므로 칸 대신 한 줄로 보여 준다 */
+  var 제목칸 = f.code==='LEAVE'
+      ? '<div class="field dfauto"><span class="fl">제목</span><p class="dfautot" id="dfTitleText" aria-live="polite"></p><input type="hidden" id="dfTitle"></div>'
+      : '<div class="field"><label class="fl req" for="dfTitle">제목</label><input type="text" id="dfTitle" oninput="DF_TITLE_TOUCHED=1"></div>';
 
-  // 양식별 항목
-  var 항목들='';
+  // 양식별 항목 — 이름별로 그려 두고 DOC_LAYOUT 차례로 놓는다 (id 는 양식 안 차례 fd_i 그대로)
+  var 칸={}, 칸순서=[];
   (f.fields||[]).forEach(function(fd,i){
-    var id='fd_'+i;
-    항목들+='<div class="field"><label for="'+id+'" class="fl'+(fd.req?' req':'')+'">'+esc(fd.name)+'</label>';
+    /* 고를 것이 하나도 없는 선택 칸은 그리지 않는다 — 거래처를 아직 하나도 안 넣어 빈 드롭다운만 남아 있었다 (필수가 아닐 때만) */
+    if(fd.kind==='선택' && !fd.req && !(fd.opts||[]).length) return;
+    var id='fd_'+i, key=칸[fd.name]? fd.name+'#'+i : fd.name;
+    var x='<div class="field"><label for="'+id+'" class="fl'+(fd.req?' req':'')+'">'+esc(fd.name)+'</label>';
     if(fd.kind==='선택'){
-      항목들+='<select id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField">'+
-         (fd.req?'':'<option value=""></option>')+
-         fd.opts.map(function(o){ return '<option value="'+esc(o)+'">'+esc(o)+'</option>'; }).join('')+
+      /* ★ 필수 고르기 칸은 미리 골라 두지 않는다 (2026-10-28 대표님) — 흐린 '고르기' 로 시작 */
+      var 따라감 = (f.code==='LEAVE' && fd.name==='휴가종류') ? ' onchange="leaveKindSync()"' : '';
+      x+='<select id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField'+(fd.req?' empty':'')+'"'+따라감+'>'+
+         (fd.req?'<option value="" disabled selected>고르기</option>':'<option value=""></option>')+
+         (fd.opts||[]).map(function(o){ return '<option value="'+esc(o)+'">'+esc(o)+'</option>'; }).join('')+
          '</select>';
     } else if(fd.kind==='여러줄'){
-      항목들+='<textarea id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField"'+(fd.req?' required aria-required="true"':'')+' placeholder="'+esc(fd.help||'')+'"></textarea>';
+      x+='<textarea id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField"'+(fd.req?' required aria-required="true"':'')+' placeholder="'+esc(fd.help||'')+'"></textarea>';
     } else if(fd.kind==='날짜'){
       /* 휴가 시작일을 고르면 종료일이 같이 따라온다 (하루짜리가 대부분) */
-      var 따라감 = (f.code==='LEAVE' && fd.name==='시작일') ? ' onchange="leaveSyncEnd()"' : '';
-      항목들+='<input type="date" id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField"'+따라감+'>';
+      var 날따라감 = (f.code==='LEAVE' && fd.name==='시작일') ? ' onchange="leaveSyncEnd()"' : '';
+      x+='<input type="date" id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField"'+날따라감+'>';
     } else if(fd.kind==='숫자'){
-      항목들+='<input type="number" id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField">';
+      x+='<input type="number" id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField">';
     } else {
-      항목들+='<input type="text" id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField">';
+      x+='<input type="text" id="'+id+'" data-name="'+esc(fd.name)+'" class="dfField">';
     }
-    항목들+='</div>';
+    칸[key]=x+'</div>'; 칸순서.push(key);
   });
 
   var 내역='';
   if(f.useItems){
     /* ★ 내역은 반드시 한 줄 이상 있어야 상신됩니다 (금액도 0원이면 막힙니다).
-       그런데 구역 제목이라 * 가 없어서, 상신을 눌러야만 알 수 있었습니다 (v55에서 붙임)
-       ★ 머리줄 한 번 (2026-09-09) — 세 칸에 라벨이 없어 금액 칸에 품목을 쓰는 일이 있었습니다. */
-    내역='<h4 class="sech req">'+esc(f.itemsTitle)+'</h4>'+
-       '<div class="grid3 ithead"><span>품목</span><span>일자</span><span>금액</span></div>'+
+       ★ 품목 줄 = [품목 · 금액 · 빼기] / [일자 · 비용 분류] (2026-10-28). 머리줄은 위 줄의 두 칸만 — 아래 줄은 칸마다 이름이 붙어 있다 */
+    내역='<section class="itbox" id="dfItemsBox" aria-label="'+esc(f.itemsTitle)+'">'+
+       '<h4 class="sech req">'+esc(f.itemsTitle)+'</h4>'+
+       '<div class="ithead" aria-hidden="true"><span>품목</span><span>금액</span></div>'+
        '<div id="dfItems"></div>'+
-       '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+
-       '<button class="btn sm" onclick="addItem()">'+ic('plus')+'줄 추가</button>'+
-       '<span id="dfTotal" class="sub"></span></div>';
+       '<div class="itfoot"><button type="button" class="btn sm" onclick="addItem(true)">'+ic('plus')+'줄 추가</button>'+
+       '<span id="dfTotal" class="sub"></span></div></section>';
   }
 
   /* ★★ 사진 칸은 **모든 양식**에 있습니다 (2026-09-11 대표님 지시).
-       2026-09-11 까지는 지출·구매·추가공사에만 그리고 인감·휴가에는 안 그렸습니다.
-       그런데 휴가 신청서에 진단서·청첩장을, 인감 품의서에 날인할 서류 사진을
-       붙일 일이 있습니다. 서버(api_saveDoc)는 원래부터 양식과 상관없이 사진을 받아
-       `첨부` 시트에 남기고, 상세 화면도 그것을 그대로 보여줍니다 — 화면 작성 창만 막고 있었습니다.
+       휴가 신청서에 진단서·청첩장을, 인감 품의서에 날인할 서류 사진을 붙일 일이 있습니다.
        ★ 필수는 영수증이 필요한 양식(지출결의서)뿐입니다. 나머지는 붙이고 싶을 때만.
        `결재시험` ⑭ · `화면튼튼시험` ⑮ 가 이것을 지킵니다. */
   /* ★ 결재 첨부만 PDF 도 받습니다 (2026-09-11). `accept` 에 pdf 가 있는 칸에서만
-       photoAdd 가 PDF 를 담습니다 — 기록·공지 칸에 PDF 를 넣으면 '사진만' 이라고 알립니다. */
-  var 사진칸='<div class="field" style="margin-top:14px"><label class="fl'+
-       (f.needReceipt?' req':'')+'">'+(f.needReceipt?'영수증 사진 · PDF':'첨부 사진 · PDF')+'</label>'+
-       '<input type="file" id="dfPhoto" accept="image/*,application/pdf" multiple '+
+       photoAdd 가 PDF 를 담습니다 — 기록·공지 칸에 PDF 를 넣으면 '사진만' 이라고 알립니다.
+     ★ 브라우저 기본 '파일 선택 · 선택된 파일 없음' 대신 [사진 · PDF 첨부] 단추 (2026-10-28 — 기록 창의 photoField 와 같은 방식).
+       고르는 칸은 그대로라 photoAdd · 키보드가 그대로 돈다 */
+  var 사진칸='<div class="field dfphoto"><label class="fl'+(f.needReceipt?' req':'')+'" for="dfPhoto">'+
+       (f.needReceipt?'영수증 사진 · PDF':'첨부 사진 · PDF')+'</label>'+
+       '<input type="file" class="photoin" id="dfPhoto" accept="image/*,application/pdf" multiple '+
          'onchange="photoAdd(&#39;dfPhoto&#39;,this)">'+
+       '<label class="btn photobtn" for="dfPhoto">'+ic('clip')+'사진 · PDF 첨부</label>'+
        '<div class="thumbs" id="dfPhotoBox"></div></div>';
   photoClear('dfPhoto');
 
-  var 비고칸='<div class="field"><label class="fl">비고</label><input type="text" id="dfMemo"></div>';
+  var 비고칸='<div class="field"><label class="fl" for="dfMemo">비고</label><input type="text" id="dfMemo"></div>';
   /* ★ 비용 분류는 **품목 줄마다** 고릅니다 (addItem · 2026-09-22 Astra 지적).
      문서에 한 칸만 두면 광고비와 식대가 같이 광고비로 저장됩니다.
      지출결의서·구매요청서에만 있고, 안 고르면 '미분류' — 막지 않습니다. */
-  /* 인감 체크는 지출·구매·추가공사에만 (2026-09-09). 휴가에 인감이 필요한 경우는 없습니다 —
-     칸이 하나 더 있는 것보다 "내가 모르는 뭔가가 있나" 하고 멈추게 하는 것이 문제였습니다. */
+  /* 인감 체크는 지출·구매·추가공사에만 (2026-09-09). 휴가에 인감이 필요한 경우는 없습니다 */
   var 인감칸 = useTask && f.code!=='SEAL'
-      ? '<div class="field"><div class="chks"><label id="dfSeal" '+
-        'onclick="this.classList.toggle(\'on\')">회사 인감이 찍힌 문서가 필요합니다</label></div></div>'
+      ? '<div class="field"><div class="chks"><label id="dfSeal" role="checkbox" tabindex="0" aria-checked="false" onkeydown="cardKey(event)" '+
+        'onclick="this.classList.toggle(\'on\');this.setAttribute(\'aria-checked\',String(this.classList.contains(\'on\')))">회사 인감이 찍힌 문서가 필요합니다</label></div></div>'
       : '';
 
-  h+='<input type="hidden" id="dfCode" value="'+esc(f.code)+'">';
-  if(f.useItems){
-    /* 지출·구매·추가공사: 내역이 첫 자리. 추가공사의 관련 업무는 필수라 위에 둔다 */
-    h+=(f.code==='ADD' ? 업무칸 : '')+
-       내역+ 항목들+ 사진칸+ 제목칸+
-       foldBox('doc:more', '그 밖에',
-         법인칸+ (f.code==='ADD' ? '' : 업무칸)+ 비고칸+ 인감칸);
-  } else {
-    /* 인감·휴가: 항목이 곧 본문. 사진은 접기 밖 — 붙이려는 사람이 찾아야 하면 안 붙입니다 */
-    h+=제목칸+ 항목들+ 업무칸+ 사진칸+
-       foldBox('doc:more', '그 밖에', 법인칸+ 비고칸);
-  }
-  h+='<div class="actions"><button class="btn" onclick="closeModal()">취소</button>'+
-    '<button class="btn pri" id="dfSave" onclick="saveDoc()">상신</button></div>'+
-    '<p class="muted" id="dfMsg" style="margin-top:8px"></p></div></div>';
+  /* [더 입력하기] — 드문 것만. 안에 무엇이 있는지 단추 글에 적는다 (새 업무 창과 같은 모양) */
+  var 접힌=[], 접힌이름=[];
+  if(!한법인){ 접힌.push(법인칸); 접힌이름.push('법인'); }
+  if(업무접기){ 접힌.push(업무칸); 접힌이름.push('관련 업무'); }
+  접힌.push(비고칸); 접힌이름.push('비고');
+  if(인감칸){ 접힌.push(인감칸); 접힌이름.push('인감'); }
+
+  h+='<input type="hidden" id="dfCode" value="'+esc(f.code)+'">'+
+     (업무필수? 업무칸 : '')+                       // 추가공사: 어느 업무인지가 맨 위
+     내역+ docFieldsHtml(f.code, 칸, 칸순서)+ 사진칸+ 제목칸+
+     '<button type="button" class="fmorebtn" onclick="dfMore()" aria-expanded="false" aria-controls="dfMoreBox">'+ic('plus')+'더 입력하기'+
+       '<span class="fmh">'+접힌이름.join(' · ')+'</span></button>'+
+     '<div class="fmorebox" id="dfMoreBox">'+접힌.join('')+'</div>'+
+     (한법인? 법인칸 : '')+ (업무필수 || 업무접기 ? '' : 업무칸);
+  h+='<div class="actions tfoot"><p class="lgmsg" id="dfMsg" role="status"></p>'+
+    '<button class="btn" onclick="closeModal()">취소</button>'+
+    '<button class="btn pri" id="dfSave" onclick="saveDoc()">상신</button></div></div></div>';
 
   $('modal').innerHTML=h;
   DF_TITLE_TOUCHED=0;
@@ -13900,9 +13992,69 @@ function openDocForm(code, prefill, workTaskId){
       var banner=document.createElement('p');banner.className='work-linked';banner.textContent='연결 업무 · '+task.title;sheet.querySelector('.sheethead').after(banner);
     }
   }
-  if(sheet)sheet.addEventListener('input',function(){$('dfCode').dataset.dirty='1';});
+  if(sheet){
+    /* 문서 종류를 바꾼 것은 '쓴 것' 이 아니다 — 그것까지 쓴 것으로 치면 종류를 바꿀 때마다 '초기화됩니다' 를 묻는다 */
+    sheet.addEventListener('input',function(e){ if(!e.target || e.target.id!=='dfKind') $('dfCode').dataset.dirty='1'; dfOkFor(e.target); });
+    sheet.addEventListener('change',function(e){ dfOkFor(e.target); });
+  }
+  [].forEach.call(document.querySelectorAll('#modal .dform select:not(#dfKind)'), function(s){ s.classList.toggle('empty', !s.value); });   // 미리 채운 칸은 흐린 글자를 푼다
+  if(f.code==='LEAVE') leaveKindSync();
   if(f.useItems) addItem();
   syncDocTitle();
+}
+
+/** 문서 종류 드롭다운 (2026-10-28) — 고르면 그 양식으로 창을 새로 그린다.
+    쓰던 것이 있으면 한 번 묻고, 아니라고 하면 원래 종류로 되돌린다 */
+function pickDocKind(sel){
+  var 지금=$('dfCode')? $('dfCode').value : '', code=sel.value;
+  if(!code || code===지금) return;
+  if($('dfCode') && $('dfCode').dataset.dirty==='1' && !confirm('문서 종류를 바꾸면 작성 중인 내용이 초기화됩니다. 바꾸시겠습니까?')){ sel.value=지금; return; }
+  var id=sel.dataset.task;
+  if(id && code!=='LEAVE') openWorkDoc(code,id); else openDocForm(code);
+}
+/** [더 입력하기] — 그 자리에서 편다 (창을 새로 열지 않는다) */
+function dfMore(focus){
+  var f=document.querySelector('#modal .dform'); if(!f) return;
+  f.classList.add('more');
+  var b=f.querySelector('.fmorebtn'); if(b) b.setAttribute('aria-expanded','true');
+  if(focus===false) return;
+  var 첫=f.querySelector('#dfMoreBox select:not([hidden]), #dfMoreBox input:not([type=hidden]), #dfMoreBox [tabindex="0"]');
+  if(첫){ try{ 첫.focus(); }catch(e){} }
+}
+/* 막힌 이유는 그 칸 바로 아래 한 곳에만 (2026-10-28 — 새 업무 창의 tfFail 과 같은 방식).
+   칸이 없는 이유(서버 거절 · 통신)는 단추 위 #dfMsg. 품목은 품목 묶음 아래 · 사진은 미리보기 아래 */
+function dfFail(msg, el, focusEl){
+  var m=$('dfMsg');
+  if(!el){ if(m) m.textContent=msg; return; }
+  if(m) m.textContent='';
+  if(el.closest && el.closest('.fmorebox')) dfMore(false);
+  var 묶음=el.id==='dfItemsBox';
+  if(!묶음){ el.classList.add('err'); el.setAttribute('aria-invalid','true'); }
+  if(focusEl){ focusEl.classList.add('err'); focusEl.setAttribute('aria-invalid','true'); }
+  var pb=el.id==='dfPhoto' && el.parentNode ? el.parentNode.querySelector('.photobtn') : null; if(pb) pb.classList.add('err');
+  var 뒤= 묶음 ? el.querySelector('.itfoot') : el.id==='dfPhoto' ? $('dfPhotoBox') : el;
+  var eid=(el.id||'dfx')+'Err', e2=$(eid);
+  if(!e2 && 뒤){ e2=document.createElement('p'); e2.className='ferr'; e2.id=eid; e2.setAttribute('role','alert'); 뒤.parentNode.insertBefore(e2, 뒤.nextSibling); }
+  if(e2) e2.textContent=msg;
+  (focusEl||el).setAttribute('aria-describedby', eid);
+  try{ (focusEl||el).focus({ preventScroll:true }); (focusEl||(pb||el)).scrollIntoView({ block:'center' }); }catch(e){}
+}
+function dfOk(el){
+  if(!el) return;
+  el.classList.remove('err'); el.removeAttribute('aria-invalid'); el.removeAttribute('aria-describedby');
+  var e2=el.id? $(el.id+'Err') : null; if(e2 && e2.parentNode) e2.parentNode.removeChild(e2);
+  if(el.id==='dfPhoto' && el.parentNode){ var pb=el.parentNode.querySelector('.photobtn'); if(pb) pb.classList.remove('err'); }
+}
+/** 칸을 고치면 그 칸의 막힌 이유를 걷고, 고르기 칸은 흐린 글자를 푼다 */
+function dfOkFor(el){
+  if(!el || !el.closest) return;
+  if(el.tagName==='SELECT' && el.id!=='dfKind') el.classList.toggle('empty', !el.value);
+  if(el.closest('#dfItemsBox')){
+    dfOk($('dfItemsBox'));
+    [].forEach.call(document.querySelectorAll('#dfItems .err'), function(x){ x.classList.remove('err'); x.removeAttribute('aria-invalid'); x.removeAttribute('aria-describedby'); });
+    return;
+  }
+  dfOk(el);
 }
 
 /* ---- 자동 제목 (v42) ---- */
@@ -13914,6 +14066,7 @@ function syncDocTitle(e){
   if(DF_TITLE_TOUCHED && (!$('dfCode') || $('dfCode').value!=='LEAVE')) return;
   var el=$('dfTitle'); if(!el) return;
   el.value=autoDocTitle();
+  var 줄=$('dfTitleText'); if(줄) 줄.textContent=el.value;     // 휴가는 고칠 수 없는 한 줄로 보여 준다
 }
 
 /** 서버의 docTitle_ 과 같은 규칙. 지출·구매는 품목이 2개 이상이면 '외 N건' 을 붙인다 */
@@ -13957,7 +14110,9 @@ function autoDocTitle(){
   } else if(code==='LEAVE'){
     var s=String(fields['시작일']||'');
     var month=/^\d{4}-(0[1-9]|1[0-2])-\d{2}$/.test(s)?Number(s.substring(5,7)):0;
-    t=join([month?month+'월':'', fields['휴가종류']||'연차', '신청서'],' ');
+    /* 휴가종류를 아직 안 골랐으면 '휴가' (2026-10-28 — 미리 '연차' 를 골라 두지 않는다). 휴가종류는 필수라
+       올라갈 때는 언제나 골라져 있어 서버 docTitle_ 의 규칙('연차' 대신)과 결과가 같다 */
+    t=join([month?month+'월':'', fields['휴가종류']||'휴가', '신청서'],' ');
   } else {
     t=join([f? f.name:'', money, first],' · ');
   }
@@ -13966,25 +14121,40 @@ function autoDocTitle(){
 }
 
 var ITEM_SEQ=0;
-function addItem(){
+/** 품목 한 줄 — [품목 · 금액 · 빼기] / [일자 · 비용 분류] (2026-10-28). focus 면 새 줄의 품목 칸으로 */
+function addItem(focus){
   var box=$('dfItems');
   if(!box) return;
   var id='amt'+(ITEM_SEQ++);
   var d=document.createElement('div');
-  d.style.marginBottom='10px';
-  d.innerHTML='<div class="grid3">'+
-    '<input type="text" class="itMemo">'+
-    '<input type="date" class="itDate" value="'+todayStr()+'">'+
-    '<input type="text" class="itAmt" id="'+id+'" inputmode="numeric" oninput="moneyInput(this)">'+
+  d.className='itrow';
+  d.innerHTML='<div class="itmain">'+
+      '<input type="text" class="itMemo" aria-label="품목">'+
+      '<input type="text" class="itAmt" id="'+id+'" inputmode="numeric" aria-label="금액" oninput="moneyInput(this)">'+
+      '<button type="button" class="itdel" aria-label="이 줄 빼기" title="이 줄 빼기" onclick="removeItem(this)">'+ic('x')+'</button>'+
     '</div>'+
-    '<p class="muted" id="'+id+'_ko" style="margin:3px 0 0;font-size:var(--fs-sm);text-align:right"></p>'+
-    /* 이 품목의 비용 분류 — 지출결의서·구매요청서에만 (2026-09-22) */
-    (COST_FORM_CODES[$('dfCode') ? $('dfCode').value : '']
-      ? '<label class="itcat"><span>비용 분류</span><select class="itCat" aria-label="이 품목의 비용 분류">'+
-        costCatOptions('')+'</select></label>'
-      : '');
+    '<p class="itko" id="'+id+'_ko"></p>'+
+    '<div class="itsub">'+
+      '<label class="itd"><span>일자</span><input type="date" class="itDate" value="'+todayStr()+'"></label>'+
+      /* 이 품목의 비용 분류 — 지출결의서·구매요청서에만 (2026-09-22) */
+      (COST_FORM_CODES[$('dfCode') ? $('dfCode').value : '']
+        ? '<label class="itcat"><span>비용 분류</span><select class="itCat" aria-label="이 품목의 비용 분류">'+
+          costCatOptions('')+'</select></label>'
+        : '')+
+    '</div>';
   box.appendChild(d);
   sumItems();
+  if(focus){ try{ d.querySelector('.itMemo').focus(); }catch(e){} }
+}
+/** 잘못 넣은 품목 줄 빼기 (2026-10-28 대표님) — 한 줄만 남으면 빼기 단추를 감춘다(CSS) */
+function removeItem(btn){
+  var row=btn.closest('.itrow'), box=$('dfItems');
+  if(!row || !box || box.children.length<2) return;
+  var 옆=row.nextElementSibling||row.previousElementSibling;
+  box.removeChild(row);
+  sumItems(); syncDocTitle(); dfOkFor(box);
+  if($('dfCode')) $('dfCode').dataset.dirty='1';
+  try{ 옆.querySelector('.itMemo').focus(); }catch(e){}
 }
 
 /* 휴가는 하루짜리가 대부분입니다.
@@ -13994,6 +14164,21 @@ function addItem(){
      (직접 고쳤는지는 '방금 우리가 채워 넣은 값 그대로인가' 로 봅니다) */
 var LEAVE_FILLED='';
 
+/* 반차는 그날 하루 — 오전반차 · 오후반차를 고르면 종료일 칸을 감추고 시작일과 같게 둔다 (2026-10-28 대표님).
+   상신할 때도 saveDoc 이 종료일을 시작일로 맞춘다 — 감추기 전에 적어 둔 종료일이 남아 여러 날 휴가로 저장되지 않게 */
+var HALF_DAY={ '오전반차':1, '오후반차':1 };
+function leaveKindSync(){
+  var kind=null, from=null, to=null;
+  [].forEach.call(document.querySelectorAll('#modal .dfField'), function(el){
+    if(el.dataset.name==='휴가종류') kind=el;
+    if(el.dataset.name==='시작일') from=el;
+    if(el.dataset.name==='종료일') to=el;
+  });
+  if(!kind || !to) return;
+  var half=!!HALF_DAY[kind.value], box=to.closest('.field');
+  if(box) box.hidden=half;
+  if(half){ to.value=from? from.value : ''; LEAVE_FILLED=to.value; dfOk(to); }
+}
 function leaveSyncEnd(){
   var from=null, to=null;
   [].forEach.call(document.querySelectorAll('.dfField'), function(el){
@@ -14034,6 +14219,7 @@ function saveDoc(){
 
   /* ★ 하루짜리 휴가는 시작일만 고르면 됩니다.
      종료일을 비워 두면 그날 하루로 봅니다 (서버도 같은 규칙입니다). */
+  if(code==='LEAVE' && HALF_DAY[fields['휴가종류']]) fields['종료일']=fields['시작일'];     // 반차는 그날 하루 (2026-10-28)
   if(code==='LEAVE' && fields['시작일'] && !fields['종료일']) fields['종료일']=fields['시작일'];
 
   var titleEl=$('dfTitle');
@@ -14049,27 +14235,34 @@ function saveDoc(){
      예전에는 제목·내역·영수증 셋만 화면에서 보고, 양식별 필수 칸과
      추가공사의 관련 업무는 **서버까지 갔다가** 되돌아왔습니다.
      지출결의서는 그 사이에 영수증 사진을 2400px 로 줄여 올린 뒤라
-     사람이 한참 기다리다 '입력해주세요' 를 봤습니다. */
-  function stop(text, id){
-    msg.textContent=text;
-    var el=id? $(id):null;
-    if(el){ el.classList.add('err'); el.focus(); }
-    return true;
-  }
-  [].forEach.call(document.querySelectorAll('#modal .err'), function(e){ e.classList.remove('err'); });
+     사람이 한참 기다리다 '입력해주세요' 를 봤습니다.
+     ★ 막힌 이유는 그 칸 바로 아래에 (2026-10-28 대표님). 보는 차례는 창에 놓인 차례 그대로 —
+       맨 위 칸부터 보여 줘야 사람이 위에서 아래로 고친다 (막는 것 자체는 서버와 같다) */
+  function stop(text, id, focusEl){ dfFail(text, id? $(id):null, focusEl||null); return true; }
+  [].forEach.call(document.querySelectorAll('#modal .err'), function(e){ dfOk(e); });
+  [].forEach.call(document.querySelectorAll('#modal .ferr'), function(e){ if(e.parentNode) e.parentNode.removeChild(e); });
+  msg.textContent='';
 
-  if(!title) return void stop('제목을 입력해주세요.', 'dfTitle');
-
-  // 양식이 요구하는 칸 (양식항목 시트의 '필수')
-  var miss=null;
-  ((f && f.fields) || []).forEach(function(fd, i){
-    if(miss) return;
-    if(fd.req && !String(fields[fd.name]||'').trim()) miss={ name:fd.name, id:'fd_'+i };
-  });
-  if(miss) return void stop(miss.name+'을(를) 입력해주세요.', miss.id);
-
-  // 추가공사는 어느 업무인지 반드시 고른다 (서버도 같은 것을 본다)
+  // 추가공사는 어느 업무인지 반드시 고른다 (서버도 같은 것을 본다) — 창 맨 위 칸
   if(code==='ADD' && !p.taskId) return void stop('어느 업무의 추가공사인지 골라주세요.', 'dfTask');
+
+  if(f && f.useItems){
+    var 첫줄=$('dfItems')? $('dfItems').firstElementChild : null;
+    if(!items.length) return void stop(f.itemsTitle+'을(를) 한 줄 이상 입력해주세요.', 'dfItemsBox', 첫줄? 첫줄.querySelector('.itMemo') : null);
+    var sum=0; items.forEach(function(it){ sum+=Number(it.amount||0); });
+    if(sum<=0) return void stop('금액을 입력해주세요.', 'dfItemsBox', 첫줄? 첫줄.querySelector('.itAmt') : null);
+  }
+
+  // 양식이 요구하는 칸 (양식항목 시트의 '필수') — 창에 놓인 차례대로
+  var miss=null;
+  [].some.call(document.querySelectorAll('#modal .dfField'), function(el){
+    var fd=((f && f.fields) || []).filter(function(x){ return x.name===el.dataset.name; })[0];
+    if(fd && fd.req && !String(fields[fd.name]||'').trim()){ miss={ name:fd.name, kind:fd.kind, id:el.id }; return true; }
+  });
+  if(!miss) ((f && f.fields) || []).some(function(fd){            // 창에 없는 필수 칸이 있으면(있어선 안 된다) 단추 위에
+    if(fd.req && !String(fields[fd.name]||'').trim()){ miss={ name:fd.name, kind:fd.kind, id:null }; return true; }
+  });
+  if(miss) return void stop(miss.name+(miss.kind==='선택'? '을(를) 골라주세요.' : '을(를) 입력해주세요.'), miss.id);
 
   /* 휴가는 날짜 앞뒤를 본다. 서버(api_saveDoc)도 같은 것을 다시 본다 (v55) */
   if(code==='LEAVE'){
@@ -14081,16 +14274,6 @@ function saveDoc(){
     }
   }
 
-  if(f && f.useItems){
-    if(!items.length) return void stop(f.itemsTitle+'을(를) 한 줄 이상 입력해주세요.');
-    var sum=0; items.forEach(function(it){ sum+=Number(it.amount||0); });
-    if(sum<=0){
-      var first=$('dfItems')? $('dfItems').querySelector('.itAmt') : null;
-      msg.textContent='금액을 입력해주세요.';
-      if(first){ first.classList.add('err'); first.focus(); }
-      return;
-    }
-  }
   /* 사진은 고르는 순간 이미 줄여서 담아 두었다 (photoAdd).
      그래서 상신을 누른 뒤에는 기다릴 것이 없다. */
   var shots = photoValues('dfPhoto');
@@ -14098,6 +14281,7 @@ function saveDoc(){
   if(f && f.needReceipt && !shots.length && !pdfs.length){
     return void stop('영수증 사진을 첨부해주세요.', 'dfPhoto');
   }
+  if(!title) return void stop('제목을 입력해주세요.', 'dfTitle');      // 제목은 맨 아래 칸 (자동으로 채워져 거의 비지 않는다)
 
   /* 돈이 걸린 동작이라 낙관 처리하지 않는다. 서버 확인 후 닫는다.
      대신 버튼을 잠가 두 번 눌리지 않게 하고, 서버는 저장까지만 하고 바로 응답한다. */
