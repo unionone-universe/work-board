@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v159">
+<meta name="uo-version" content="v160">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -2341,9 +2341,9 @@ body:has(#modal .veil:not(.tdveil)) #writeDock,body:has(#modal .veil:not(.tdveil
               <button role="tab" data-col="colWait" aria-selected="false" aria-controls="colWait" onclick="boardTab('colWait')">대기 <span class="n" id="tWait">0</span></button>
               <button role="tab" data-col="colDone" aria-selected="false" aria-controls="colDone" onclick="boardTab('colDone')">완료 <span class="n" id="tDone">0</span></button>
             </div>
-            <button class="btn ftoggle" id="fToggle" onclick="toggleFilters()" aria-expanded="false" aria-controls="corpFilter" aria-label="거르기"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-filter"/></svg><span class="flbl">거르기</span><span class="fbadge hide" id="fBadge"></span></button>
+            <button class="btn ftoggle" id="fToggle" onclick="toggleFilters()" aria-expanded="false" aria-controls="corpFilter" aria-label="필터"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-filter"/></svg><span class="flbl">필터</span><span class="fbadge hide" id="fBadge"></span></button>
             <div class="fsum" id="fSum"></div>
-            <div class="filterbar" id="corpFilter" role="group" aria-label="업무 거르기"></div>
+            <div class="filterbar" id="corpFilter" role="group" aria-label="업무 필터"></div>
             <button class="refbtn" id="refBtn" onclick="refresh(true)" title="마지막으로 받아온 시각 · 누르면 다시 받아옵니다"><span class="rico"><svg class="ic" aria-hidden="true" focusable="false"><use href="#i-refresh"/></svg></span><span class="clock" id="atTime"></span><span class="sronly">새로고침</span></button>
           </div>
           <div class="board" data-tab="colRun">
@@ -5625,7 +5625,7 @@ function renderFilters(){
   var sum=$('fSum');
   if(sum) sum.innerHTML = 조건.length
     ? 조건.map(function(x){ return '<span class="fcond">'+ic('filter')+esc(x)+'</span>'; }).join('')+
-      '<button class="btn sm freset" onclick="clearFilter()" aria-label="거른 조건 초기화">'+ic('reset')+'<span>초기화</span></button>'
+      '<button class="btn sm freset" onclick="clearFilter()" aria-label="필터 초기화">'+ic('reset')+'<span>초기화</span></button>'
     : '';
   var bd=$('fBadge');
   if(bd){ bd.textContent = 조건.length ? String(조건.length) : ''; bd.classList.toggle('hide', !조건.length); }
@@ -5683,7 +5683,7 @@ function ownerChip(t){
   /* ★ 21 지시 — 밑줄 대신 사람 아이콘 + 이름 딱지 한 가지 모양. 거르고 있는 사람이면 녹색(고른 것) + 누르면 풀린다 */
   var 거름=(S.owner===t.owner);
   return '<button class="who'+(거름?' on':'')+'" aria-pressed="'+(거름?'true':'false')+'"'+
-         ' title="'+esc(거름? '담당 거르기 풀기' : t.ownerName+' 업무만 보기')+'"'+
+         ' title="'+esc(거름? '담당 필터 풀기' : t.ownerName+' 업무만 보기')+'"'+
          ' onclick="event.stopPropagation();setOwner(\''+t.owner+'\')">'+ic('user')+esc(t.ownerName)+'</button>';
 }
 

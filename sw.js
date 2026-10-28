@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v159';  // 2026-10-28 실장은 아래 직급 직원 업무도 보기 (보기 · 댓글만)
+const CACHE = 'unionone-launcher-v160';  // 2026-10-28 '거르기' 글자를 '필터' 로
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;
