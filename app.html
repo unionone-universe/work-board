@@ -3,8 +3,10 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v154">
+<meta name="uo-version" content="v155">
 <title>UNION ONE WORK BOARD</title>
+<link rel="preconnect" href="https://drive.google.com">
+<link rel="preconnect" href="https://lh3.googleusercontent.com">
 <style>
 /* 워크보드 시각 기준 · 2026-10-13
    밝은 회색 바탕 / 흰 콘텐츠 / 블루 행동색. 어두운 화면도 명도 단계로 구분한다.
@@ -4901,7 +4903,8 @@ function saveSnap(){
              subs:d.subs,                // 구독 관리 (2026-10-01) — 같은 사람에게만 서버가 보낸다
              notices:d.notices, commentsByTask:d.commentsByTask, commentCount:d.commentCount,
              cmtDot:d.cmtDot,     // 안 읽은 댓글 배지 (서버 판정, v44)
-             vers:d.vers }        // 분야별 번호표도 같이 (다음 접속 때 캐시 판정에 쓴다)
+             vers:d.vers },       // 분야별 번호표도 같이 (다음 접속 때 캐시 판정에 쓴다)
+      docMore:snapDocMore(d)      // 판 밖에서 받아 둔 결재 상세 (2026-10-28)
     }));
   }catch(e){ quiet('마지막 화면 저장', e); }   // 다음 접속이 느려질 뿐, 이번 화면은 그대로
 }
@@ -5017,6 +5020,7 @@ function boot(){
     S.confirmedAt=snap.t;         // 이 화면을 서버가 마지막으로 확인해 준 시각
     useRanks(S.meta);
     takeDocPack(S.data);          // 지난번에 받아둔 문서 상세도 되살린다
+    takeDocMore(snap.docMore);    // 판 밖에서 받아 둔 것도 (2026-10-28)
     $('brandName').textContent=(S.meta.company||'UNION ONE').replace('(주)','').trim()||'UNION ONE';
     loadFont(S.meta.fontTitle, S.meta.fontNum);
     renderFilters();
@@ -5504,6 +5508,7 @@ function applyBoard(b){
   showNoti(b.noti);
   if(S.view==='doc') renderDocs();
   scheduleSnap();
+  prefetchDocsSoon();                       // 목록의 결재 상세 · 사진을 뒤에서 받아 둔다 (2026-10-28)
   // 공지 3건과 댓글은 판에 이미 있다. 전체 공지 이력은 공지를 열 때만 받는다.
   UPDATE_NOTICE_AUTH=updateNoticeAccount();
   scheduleUpdateNotice();
@@ -13013,26 +13018,106 @@ function findDocBrief(no){
 }
 
 /**
- * 문서 상세는 board 가 이미 통째로 실어 보낸다(`docPack`).
- * 여기서는 거기에 안 담긴 오래된 문서만 뒤에서 채운다.
+ * 결재 상세 미리 받기 (2026-10-28 대표님 — 지출결의서 같은 결재를 열면 '내역을 불러오는 중입니다' 가 뜨고 사진도 늦게 떴다).
+ * 판(board)은 가볍게 두려고 최근 8건(`docPack`)만 싣는다. 예전에는 나머지를 **결재 화면에 있을 때 2건씩만** 받아서,
+ * 9번째 문서부터는 열 때마다 서버를 2~3초 기다렸다.
+ * 이제 판을 받은 뒤 **어느 화면에 있든**(알림 · 업무의 관련 결재 · 종류별 보기에서도 연다) 목록의 문서를 뒤에서 한꺼번에 받아 둔다.
+ * 결재할 것 → 내가 올린 것 → 그 밖의 차례로 한 번에 30건, 60건까지. 받아 둔 문서는 다시 묻지 않는다
+ * (결재 쪽이 바뀌었으면 열 때 받아 둔 것을 먼저 보여 주고 뒤에서 새로 받는다 — openDoc 그대로).
+ * 숨긴 탭 · 저장 중 · 이미 받는 중이면 쉬고, 계정 · 권한이 바뀌었거나 그사이 저장이 있었으면 답을 버린다.
  */
-function prefetchDocs(){
-  if(document.hidden || S.view!=='doc' || ACTIVE_WRITES || ($('modal') && $('modal').innerHTML))return;
-  var src=docSource(); if(!src) return;
-  var nos=[];
+var DOC_PREFETCH=null, DOC_PREFETCH_T=null, DOC_PREFETCH_MAX=60, DOC_PREFETCH_CHUNK=30;
+function prefetchDocsSoon(){ clearTimeout(DOC_PREFETCH_T); DOC_PREFETCH_T=setTimeout(prefetchDocs, 800); }
+function docPrefetchList(){
+  var src=docSource(), nos=[], seen={};
+  if(!src) return nos;
   ['toAct','drafts','others'].forEach(function(k){
     (src[k]||[]).forEach(function(d){
-      if(nos.length>=2) return;
+      if(!d || !d.no || seen[d.no] || nos.length>=DOC_PREFETCH_MAX) return;
+      seen[d.no]=1;
       if(!S.docCache[d.no]) nos.push(d.no);
     });
   });
-  if(!nos.length) return;
-  var at=areaVer('doc'),ep=S.epoch,token=S.token,rev=READ_REV;
-  callWithOptions({quiet:true},'api_docDetails', S.token, nos).then(function(r){
-    if(!r || !r.ok || ep!==S.epoch || token!==S.token || rev!==READ_REV) return;
-    Object.keys(r.docs||{}).forEach(function(k){
-      S.docCache[k]=r.docs[k]; S.docCacheAt[k]=at;
+  return nos;
+}
+function prefetchDocs(){
+  if(DOC_PREFETCH || document.hidden || ACTIVE_WRITES || !S.token || !S.me) return;
+  var nos=docPrefetchList();
+  if(!nos.length){ warmDocShots(); return; }
+  var at=areaVer('doc'), ep=S.epoch, token=S.token, rev=READ_REV, job=DOC_PREFETCH={};
+  function stop(){ if(DOC_PREFETCH===job) DOC_PREFETCH=null; }
+  (function next(i){
+    var part=nos.slice(i, i+DOC_PREFETCH_CHUNK);
+    if(ep!==S.epoch || token!==S.token){ stop(); return; }                  // 계정 · 권한이 바뀌었다 — 그만 받는다
+    if(!part.length){ stop(); warmDocShots(); scheduleSnap(); return; }     // 다 받았다 — 사진을 데우고 저장본에도
+    callWithOptions({quiet:true},'api_docDetails', S.token, part).then(function(r){
+      if(!r || !r.ok || ep!==S.epoch || token!==S.token || rev!==READ_REV){ stop(); return; }
+      Object.keys(r.docs||{}).forEach(function(k){
+        if(S.docCache[k]) return;                 // 그사이 문서를 열어 받은 것이 있으면 그것을 둔다
+        S.docCache[k]=r.docs[k]; S.docCacheAt[k]=at;
+        docPaintIfWaiting(k);
+      });
+      next(i+DOC_PREFETCH_CHUNK);
+    }, stop);
+  })(0);
+}
+
+/** 열어 둔 창이 아직 '내역을 불러오는 중' 이면, 미리 받기가 먼저 가져온 내역으로 바로 그린다 */
+function docPaintIfWaiting(no){
+  var body=$('ddBody'), r=S.docCache[no];
+  if(!body || body.dataset.no!==no || !r || !body.querySelector('.doc-waiting')) return;
+  $('modal').innerHTML=docSheetHtml(r.doc, r);
+}
+
+/**
+ * 결재 사진 미리 받기 (2026-10-28) — 상세의 썸네일과 **같은 주소**를 이 창에서 먼저 받아 두면
+ * 문서를 열 때 브라우저가 다시 받지 않고 바로 그린다(드라이브가 주소를 돌려보내고 저장을 막아도 같은 창 안에서는 다시 쓴다).
+ * 결재할 것 · 내가 올린 진행 중 문서의 사진만, 한 번에 20장 · 모두 60장까지. 데이터 절약 모드 · 숨긴 탭이면 하지 않는다.
+ */
+var SHOT_WARM=Object.create(null), SHOT_WARM_KEEP=60, SHOT_WARM_EACH=20;
+function docThumbSrc(id){ return 'https://drive.google.com/thumbnail?id='+id+'&sz=w400'; }
+function warmDocShots(){
+  try{ if(navigator.connection && navigator.connection.saveData) return; }catch(e){}
+  if(document.hidden) return;
+  var src=docSource(); if(!src) return;
+  var list=[].concat(src.toAct||[], (src.drafts||[]).filter(function(d){ return d && d.status==='진행중'; })), n=0;
+  list.forEach(function(d){
+    var r=d && S.docCache[d.no];
+    ((r && r.files) || []).forEach(function(f){
+      if(n>=SHOT_WARM_EACH || /\.pdf$/i.test(String(f.name||''))) return;
+      var id=driveId(f.url), s=id && docThumbSrc(id);
+      if(!s || SHOT_WARM[s]) return;
+      var im=new Image(); im.decoding='async'; im.src=s; SHOT_WARM[s]=im; n++;
     });
+  });
+  var keys=Object.keys(SHOT_WARM);
+  keys.slice(0, Math.max(0, keys.length-SHOT_WARM_KEEP)).forEach(function(k){ delete SHOT_WARM[k]; });
+}
+
+/**
+ * 판 밖에서 받아 둔 결재 상세도 저장본에 같이 (2026-10-28) — 앱을 다시 열자마자 문서를 눌러도 기다리지 않게.
+ * 지금 목록에 있는 문서만, 40건 · 30만 자까지. 판(docPack)에 이미 있는 것은 빼고, 받을 때의 결재 번호표를 같이 남긴다
+ * (번호표가 지금과 다르면 열 때 먼저 보여 주고 뒤에서 새로 받는다).
+ */
+function snapDocMore(d){
+  var out={}, at={}, n=0, pack=(d && d.docPack) || {}, src=d && d.docs;
+  if(!src) return null;
+  ['toAct','drafts','others'].forEach(function(k){
+    (src[k]||[]).forEach(function(x){
+      if(n>=40 || !x || !x.no || pack[x.no] || out[x.no] || !S.docCache[x.no]) return;
+      out[x.no]=S.docCache[x.no]; at[x.no]=S.docCacheAt[x.no]||''; n++;
+    });
+  });
+  if(!n) return null;
+  var v={docs:out, at:at};
+  try{ if(JSON.stringify(v).length>300000) return null; }catch(e){ return null; }
+  return v;
+}
+function takeDocMore(m){
+  if(!m || !m.docs) return;
+  Object.keys(m.docs).forEach(function(no){
+    if(S.docCache[no]) return;
+    S.docCache[no]=m.docs[no]; S.docCacheAt[no]=(m.at && m.at[no]) || '';
   });
 }
 
@@ -13100,7 +13185,7 @@ function docSheetHtml(d, r){
 
 /** 상세를 확인하기 전에는 처리 버튼을 노출하지 않는다. */
 function waitingBody(d){
-  return '<p class="muted" role="status">내역을 불러오는 중입니다…</p>';
+  return '<p class="muted doc-waiting" role="status">내역을 불러오는 중입니다…</p>';
 }
 
 function docDetailBody(r){
@@ -13251,7 +13336,8 @@ function receiptThumb(url, i){
   var id=driveId(url);
   RCPT[i]=url;
   if(!id) return '<a href="'+esc(url)+'" target="_blank" class="btn sm">영수증 보기</a>';
-  return '<img loading="lazy" decoding="async" src="https://drive.google.com/thumbnail?id='+esc(id)+'&sz=w400" '+
+  /* ★ loading="lazy" 를 뗐다 (2026-10-28) — 상세의 사진은 몇 장뿐이고 바로 보여야 한다. 주소는 미리 받기(warmDocShots)와 같은 docThumbSrc */
+  return '<img decoding="async" width="72" height="72" src="'+esc(docThumbSrc(id))+'" '+
     'alt="영수증" onclick="openReceipt(\''+esc(id)+'\','+i+')" '+
     'onerror="this.outerHTML=\'<a href=&quot;'+esc(url)+'&quot; target=_blank class=&quot;btn sm&quot;>영수증 보기</a>\'" '+
     'style="width:72px;height:72px;object-fit:cover;border-radius:var(--r);'+
