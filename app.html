@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v160">
+<meta name="uo-version" content="v161">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -1622,7 +1622,14 @@ html[data-theme="dark"] .newsheet .ntabs button[aria-selected="true"]{background
 .fmorebtn:hover{background:var(--panel);color:var(--t1)}
 .fmorebtn .ic{color:var(--pri)}
 .fmorebtn .fmh{margin-left:auto;font-size:var(--fs-sm);font-weight:500;color:var(--t3)}
+/* 좁은 폰에서 접힌 칸 안내(마감 날짜 · 진행률 · 자료)가 길면 '더 입력하기' 가 '더 입력하 / 기' 로 꺾였다 — 단추 글은 한 줄, 안내만 다음 줄로 (2026-10-28) */
+.fmorebtn{flex-wrap:wrap;white-space:nowrap;row-gap:2px;padding-top:6px;padding-bottom:6px}
+.fmorebtn .fmh{white-space:normal;text-align:right}
 .fmorebox{display:none}
+.tform .tfdue{max-width:260px}
+.tform select.empty{color:var(--t3)}
+.tform select.empty option{color:var(--t1)}
+.tfattach #tfFilesNote:empty{display:none}
 .tform.more .fmorebox{display:block}
 .tform.more .fmorebtn{display:none}
 .tform .field{margin-bottom:18px}
@@ -8701,7 +8708,7 @@ function tfFilesPick(input){
     q.items.push({file:f,state:'ready',requestId:'',data:''});
   });
   if(q.items.length){MODAL_TOUCHED=true;MODAL_DRAWN=true;}
-  $('tfFilesNote').textContent=notes.length?Array.from(new Set(notes)).join(' '):'PDF·이미지 · 최대 3개 · 파일당 8MB';tfFilesDraw();
+  $('tfFilesNote').textContent=notes.length?Array.from(new Set(notes)).join(' '):(q.items.length?'최대 3개 · 파일당 8MB':'');tfFilesDraw();
 }
 function tfFileRead(f){return new Promise(function(resolve,reject){
   var reader=new FileReader();reader.onerror=function(){reject(new Error('파일을 읽지 못했습니다. 다시 선택해주세요.'));};
@@ -8804,8 +8811,11 @@ function drawTaskForm(id, t, files){
     (S.meta.typeAll||[]).forEach(function(x){ if(x.code===t.type) old=x; });
     types.push(old || { code:t.type, name:t.typeName||t.type });
   }
-  /* ★★ 워크보드 2.0 입력 창 — **지금 필요한 것만 먼저** (업무명 · 종류 · 담당 · 마감 · 지금 상태).
-       내용 · 현장 · 협업자 · (법인) · 세밀한 진행률 · 자료는 [더 입력하기] 로 그 자리에서 펼친다 (창을 새로 열지 않는다).
+  /* ★★ 입력 창 (2026-10-28 대표님 — '새 업무 칸 손봐야' 반영) — **쓰는 것이 먼저**:
+       업무명 → [업무 종류 ▾ · 담당자 ▾] 한 줄 → 업무 내용(바로 쓴다 · 사진 넣기) → 지금 상태 → 첨부파일.
+       예전에는 종류가 칩 여덟 개로 두 줄을 차지했고, 마감일이 필수처럼 앞에 있었고, 업무 내용은 [더 입력하기] 안에 숨어 있었다.
+       마감일 · 현장 · 협업자 · (법인) · 세밀한 진행률 · 자료는 [더 입력하기] 로 그 자리에서 펼친다 (창을 새로 열지 않는다).
+       마감일이 정해진 업무는 접힌 단추에 그 날짜를 적어 둔다 — 접혀 있어도 있는 줄 안다.
        ★ 수정도 같은 순서로 접어서 연다 (15 지시 — 필수 정보와 저장이 먼저). 저장 실패로 되살린 창만 펼친다(tfDraw).
      ★ 칸 이름(id) · 필수 규칙 · 기본값은 그대로 — 업무명 · 종류 필수, 담당자는 나, 종류는 미리 안 고름.
      ★ 법인이 하나뿐이면 고를 것이 없으므로 칸을 감추고 그 값으로 저장한다 (서버 필수값은 그대로 보낸다).
@@ -8826,14 +8836,12 @@ function drawTaskForm(id, t, files){
       '<div class="field"><label class="fl req" for="tfTitle">업무명</label>'+
         '<textarea id="tfTitle" class="tftitle" rows="1" spellcheck="false" '+
           'onkeydown="tfTitleKey(event)" oninput="tfGrow(this);tfOk(this)">'+esc(t?t.title:'')+'</textarea></div>'+
-      '<div class="field"><label class="fl req">업무 종류</label>'+
-        '<div class="chks tfpick" id="tfType" role="radiogroup" aria-label="업무 종류">'+
-        types.map(function(x){ var on=(t&&t.type===x.code);
-          return '<label data-v="'+x.code+'" class="'+(on?'on':'')+'" role="radio" tabindex="0" '+
-            'aria-checked="'+(on?'true':'false')+'" onkeydown="cardKey(event)" onclick="pickType(this)">'+
-            esc(x.name)+'</label>'; }).join('')+
-      '</div></div>'+
       '<div class="grid2">'+
+        /* 업무 종류 — 드롭다운 하나 (2026-10-28). 미리 고르지 않는다 — 안 고르면 저장에서 막는다 */
+        '<div class="field"><label class="fl req" for="tfType">업무 종류</label>'+
+          '<select id="tfType" class="'+(t&&t.type?'':'empty')+'" onchange="pickTypeSel(this)"><option value="" disabled'+(t&&t.type?'':' selected')+'>종류 고르기</option>'+
+          types.map(function(x){ return '<option value="'+esc(x.code)+'"'+(t&&t.type===x.code?' selected':'')+'>'+esc(x.name)+'</option>'; }).join('')+
+          '</select></div>'+
         /* ★ 본인 업무만 보는 사람은 담당자를 본인으로만 (2026-09-30) — 서버(api_saveTask)도 같은 규칙으로 막습니다 */
         '<div class="field"><label class="fl req" for="tfOwner">담당자</label>'+
           (selfOnly()
@@ -8841,28 +8849,22 @@ function drawTaskForm(id, t, files){
                 esc(S.me.name||'나')+' (본인)</option></select>'+
               '<p class="fhelp" id="tfOwnerNote">본인 업무만 올리고 고칠 수 있습니다</p></div>'
             : '<select id="tfOwner" onchange="syncCo()">'+staffOptions(t?t.owner:S.me.phone)+'</select></div>')+
-        '<div class="field"><label class="fl" for="tfDue">마감일</label>'+
-          '<input type="date" id="tfDue" value="'+esc(t?t.due:'')+'"></div>'+
       '</div>'+
-      /* 지금 상태 — 새 업무는 [대기] · [바로 시작] 만. 세밀한 진행률은 [더 입력하기] 안 (상태는 진행률이 정한다) */
-      (수정 ? '' :
-      '<div class="field"><label class="fl">지금 상태</label>'+
-        '<div class="chks tfpick" id="tfState" role="radiogroup" aria-label="지금 상태">'+
-          '<label data-v="wait" class="on" role="radio" tabindex="0" aria-checked="true" onkeydown="cardKey(event)" onclick="tfState(\'wait\')">대기</label>'+
-          '<label data-v="run" role="radio" tabindex="0" aria-checked="false" onkeydown="cardKey(event)" onclick="tfState(\'run\')">바로 시작</label>'+
-        '</div></div>')+
+      /* 업무 내용 — 바로 쓴다 (예전에는 [더 입력하기] 안). 사진도 여기서 넣는다 */
+      '<div class="field"><label class="fl">업무 내용</label>'+
+        mkEditor('tfContent', (t&&t.content)?t.content:'', 120, false, true)+'</div>'+
       (한법인? 법인칸 : '')+
     '</div>'+
-    (!id ? '<section class="tfattach" aria-label="첨부파일"><label class="fl">첨부파일</label>'+
+    (!id ? '<section class="tfattach" aria-label="첨부파일">'+
       '<input id="tfFilesInput" type="file" accept="application/pdf,image/jpeg,image/png,image/webp,image/gif,image/heic,image/heif,.pdf,.heic,.heif" multiple hidden onchange="tfFilesPick(this)">'+
-      '<button id="tfFilesAdd" type="button" class="btn" onclick="document.getElementById(\'tfFilesInput\').click()">'+ic('clip')+'PDF · 이미지 추가</button>'+
-      '<p id="tfFilesNote" class="fhelp">PDF·이미지 · 최대 3개 · 파일당 8MB</p><div id="tfFiles" aria-live="polite"></div></section>' : '')+
+      '<button id="tfFilesAdd" type="button" class="btn sm" title="PDF·이미지 · 최대 3개 · 파일당 8MB" onclick="document.getElementById(\'tfFilesInput\').click()">'+ic('clip')+'파일 첨부 (PDF · 이미지)</button>'+
+      '<p id="tfFilesNote" class="fhelp"></p><div id="tfFiles" aria-live="polite"></div></section>' : '')+
     '<button type="button" class="fmorebtn" onclick="tfMore()" aria-expanded="false">'+ic('plus')+'더 입력하기'+
-      '<span class="fmh">내용 · 현장 · 협업자'+(한법인? '' : ' · 법인')+(수정? ' · 진행률 · 자료' : '')+'</span></button>'+
+      '<span class="fmh">'+(t&&t.due? '마감 '+esc(krDate(t.due)) : '마감일')+(수정? '' : ' · 지금 상태')+' · 현장 · 협업자'+(한법인? '' : ' · 법인')+(수정? ' · 진행률 · 자료' : '')+'</span></button>'+
     '<div class="fmorebox">'+
-      '<div class="fgrp"><p class="fgh">'+ic('list')+'자세한 내용</p>'+
-        '<div class="field"><label class="fl">업무 내용</label>'+
-          mkEditor('tfContent', (t&&t.content)?t.content:'', 64, true, true)+'</div>'+
+      '<div class="fgrp"><p class="fgh">'+ic('cal')+'일정</p>'+
+        '<div class="field tfdue"><label class="fl" for="tfDue">마감일</label>'+
+          '<input type="date" id="tfDue" value="'+esc(t?t.due:'')+'"></div>'+
       '</div>'+
       /* 철거를 고르면 현장 · 계약금액 (고른 뒤에야 보인다 — syncDemo) */
       '<div class="fgrp" id="tfDemo"><p class="fgh">'+ic('pin')+'현장</p>'+
@@ -8883,6 +8885,14 @@ function drawTaskForm(id, t, files){
       '</div>'+
       /* 진행률 — 상태는 진행률이 정한다 (0% 대기 · 5~95% 진행중 · 100% 완료). 수정은 저장된 값 그대로 (5 단위가 아니어도) */
       '<div class="fgrp"><p class="fgh">'+ic('clock')+'진행 상태</p>'+
+        /* 지금 상태 — 새 업무는 [대기] · [바로 시작] (2026-10-28 대표님 — 앞에서 [더 입력하기] 안으로). 거의 늘 대기라 접어 두고,
+           어느 목록에 들어가는지는 머리 아래 한 줄(#tfDest)이 늘 말한다. 상태는 진행률이 정한다 */
+        (수정 ? '' :
+        '<div class="field"><label class="fl">지금 상태</label>'+
+        '<div class="chks tfpick" id="tfState" role="radiogroup" aria-label="지금 상태">'+
+          '<label data-v="wait" class="on" role="radio" tabindex="0" aria-checked="true" onkeydown="cardKey(event)" onclick="tfState(\'wait\')">대기</label>'+
+          '<label data-v="run" role="radio" tabindex="0" aria-checked="false" onkeydown="cardKey(event)" onclick="tfState(\'run\')">바로 시작</label>'+
+        '</div></div>')+
         '<div class="field tfprog"><label class="fl">진행률</label>'+
           progBox('tf', (t&&t.progress)?t.progress:0)+'</div>'+
       '</div>'+
@@ -8900,6 +8910,7 @@ function drawTaskForm(id, t, files){
     '<button class="btn pri" id="tfSave" onclick="saveTask()">'+(id?'변경 저장':'업무 만들기')+'</button></div>'+
     '</div></div>';
   $('modal').innerHTML=h;
+  TF_TPL_SET='';                           // 새로 연 창에는 채워 둔 틀이 없다
   TF_FILES=!id?{root:document.querySelector('#modal .tform'),items:[],taskId:'',result:null,busy:false}:null;
   syncDemo();
   syncProg('tf');          /* 상태 · 저장될 자리를 지금 값에 맞춰 그린다 */
@@ -9097,9 +9108,17 @@ function tfOk(el){
   var e2=$((el.id||'tfx')+'Err'); if(e2 && e2.parentNode) e2.parentNode.removeChild(e2);
   var m=$('tfMsg'); if(m) m.textContent='';
 }
-function pickType(el){
-  pickOne(el); syncDemo(); tfOk(el.parentNode);
-  [].forEach.call(el.parentNode.children, function(c){ c.setAttribute('aria-checked', c===el?'true':'false'); });
+/** 업무 종류 드롭다운 (2026-10-28) — 고르면 흐린 글자를 풀고, 회의록이면 틀을 채운다 */
+function pickTypeSel(sel){ sel.classList.toggle('empty', !sel.value); tfTemplate(sel.value); syncDemo(); tfOk(sel); }
+/* ★ 회의록을 고르면 **비어 있는** 내용 칸에 틀을 채운다 (2026-10-28 대표님). 쓰던 글은 건드리지 않는다.
+     틀을 손대지 않은 채 다른 종류로 바꾸면 다시 비우고, 손대지 않은 틀은 저장하지 않는다(saveTask) — 빈 제목 넷이 업무 내용으로 남지 않게 */
+var TF_TPL={ MTG:'## 참석자\n- \n\n## 안건\n- \n\n## 결정 사항\n- \n\n## 다음 할 일\n- ' };
+var TF_TPL_SET='';                 // 지금 칸에 채워 둔 틀 (저장 글 모양) — 손대지 않았는지 견줄 때
+function tfTplUntouched(){ return !!TF_TPL_SET && $('tfContent') && mkValue('tfContent').trim()===TF_TPL_SET.trim(); }
+function tfTemplate(code){
+  var ed=$('tfContent'); if(!ed) return;
+  if(tfTplUntouched()){ ed.innerHTML=''; TF_TPL_SET=''; }
+  if(TF_TPL[code] && !mkValue('tfContent').trim()){ ed.innerHTML=fmt(TF_TPL[code]); TF_TPL_SET=mkValue('tfContent'); }
 }
 function pickOne(el){
   [].forEach.call(el.parentNode.children,function(c){ c.classList.remove('on'); });
@@ -9107,6 +9126,7 @@ function pickOne(el){
 }
 function pickedVal(id){
   var box=$(id); if(!box) return '';
+  if(box.tagName==='SELECT') return box.value;      // 업무 종류는 드롭다운 (2026-10-28)
   var on=box.querySelector('.on'); return on? (on.dataset.v||on.textContent) : '';
 }
 function syncDemo(){
@@ -9650,7 +9670,7 @@ function saveTask(){
      서버(taskFields_)는 넘어오지 않은 값을 건드리지 않으므로 예전 데이터가 살아남는다. */
   var p={
     id:$('tfId').value, type:type, corp:$('tfCorp').value,
-    title:$('tfTitle').value.replace(/\s*[\r\n]+\s*/g,' ').trim(), content:mkValue('tfContent'),
+    title:$('tfTitle').value.replace(/\s*[\r\n]+\s*/g,' ').trim(), content:tfTplUntouched()? '' : mkValue('tfContent'),
     owner:$('tfOwner').value, due:$('tfDue').value,
     co:$('tfCo').value
   };

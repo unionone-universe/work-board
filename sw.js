@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v160';  // 2026-10-28 '거르기' 글자를 '필터' 로
+const CACHE = 'unionone-launcher-v161';  // 2026-10-28 새 업무 창 (종류 드롭다운 · 업무 내용 먼저 · 마감일 · 지금 상태 접기 · 회의록 틀)
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;
