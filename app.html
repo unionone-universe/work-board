@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v163">
+<meta name="uo-version" content="v164">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -1199,6 +1199,10 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 
 .support-search{display:grid;gap:6px;margin:0 0 12px;font-size:var(--fs-sm);color:var(--t2)}
 .doc-compact{max-width:680px}
+/* 긴 제목이어도 [닫기] 는 제목 줄 오른쪽에 (2026-10-28 — 폰에서 닫기가 제목 아래 한 줄을 따로 썼다) */
+.doc-compact .sheethead{flex-wrap:nowrap;align-items:flex-start}
+.doc-compact .sheethead h3{flex:1 1 auto;min-width:0;overflow-wrap:anywhere}
+.doc-compact .sheethead .btn,.doc-compact .sheethead .tdico{flex:none}
 .doc-compact .by{margin-bottom:12px}
 .doc-compact .lrow.plain{padding:10px 0;min-height:0}
 .doc-fold{border-top:1px solid var(--line);margin-top:0;padding-top:0}
@@ -1206,6 +1210,28 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .doc-fold>summary::after{content:'+';margin-left:auto;font-size:20px}
 .doc-fold[open]>summary::after{content:'−'}
 .doc-fold>summary span{color:var(--t3);font-weight:400}
+/* 결재 상세 — 간략하게 (2026-10-28) */
+.dcamt{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;margin:0 0 14px}
+.dcamt b{font-size:var(--fs-num-md)}
+.dcamt span{font-size:var(--fs-body);color:var(--t2)}
+.dcamt span::before{content:"·";margin-right:10px;color:var(--t3)}
+.paybox.slim .payrow{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px 12px}
+.paybox.slim .payform{margin-top:10px}
+.paybox.slim .payform .field{margin-bottom:10px}
+@media (max-width:559px){ .paybox.slim .payform .grid2{grid-template-columns:1fr;gap:0} }
+.paybox [hidden],#dcMore[hidden]{display:none !important}
+.dcfoot{display:flex;align-items:center;flex-wrap:wrap;gap:4px 8px;margin-top:14px;border-top:1px solid var(--line)}
+.dcmore{flex:1 1 auto;display:flex;align-items:center;gap:8px;min-height:var(--tap);padding:0;border:0;background:none;color:var(--t2);
+  font:inherit;font-size:var(--fs-sm);font-weight:600;text-align:left;cursor:pointer}
+.dcmore span{color:var(--t3);font-weight:400}
+.dcmore .ic{width:16px;height:16px;transition:transform .15s}
+.dcmore[aria-expanded="true"] .ic{transform:rotate(180deg)}
+.dcmore:focus-visible{outline:3px solid var(--pri);outline-offset:2px;border-radius:var(--r-sm)}
+.dcfa{display:flex;gap:8px}
+#dcMore{padding:0 0 6px}
+.dcsub+.dcsub{margin-top:10px}
+.dch{margin:6px 0 2px;font-size:var(--fs-sm);font-weight:700;color:var(--t2)}
+@media (prefers-reduced-motion:reduce){ .dcmore .ic{transition:none} }
 .doc-actions{position:sticky;bottom:-24px;background:var(--card);padding:12px 0 16px;margin-top:14px;border-top:1px solid var(--line);z-index:2}
 .doc-actions>p{font-size:var(--fs-sm);margin:0 0 8px}
 .sheet.doc-compact .doc-actions .actions{margin-top:0}
@@ -12169,7 +12195,7 @@ function saveCostCat(no){
     costApplyLocal(no, r.items);
     toast('분류를 저장했습니다');
     var 상세=S.docCache[no] || (S.data && S.data.docPack && S.data.docPack[no]);
-    if(그창 && 상세) $('ddBody').innerHTML=docDetailBody(상세);
+    if(그창 && 상세){ var keep=docKeepState(); $('ddBody').innerHTML=docDetailBody(상세); docRestoreState(keep); }
     if(S.view==='doc') renderDocs();
   });
 }
@@ -13108,23 +13134,57 @@ function docPayLocal(no, pay, quiet){
   });
   if(quiet) return;
   if(S.view==='doc') renderDocs();
-  var body=$('ddBody'); if(body && body.dataset.no===no && S.docCache[no]) body.innerHTML=docDetailBody(S.docCache[no]);
+  var body=$('ddBody'); if(body && body.dataset.no===no && S.docCache[no]){ var keep=docKeepState(); body.innerHTML=docDetailBody(S.docCache[no]); docRestoreState({more:keep.more, cmt:keep.cmt}); }
 }
 /** 상세의 결제 칸 */
 function payBoxHtml(d){
   var p=d.pay; if(!p) return '';
   var 완료=p.state==='완료';
   var 줄=완료 ? ['결제 완료', p.date? shortDate(p.date) : '', p.by||''].filter(function(x){return x;}).join(' · ') : '결제 대기';
-  var h='<div class="paybox" id="dpBox"><p class="t">'+(완료? ic('check') : '')+esc(줄)+'</p>'+
-    (완료 && p.memo? '<p class="b">'+esc(p.memo)+'</p>' : (!완료? '<p class="b">승인됐어도 실제 결제를 확인해 표시하기 전까지는 결제 대기입니다</p>' : ''));
+  /* ★ 한 줄로 (2026-10-28 대표님 — 예전엔 설명 문장 · 결제일 · 메모 · 큰 단추가 늘 펼쳐져 화면의 3분의 1이었다).
+       [결제 완료로 표시] 를 누르면 그 자리에 결제일(오늘) · 메모 · [저장] 이 열린다. 막는 규칙(docPay)은 그대로 */
+  var h='<div class="paybox slim" id="dpBox"><div class="payrow"><p class="t">'+(완료? ic('check') : '')+esc(줄)+'</p>';
   if(d.canPay){
     h+= 완료
-      ? '<div class="actions"><button class="btn sm" onclick="docPay(\''+esc(d.no)+'\',false)">결제 완료 취소</button></div>'
-      : '<div class="field"><label class="fl" for="dpDate">실제 결제일</label><input type="date" id="dpDate" value="'+todayStr()+'" max="'+todayStr()+'"></div>'+
-        '<div class="field"><label class="fl" for="dpMemo">메모</label><input type="text" id="dpMemo" maxlength="200"></div>'+
-        '<div class="actions"><button class="btn pri" onclick="docPay(\''+esc(d.no)+'\',true)">결제 완료로 표시</button></div>';
+      ? '<button class="btn sm" onclick="docPay(\''+esc(d.no)+'\',false)">결제 완료 취소</button>'
+      : '<button class="btn sm pri" id="dpOpen" aria-expanded="false" aria-controls="dpForm" onclick="docPayForm(true)">결제 완료로 표시</button>';
+  }
+  h+='</div>'+(완료 && p.memo? '<p class="b">'+esc(p.memo)+'</p>' : '');
+  if(d.canPay && !완료){
+    h+='<div class="payform" id="dpForm" hidden><div class="grid2">'+
+        '<div class="field"><label class="fl" for="dpDate">실제 결제일</label><input type="date" id="dpDate" value="'+todayStr()+'" max="'+todayStr()+'"></div>'+
+        '<div class="field"><label class="fl" for="dpMemo">메모</label><input type="text" id="dpMemo" maxlength="200"></div></div>'+
+        '<div class="actions"><button class="btn" onclick="docPayForm(false)">취소</button>'+
+        '<button class="btn pri" onclick="docPay(\''+esc(d.no)+'\',true)">저장</button></div></div>';
   }
   return h+'</div>';
+}
+/** 결제 칸 펴기 · 접기 — 펴면 결제일 칸으로 (noFocus — 다시 그린 뒤 되살릴 때) */
+function docPayForm(on, noFocus){
+  var f=$('dpForm'), b=$('dpOpen'); if(!f) return;
+  f.hidden=!on;
+  if(b){ b.hidden=!!on; b.setAttribute('aria-expanded', on?'true':'false'); }
+  if(noFocus) return;
+  try{ if(on) $('dpDate').focus(); else if(b) b.focus(); }catch(e){}
+}
+/** [자세히] 펴기 · 접기 (on 을 안 주면 뒤집는다) */
+function docMoreToggle(on){
+  var box=$('dcMore'), b=$('dcMoreBtn'); if(!box) return;
+  if(on==null) on=box.hidden;
+  box.hidden=!on;
+  if(b) b.setAttribute('aria-expanded', on?'true':'false');
+}
+/** 상세를 다시 그릴 때 펼쳐 둔 것 · 적던 것을 지킨다 — [자세히] · 결제 칸(결제일 · 메모) · 의견 */
+function docKeepState(){
+  return { more:!!$('dcMore') && !$('dcMore').hidden, pay:!!$('dpForm') && !$('dpForm').hidden,
+           date:$('dpDate')? $('dpDate').value : '', memo:$('dpMemo')? $('dpMemo').value : '',
+           cmt:$('dcComment')? $('dcComment').value : '' };
+}
+function docRestoreState(k){
+  if(!k) return;
+  if(k.more) docMoreToggle(true);
+  if(k.pay && $('dpForm')){ docPayForm(true, true); if(k.date && $('dpDate')) $('dpDate').value=k.date; if($('dpMemo')) $('dpMemo').value=k.memo; }
+  if(k.cmt && $('dcComment')) $('dcComment').value=k.cmt;
 }
 function docPay(no, paid){
   var r=S.docCache[no], d=r&&r.doc, brief=findDocBrief(no);
@@ -13440,12 +13500,12 @@ function docFetchOne(no, shown){
     S.docCache[no]=r; S.docCacheAt[no]=at;
     if(!body || body.dataset.no!==no)return;
     if(shown && docSig(r)===shown && !body.querySelector('.doc-waiting')) return;   // 그린 것과 같다 — 그대로 둔다
-    var keep=$('dcComment')? $('dcComment').value : '';   // 적던 의견을 잃지 않게
+    var keep=docKeepState();                              // 적던 의견 · 결제일 · 메모 · 펼쳐 둔 [자세히] 를 잃지 않게
     var sheet=body.closest('.sheet'), scroll=sheet?sheet.scrollTop:0;
     var expanded=Array.from(document.querySelectorAll('#modal details[open]')).map(function(e){return e.id;});
     $('modal').innerHTML=docSheetHtml(r.doc,r);
     expanded.forEach(function(id){if(id&&$(id))$(id).open=true;});
-    if(keep && $('dcComment')) $('dcComment').value=keep;
+    docRestoreState(keep);
     var next=$('ddBody').closest('.sheet');if(next)next.scrollTop=scroll;
   });
 }
@@ -13472,8 +13532,7 @@ function docSheetHtml(d, r){
     (관리자? '<div class="tdmenu" id="tdMenu">'+
       '<button id="docDeleteBtn" data-no="'+esc(d.no)+'" class="btn sm dg" onclick="deleteDoc(this.dataset.no)"'+(DOC_DELETING[d.no]?' disabled':'')+'>'+(DOC_DELETING[d.no]?'삭제 확인 중…':'삭제')+'</button></div><p id="docDeleteStatus" role="status" class="muted"></p>' : '')+
     byline(head)+
-    (d.amount? '<p style="margin:0 0 18px"><b class="num" style="font-size:var(--fs-num-md)">'+
-       won(d.amount)+'원</b></p>' : '')+
+    (d.amount && !r? docAmountLine(d.amount, '') : '')+
     '<div id="ddBody" data-no="'+esc(d.no)+'">'+ (r? docDetailBody(r) : waitingBody(d)) +'</div>'+
     '</div></div>';
 }
@@ -13483,34 +13542,48 @@ function waitingBody(d){
   return '<p class="muted doc-waiting" role="status">내역을 불러오는 중입니다…</p>';
 }
 
+/** 금액 · 결제수단 한 줄 (2026-10-28 — 예전엔 큰 금액 한 줄 + 결제수단 칸이 따로였다) */
+function docAmountLine(amount, 수단){
+  return '<p class="dcamt"><b class="num">'+won(amount)+'원</b>'+(수단? '<span>'+esc(수단)+'</span>' : '')+'</p>';
+}
+/* ★★ 결재 상세를 간략하게 (2026-10-28 대표님 "내용도 너무 난잡해 · 간략하게 · 너무 내용이 많아").
+     · 금액과 결제수단을 한 줄로 (금액은 제목 · 큰 숫자 · 품목에 세 번 나왔다)
+     · 품목이 한 줄이고 그 이름이 제목에 이미 있으면 그 줄을 뺀다 · 품목 날짜는 기안일과 다를 때만 · 빈 칸은 줄을 안 만든다
+     · 결제 칸은 한 줄('결제 대기 [결제 완료로 표시]') — 누르면 그 자리에 결제일 · 메모 · [저장] (설명 문장은 뺐다)
+     · 결재·열람 현황 · 비용 분류는 [자세히] 하나 안에, 문서 보기 · 보내기는 그 줄 옆 작은 단추
+     막는 규칙 · 처리 단추(승인 · 반려 · 열람 확인 · 결제 표시) · 서버는 그대로다 */
 function docDetailBody(r){
-  var d=r.doc;
-  var h=d.taskId?'<button class="work-linked work-back" data-task="'+esc(d.taskId)+'" onclick="openTask(this.dataset.task)">'+ic('chev-l')+'관련 업무 · '+esc(d.taskName||'업무 보기')+'</button>':'';
+  var d=r.doc, 수단='';
+  (d.fields||[]).forEach(function(f){ if(f.name==='결제수단' && f.value) 수단=String(f.value); });
+  var 금액줄=!!d.amount;
+  var h=금액줄? docAmountLine(d.amount, 수단) : '';
+  h+=d.taskId?'<button class="work-linked work-back" data-task="'+esc(d.taskId)+'" onclick="openTask(this.dataset.task)">'+ic('chev-l')+'관련 업무 · '+esc(d.taskName||'업무 보기')+'</button>':'';
 
-  /* ★★★ 비고는 `결재문서` 시트의 **열**이라 `fields` 에 안 들어옵니다 (2026-09-07).
-     화면은 진작 보내고 있었고(`dfMemo`), 서버는 저장하고(`비고`),
-     상세 응답에 `memo` 로 실어 보내고, **PDF 에도 찍고, 검색도 훑습니다.**
-     오직 이 화면만 안 그렸습니다 — 그래서 작성자가 쓴 비고를
-     **앱 안에서는 볼 방법이 없었습니다.** 오류가 안 나서 아무도 몰랐습니다.
-     ★ 빈 값이면 줄 자체를 만들지 않습니다 (CLAUDE.md).
-     ★ `fields` 가 없고 비고만 있는 양식도 있으므로 상자를 같이 엽니다. */
+  /* ★★★ 비고는 `결재문서` 시트의 **열**이라 `fields` 에 안 들어옵니다 (2026-09-07) — doc.memo 로 따로 온다.
+     ★ 빈 값이면 줄 자체를 만들지 않습니다 (CLAUDE.md). 결제수단은 금액 줄에 있으면 여기서 빼고 */
   var 칸=[];
-  if(d.fields && d.fields.length){
-    d.fields.forEach(function(f){ 칸.push(row(f.name, f.value)); });
-  }
+  (d.fields||[]).forEach(function(f){
+    if(금액줄 && f.name==='결제수단') return;
+    if(!String(f.value==null?'':f.value).trim()) return;
+    칸.push(row(f.name, f.value));
+  });
   if(d.memo) 칸.push(row('비고', d.memo));
   if(칸.length) h+='<div class="kv" style="margin-bottom:14px">'+칸.join('')+'</div>';
   if(r.items.length>1) h+=sechead(d.itemsTitle||'내역', r.items.length);
   var 비용문서 = !!COST_FORM_CODES[d.form];
+  var 한줄=r.items.length===1 && String(r.items[0].memo||'').trim(), 기안날=String(d.at||'').slice(0,10);
+  var 제목에있음=!!한줄 && String(d.title||'').indexOf(String(r.items[0].memo).trim())>=0;
   r.items.forEach(function(i){
-    var sub=[shortDate(i.date), i.kind, 비용문서 ? (i.cat||'') : ''].filter(function(x){ return x; }).join(' · ');
+    var 날=(i.date && String(i.date).slice(0,10)!==기안날)? shortDate(i.date) : '';
+    var 분류=비용문서 ? (i.cat||'') : '';
+    if(제목에있음 && !날 && !i.kind && !분류) return;          // 제목에 이미 있는 한 줄 — 같은 말을 두 번 적지 않는다
+    var sub=[날, i.kind, 분류].filter(function(x){ return x; }).join(' · ');
     h+='<div class="lrow plain"><div class="m"><p class="t">'+esc(i.memo)+'</p>'+
        (sub? '<p class="b">'+esc(sub)+'</p>':'')+'</div>'+
        (r.items.length>1?'<div class="r"><span class="v">'+won(i.amount)+'원</span></div>':'')+'</div>';
   });
 
-  // 영수증 — 눌러서 원본 크기로 크게 볼 수 있게 (v42)
-  // PDF 는 그림으로 못 그리므로 이름 링크로 (2026-09-11)
+  // 영수증 — 눌러서 원본 크기로 크게 볼 수 있게 (v42) · PDF 는 이름 링크로 (2026-09-11)
   if(r.files.length){
     h+='<div style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px">';
     r.files.forEach(function(f, i2){
@@ -13519,31 +13592,21 @@ function docDetailBody(r){
     h+='</div>';
   }
 
-  h+=payBoxHtml(d);                                // 결제 대기 / 결제 완료 (2026-10-27)
+  h+=payBoxHtml(d);                                // 결제 대기 / 결제 완료 — 한 줄 (2026-10-27 · 2026-10-28)
 
-  /* 비용 분류 바꾸기 — 올린 사람·관리자만 (d.canCat 은 서버 판정, 저장할 때 서버가 다시 봅니다) */
-  if(비용문서 && d.canCat && r.items.length){
-    h+='<details class="doc-fold" id="dcCostDetails"><summary>비용 분류</summary><div class="catedit hide" id="dcCatBox">'+
-       r.items.map(function(i){
-         return '<div class="catrow"><span class="t">'+esc(i.memo||('품목 '+i.seq))+'</span>'+
-                '<select class="dcCat" data-seq="'+Number(i.seq||0)+'" aria-label="비용 분류">'+
-                costCatOptions(i.cat||'')+'</select></div>';
-       }).join('')+
-       '<p class="tfmsg" id="dcCatMsg" role="alert"></p>'+
-       '<div class="actions"><button class="btn" onclick="catEditToggle(false)">취소</button>'+
-       '<button class="btn pri" id="dcCatSave" onclick="saveCostCat(\''+d.no+'\')">분류 저장</button></div></div>'+
-       '<div class="catbtn" id="dcCatBtnBox"><button class="btn sm" onclick="catEditToggle(true)">비용 분류 바꾸기</button></div></details>';
+  // 승인이 끝난 문서 — 시스템이 찍은 법인 도장
+  var 승인끝=d.status==='승인완료';
+  if(승인끝){
+    /* 도장이 없는 유니온원철거 문서는 결재 PDF 와 같은 임시 도장 (판정은 서버 tempSeal_ · 2026-09-28) */
+    var sealSrc=d.seal || (d.tempSeal? './uo-temp-seal.png' : '');
+    if(sealSrc){
+      h+='<div style="margin-top:16px;display:flex;justify-content:flex-end;align-items:center;gap:12px">'+
+         (d.done? '<span class="sub" style="font-size:var(--fs-body)">'+esc(String(d.done).substring(0,10))+' 승인</span>':'')+
+         '<img src="'+esc(sealSrc)+'" alt="법인 도장" '+
+         'style="width:74px;height:74px;object-fit:contain"></div>';
+    }
   }
 
-  h+='<details class="doc-fold" id="dcRoute"><summary>결재·열람 현황 <span>'+r.lines.length+'명</span></summary>';
-  r.lines.forEach(function(l){
-    var st=[l.state, l.at? shortDate(l.at):''].filter(function(x){ return x; }).join(' · ');
-    h+='<div class="lrow plain"><div class="m"><p class="t">'+esc(l.name)+
-       ' <span class="tag gy">'+esc(l.role)+'</span></p></div>'+
-       (st? '<div class="r"><span class="b">'+esc(st)+'</span></div>':'')+'</div>';
-  });
-
-  h+='</details>';
   // 내가 아직 확인하지 않은 열람자라면 큰 버튼을 먼저 보여준다
   /* ★ 내가 누른 승인 · 반려 · 열람 확인을 아직 보내는 중이면 단추 대신 '보내는 중' (2026-10-28) —
        서버가 처리하기 전에 상세를 다시 받으면 [승인] 단추가 되살아나 '이랬다 저랬다' 했다 */
@@ -13556,28 +13619,44 @@ function docDetailBody(r){
        '<button class="btn pri" style="width:100%;padding:14px;font-size:var(--fs-h1)" '+
        'onclick="readDoc(\''+d.no+'\')">열람 확인</button></div>';
   }
+
+  /* [자세히] — 결재·열람 현황 · 비용 분류를 한곳에 (2026-10-28). 같은 줄 오른쪽에 문서 보기 · 보내기(승인완료만) */
+  var 분류바꾸기=비용문서 && d.canCat && r.items.length;
+  var 안='<div class="dcsub"><p class="dch">결재·열람 현황</p>';
+  r.lines.forEach(function(l){
+    var st=[l.state, l.at? shortDate(l.at):''].filter(function(x){ return x; }).join(' · ');
+    안+='<div class="lrow plain"><div class="m"><p class="t">'+esc(l.name)+
+       ' <span class="tag gy">'+esc(l.role)+'</span></p></div>'+
+       (st? '<div class="r"><span class="b">'+esc(st)+'</span></div>':'')+'</div>';
+  });
   if(viewers.length && !r.lines.some(function(l){return l.role==='열람';})){
-    h+='<p class="sub" style="margin:8px 0 0;font-size:var(--fs-sm)">열람 · '+
+    안+='<p class="sub" style="margin:8px 0 0;font-size:var(--fs-sm)">열람 · '+
        viewers.map(function(v){
          return esc(v.name)+' '+(v.done? ('확인'+(v.at?' '+esc(shortDate(v.at)):'')) : '미확인');
        }).join(' / ')+'</p>';
   }
-
-  // 승인이 끝난 문서 — 시스템이 찍은 법인 도장과 문서 내려받기
-  if(d.status==='승인완료'){
-    /* 도장이 없는 유니온원철거 문서는 결재 PDF 와 같은 임시 도장 (판정은 서버 tempSeal_ · 2026-09-28) */
-    var sealSrc=d.seal || (d.tempSeal? './uo-temp-seal.png' : '');
-    if(sealSrc){
-      h+='<div style="margin-top:16px;display:flex;justify-content:flex-end;align-items:center;gap:12px">'+
-         (d.done? '<span class="sub" style="font-size:var(--fs-body)">'+esc(String(d.done).substring(0,10))+' 승인</span>':'')+
-         '<img src="'+esc(sealSrc)+'" alt="법인 도장" '+
-         'style="width:74px;height:74px;object-fit:contain"></div>';
-    }
-    h+='<div class="actions" style="margin-top:14px">'+
-       '<button class="btn" id="dcPdf" onclick="openDocPdf(\''+d.no+'\')">문서 보기</button>'+
-       '<button class="btn" onclick="shareDoc(\''+d.no+'\')">보내기</button></div>'+
-       '<p class="muted" id="dcPdfMsg" style="margin:6px 0 0;font-size:var(--fs-sm)"></p>';
+  안+='</div>';
+  /* 비용 분류 바꾸기 — 올린 사람·관리자만 (d.canCat 은 서버 판정, 저장할 때 서버가 다시 봅니다) */
+  if(분류바꾸기){
+    안+='<div class="dcsub"><p class="dch">비용 분류</p><div class="catedit hide" id="dcCatBox">'+
+       r.items.map(function(i){
+         return '<div class="catrow"><span class="t">'+esc(i.memo||('품목 '+i.seq))+'</span>'+
+                '<select class="dcCat" data-seq="'+Number(i.seq||0)+'" aria-label="비용 분류">'+
+                costCatOptions(i.cat||'')+'</select></div>';
+       }).join('')+
+       '<p class="tfmsg" id="dcCatMsg" role="alert"></p>'+
+       '<div class="actions"><button class="btn" onclick="catEditToggle(false)">취소</button>'+
+       '<button class="btn pri" id="dcCatSave" onclick="saveCostCat(\''+d.no+'\')">분류 저장</button></div></div>'+
+       '<div class="catbtn" id="dcCatBtnBox"><button class="btn sm" onclick="catEditToggle(true)">비용 분류 바꾸기</button></div></div>';
   }
+  var 이름=['결재·열람 '+r.lines.length+'명'].concat(분류바꾸기? ['비용 분류'] : []).join(' · ');
+  h+='<div class="dcfoot"><button type="button" class="dcmore" id="dcMoreBtn" aria-expanded="false" aria-controls="dcMore" onclick="docMoreToggle()">'+
+       '자세히<span>'+esc(이름)+'</span>'+ic('chev-d')+'</button>'+
+     (승인끝? '<span class="dcfa"><button class="btn sm" id="dcPdf" onclick="openDocPdf(\''+d.no+'\')">문서 보기</button>'+
+              '<button class="btn sm" onclick="shareDoc(\''+d.no+'\')">보내기</button></span>' : '')+
+     '</div>'+
+     (승인끝? '<p class="muted" id="dcPdfMsg" style="margin:6px 0 0;font-size:var(--fs-sm)"></p>' : '')+
+     '<div id="dcMore" hidden>'+안+'</div>';
 
   // 결재할 수 있는지는 서버가 판정해서 보낸다 (화면에서 이름을 비교하지 않는다)
   if(r.canAct && /a/.test(보내는중)){
