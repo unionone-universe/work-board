@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v162">
+<meta name="uo-version" content="v163">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -5096,6 +5096,7 @@ function boot(){
     useRanks(S.meta);
     takeDocPack(S.data);          // 지난번에 받아둔 문서 상세도 되살린다
     takeDocMore(snap.docMore);    // 판 밖에서 받아 둔 것도 (2026-10-28)
+    docDropStale();               // 저장본 목록과 어긋난 상세는 버린다 (2026-10-28 — 열 때 옛 상태를 먼저 그리던 것)
     $('brandName').textContent=(S.meta.company||'UNION ONE').replace('(주)','').trim()||'UNION ONE';
     loadFont(S.meta.fontTitle, S.meta.fontNum);
     renderFilters();
@@ -5572,6 +5573,7 @@ function applyBoard(b){
   else if(바뀜 && S.meta) S.meta.sites=[];
   S.lastUpdate=b.lastUpdate||S.lastUpdate; S.lastSync=Date.now(); if(b.t) S.lastT=b.t;
   takeDocPack(b);
+  docDropStale();                           // 목록과 어긋난 결재 상세는 버린다 — 미리 받기가 새로 받는다 (2026-10-28)
   mkSetNames(b.staff);          /* @이름 강조·고르기에 쓰는 명부 (2026-09-02) */
   /* ★ 필터 줄은 **그린 때의 범위**가 지금과 다르면 다시 그린다 (검수 1차).
      첫 접속에는 판을 받기 전에 필터를 먼저 그려서 담당자 칸이 남아 있었다 */
@@ -13162,6 +13164,51 @@ function docPay(no, paid){
   });
 }
 
+/* ★★ 받아 둔 결재 상세가 지금 목록과 어긋나면 옛것이다 (2026-10-28 대표님 "화면이 이랬다 저랬다 한다").
+   미리 받아 둔 상세(v155~ · 저장본 docMore)는 그 뒤에 결재가 진행돼도 그대로 남아, 문서를 열 때마다
+   옛 상태(진행중 · [대리 승인] 단추)를 먼저 그리고 새로 받은 상태(승인완료 · 결제 대기)로 다시 그렸다.
+   목록(판)은 받을 때마다 새것이므로 상태 · 결재할 수 있나 · 열람할 것 · 결제 상태를 견주어, 어긋나면 버린다
+   (미리 받기가 곧 새로 받는다). 판에 같이 실려 온 상세(docPack)는 목록과 같은 때 것이라 늘 맞는다.
+   ★ 내가 누른 승인 · 반려 · 열람 확인을 보내는 중인 문서는 목록만 먼저 바뀌어 있으므로 견주지 않는다 */
+function docListRow(no){
+  var src=docSource(), hit=null;
+  if(src) ['toAct','drafts','others'].forEach(function(k){ (src[k]||[]).forEach(function(d){ if(d && d.no===no) hit=d; }); });
+  return hit;
+}
+function docStateKey(status, act, read, pay){ return [String(status||'진행중'), act?1:0, read?1:0, pay||''].join('|'); }
+/** 보내는 중인 결재 처리 — 문서번호 → 'a'(승인 · 반려) · 'r'(열람 확인). 보내는 함(이 기기 · 다시 연 뒤)과 지금 누른 것 */
+function docPendingMap(){
+  var m={};
+  function add(no, k){ if(no) m[no]=(m[no]||'')+k; }
+  Object.keys(DOC_ACTING).forEach(function(no){ add(no, 'a'); });
+  outboxList().forEach(function(x){
+    if(!x || x.state!=='send') return;
+    if(x.kind==='docAct') add(x.ref, 'a');
+    else if(x.kind==='docRead') add(x.ref, 'r');
+    else if(x.kind==='docActMany') (Array.isArray(x.args&&x.args[0]) ? x.args[0] : []).forEach(function(no){ add(no, 'a'); });
+  });
+  return m;
+}
+function docStale(no, pend){
+  var r=S.docCache[no], b=docListRow(no);
+  if(!r || !r.doc || !b) return false;                          // 목록에 없으면 견줄 수 없다
+  if((pend||docPendingMap())[no]) return false;
+  var d=r.doc, read=(r.viewers||[]).some(function(v){ return v && v.mine && !v.done; });
+  return docStateKey(b.status, b.canAct, b.canRead, b.pay&&b.pay.state) !== docStateKey(d.status, r.canAct, read, d.pay&&d.pay.state);
+}
+/** 판 · 저장본을 받을 때마다 — 목록과 어긋난 상세는 버린다 (열 때 옛 상태를 먼저 그리지 않게) */
+function docDropStale(){
+  if(!S.docCache) return;
+  var pend=docPendingMap();
+  Object.keys(S.docCache).forEach(function(no){
+    if(docStale(no, pend)){ delete S.docCache[no]; delete S.docCacheAt[no]; }
+  });
+}
+/** 화면에 그린 상세와 새로 받은 상세가 같은가 — 같으면 창을 다시 그리지 않는다 (깜빡임 · 사진 다시 그리기) */
+function docSig(r){
+  try{ return JSON.stringify([r.doc, r.items, r.files, r.lines, r.viewers, !!r.canAct, !!r.proxy]); }catch(e){ return ''; }
+}
+
 /** 목록이 이미 가진 값으로 창을 즉시 띄우고 내역·결재선만 뒤에서 채운다 */
 function findDocBrief(no){
   var hit=null;
@@ -13197,13 +13244,13 @@ function prefetchDocsSoon(ms){ clearTimeout(DOC_PREFETCH_T); DOC_PREFETCH_T=setT
 /* 서버가 '없다 · 볼 수 없다' 고 답한 문서 — 같은 접속 · 같은 권한(epoch)에서는 다시 묻지 않는다 (3차) */
 var DOC_MISS=Object.create(null);
 function docPrefetchList(){
-  var src=docSource(), nos=[], seen={};
+  var src=docSource(), nos=[], seen={}, pend=docPendingMap();
   if(!src) return nos;
   ['toAct','drafts','others'].forEach(function(k){
     (src[k]||[]).forEach(function(d){
       if(!d || !d.no || seen[d.no] || nos.length>=DOC_PREFETCH_MAX) return;
       seen[d.no]=1;
-      if(!S.docCache[d.no] && DOC_MISS[d.no]!==S.epoch) nos.push(d.no);
+      if(!S.docCache[d.no] && DOC_MISS[d.no]!==S.epoch && !pend[d.no]) nos.push(d.no);
     });
   });
   return nos;
@@ -13244,8 +13291,9 @@ function docFetchBatch(nos, first){
   var at=areaVer('doc'), ep=S.epoch, token=S.token, rev=READ_REV, job;
   job=callWithOptions({quiet:true},'api_docDetails', S.token, want).then(function(r){
     if(!r || !r.ok || ep!==S.epoch || token!==S.token || rev!==READ_REV) return false;
+    var pend=docPendingMap();
     Object.keys(r.docs||{}).forEach(function(k){
-      if(S.docCache[k]) return;                 // 그사이 문서를 열어 받은 것이 있으면 그것을 둔다
+      if(S.docCache[k] || pend[k]) return;      // 그사이 열어 받은 것은 두고, 보내는 중인 문서는 처리 전 상태라 담지 않는다
       S.docCache[k]=r.docs[k]; S.docCacheAt[k]=at;
       docPaintIfWaiting(k);
     });
@@ -13313,9 +13361,10 @@ function warmDocShots(first){
 function snapDocMore(d){
   var out={}, at={}, n=0, pack=(d && d.docPack) || {}, src=d && d.docs;
   if(!src) return null;
+  var pend=docPendingMap();          // 승인 · 반려 · 열람 확인을 보내는 중인 문서는 처리 전 상세일 수 있어 남기지 않는다 (2026-10-28 · Astra 2차)
   ['toAct','drafts','others'].forEach(function(k){
     (src[k]||[]).forEach(function(x){
-      if(n>=40 || !x || !x.no || pack[x.no] || out[x.no] || !S.docCache[x.no]) return;
+      if(n>=40 || !x || !x.no || pack[x.no] || out[x.no] || !S.docCache[x.no] || pend[x.no] || docStale(x.no, pend)) return;
       out[x.no]=S.docCache[x.no]; at[x.no]=S.docCacheAt[x.no]||''; n++;
     });
   });
@@ -13335,11 +13384,14 @@ function takeDocMore(m){
 function openDoc(no){
   var b=findDocBrief(no);
   var cached=S.docCache[no];
+  /* 목록과 어긋난 상세(옛것)는 그리지 않는다 — 목록의 제목 · 상태로 열고 새로 받는다 (2026-10-28 "이랬다 저랬다") */
+  if(cached && docStale(no)){ delete S.docCache[no]; delete S.docCacheAt[no]; cached=null; }
 
   if(cached){
     // 미리 받아둔 것이 있으면 그대로 연다 (왕복 0회)
     $('modal').innerHTML=docSheetHtml(cached.doc, cached);
     if(S.docCacheAt[no]===areaVer('doc')) return;   // 결재 쪽이 안 바뀌었으면 다시 받지 않는다
+    return void docFetchOne(no, docSig(cached));     // 뒤에서 새로 받되, 그린 것과 같으면 다시 그리지 않는다
   } else if(b){
     // 제목·금액은 즉시 표시하고 처리 버튼은 상세 응답 뒤에 표시한다
     $('modal').innerHTML=docSheetHtml({
@@ -13363,9 +13415,10 @@ function openDoc(no){
   docFetchOne(no);
 }
 
-/** 문서 한 건 상세를 받아 열린 창을 채운다 — 받는 동안은 미리 받기가 같은 문서를 묻지 않는다 */
-function docFetchOne(no){
-  var at=areaVer('doc'), ep=S.epoch, token=S.token, job;
+/** 문서 한 건 상세를 받아 열린 창을 채운다 — 받는 동안은 미리 받기가 같은 문서를 묻지 않는다.
+    shown — 창에 이미 그린 상세(docSig). 새로 받은 것이 같으면 창을 다시 그리지 않는다 (2026-10-28 — 깜빡임) */
+function docFetchOne(no, shown){
+  var at=areaVer('doc'), ep=S.epoch, token=S.token, rev=READ_REV, 보내던=!!docPendingMap()[no], job;
   job=call('api_docDetail', S.token, no);
   if(!S.docCache[no]){
     DOC_FETCHING[no]=job;
@@ -13375,8 +13428,18 @@ function docFetchOne(no){
     if(ep!==S.epoch || token!==S.token)return;
     var body=$('ddBody');
     if(!r.ok){if(body&&body.dataset.no===no)body.innerHTML='<p class="muted">내역을 불러오지 못했습니다.</p><button class="btn" data-no="'+esc(no)+'" onclick="openDoc(this.dataset.no)">다시 불러오기</button>';return;}
+    /* ★ 처리 전 상태일 수 있는 답은 담지 않는다 (2026-10-28 · Astra 1차) — 지금 보내는 중이거나, 받기 시작할 때 보내는 중이었거나,
+         받는 사이 저장(승인 · 반려 등)이 있었다. 보내는 중이면 단추 대신 '보내는 중' 으로 그리고, 끝났으면 열린 창을 위해 새로 받는다 */
+    var 지금보내는=!!docPendingMap()[no];
+    if(지금보내는 || 보내던 || rev!==READ_REV){
+      var 열림=!!body && body.dataset.no===no;
+      if(열림 && 지금보내는){ if(body.querySelector('.doc-waiting')) $('modal').innerHTML=docSheetHtml(r.doc,r); }
+      else if(열림 && !(DOC_FETCHING[no] && DOC_FETCHING[no]!==job)) docFetchOne(no, shown);   // 더 새로 떠난 조회가 있으면 그것을 기다린다
+      return;
+    }
     S.docCache[no]=r; S.docCacheAt[no]=at;
     if(!body || body.dataset.no!==no)return;
+    if(shown && docSig(r)===shown && !body.querySelector('.doc-waiting')) return;   // 그린 것과 같다 — 그대로 둔다
     var keep=$('dcComment')? $('dcComment').value : '';   // 적던 의견을 잃지 않게
     var sheet=body.closest('.sheet'), scroll=sheet?sheet.scrollTop:0;
     var expanded=Array.from(document.querySelectorAll('#modal details[open]')).map(function(e){return e.id;});
@@ -13482,9 +13545,13 @@ function docDetailBody(r){
 
   h+='</details>';
   // 내가 아직 확인하지 않은 열람자라면 큰 버튼을 먼저 보여준다
+  /* ★ 내가 누른 승인 · 반려 · 열람 확인을 아직 보내는 중이면 단추 대신 '보내는 중' (2026-10-28) —
+       서버가 처리하기 전에 상세를 다시 받으면 [승인] 단추가 되살아나 '이랬다 저랬다' 했다 */
+  var 보내는중 = docPendingMap()[d.no] || '';
   var viewers = r.viewers || [];
   var needRead = viewers.some(function(v){ return v.mine && !v.done; });
-  if(needRead){
+  if(needRead && /r/.test(보내는중)) h+='<p class="muted doc-sending" role="status">열람 확인을 보내는 중입니다</p>';
+  else if(needRead){
     h+='<div style="margin-top:14px">'+
        '<button class="btn pri" style="width:100%;padding:14px;font-size:var(--fs-h1)" '+
        'onclick="readDoc(\''+d.no+'\')">열람 확인</button></div>';
@@ -13513,7 +13580,9 @@ function docDetailBody(r){
   }
 
   // 결재할 수 있는지는 서버가 판정해서 보낸다 (화면에서 이름을 비교하지 않는다)
-  if(r.canAct){
+  if(r.canAct && /a/.test(보내는중)){
+    h+='<p class="muted doc-sending" role="status">승인 · 반려를 보내는 중입니다. 서버가 확인하면 목록에 반영됩니다</p>';
+  } else if(r.canAct){
     h+='<details class="doc-fold" id="dcOpinion"><summary>의견 남기기 <span>선택</span></summary><div class="field"><label class="fl" for="dcComment">의견</label>'+
        '<input type="text" id="dcComment"></div></details>'+
        '<div class="doc-actions">'+(r.proxy? '<p class="muted">대리 처리 · 처리자가 기록됩니다</p>' : '')+'<div class="actions">'+
@@ -13703,6 +13772,7 @@ function readDoc(no){
       return;
     }
     boardInvalidate(); toast('열람 확인되었습니다');
+    setTimeout(function(){ if($('ddBody') && $('ddBody').dataset.no===no && !docPendingMap()[no]) docFetchOne(no); }, 0);   // 열어 둔 '보내는 중' 창을 새 상태로 (2026-10-28)
     softRefresh();
   });
 }
@@ -13754,6 +13824,7 @@ function actDoc(no, action){
     }
     boardInvalidate();                                   // 승인 전에 출발한 판이 늦게 와도 '결재할 것' 으로 되살아나지 않게
     toast(action==='approve'?'승인되었습니다':'반려되었습니다');
+    setTimeout(function(){ if($('ddBody') && $('ddBody').dataset.no===no && !docPendingMap()[no]) docFetchOne(no); }, 0);   // 열어 둔 '보내는 중' 창을 새 상태로 (2026-10-28)
     if(r.status) markDocLocal(no, { status:r.status });
     if(r.final && !r.sealed){
       /* 도장이 없는 유니온원철거 문서는 임시 도장이 찍힌다 (서버 tempSeal_ · 2026-09-29) */
