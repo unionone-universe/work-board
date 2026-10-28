@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v155';  // 2026-10-28 결재 상세 · 사진 미리 받기 (열면 바로)
+const CACHE = 'unionone-launcher-v156';  // 2026-10-28 결재 미리 받기 2차 (겹쳐 묻지 않기 · 사진 먼저 · 펼친 목록 · 크게 보기)
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;

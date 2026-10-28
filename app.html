@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v155">
+<meta name="uo-version" content="v156">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -6860,6 +6860,7 @@ function toggleFold(key, el){
   var on=!box.classList.contains('open');
   box.classList.toggle('open', on);
   FOLD[key]=on;
+  if(on && key==='docDone') docWarmDone();      // 끝난 결재를 펼치면 그 목록의 내역 · 사진을 준비 (2026-10-28 2차)
 }
 
 /** 워크보드가 이미 들고 있는 재료로 상세 화면을 만든다 (서버 왕복 0회) */
@@ -11723,6 +11724,14 @@ function paintDocs(r){
   var 칸 = docBoxesHtml();
   if(!h && !칸) h='<p class="none big">결재할 문서가 없습니다</p>';
   paintList('docLists',h+칸);
+  /* 끝난 문서를 펼쳐 두었으면 그 목록의 내역 · 사진을 바로 준비한다 (2026-10-28 2차) — 지난 지출결의서를 열 때 사진을 기다리지 않게 */
+  DOC_DONE_NOS=done.map(function(d){ return d.no; });
+  if(FOLD.docDone) docWarmDone();
+}
+var DOC_DONE_NOS=[];
+function docWarmDone(){
+  var nos=DOC_DONE_NOS.slice(0, DOC_PREFETCH_CHUNK);
+  if(nos.length && !document.hidden && S.token) docFetchBatch(nos, nos);
 }
 
 /* ===================== 마케팅·구독·채용비 (2026-09-22 전무님 요청) =====================
@@ -12799,6 +12808,9 @@ function drawDocBox(){
 
   h+='</div></div>';
   $('modal').innerHTML=h;
+  /* 지금 보고 있는 달의 문서 — 최근 60건 밖의 지난 지출결의서도 열기 전에 내역 · 사진을 받아 둔다 (2026-10-28 2차) */
+  var 보는것=rows.slice(0, DOC_PREFETCH_CHUNK).map(function(d){ return d.no; });
+  if(보는것.length && !document.hidden && S.token) docFetchBatch(보는것, 보는것);
 }
 
 /* ── 여러 건 한 번에 승인 (2026-09-02) ─────────────────────────
@@ -13027,6 +13039,9 @@ function findDocBrief(no){
  * 숨긴 탭 · 저장 중 · 이미 받는 중이면 쉬고, 계정 · 권한이 바뀌었거나 그사이 저장이 있었으면 답을 버린다.
  */
 var DOC_PREFETCH=null, DOC_PREFETCH_T=null, DOC_PREFETCH_MAX=60, DOC_PREFETCH_CHUNK=30;
+/* 받는 중인 문서 — 문서번호 → 그 요청 (2026-10-28 2차). 미리 받기 · 문서 열기가 같이 본다:
+   미리 받기가 받는 중인 문서를 열면 따로 묻지 않고 그 답을 기다리고, 열어서 받는 중인 문서는 미리 받기가 다시 묻지 않는다 */
+var DOC_FETCHING=Object.create(null);
 function prefetchDocsSoon(){ clearTimeout(DOC_PREFETCH_T); DOC_PREFETCH_T=setTimeout(prefetchDocs, 800); }
 function docPrefetchList(){
   var src=docSource(), nos=[], seen={};
@@ -13042,24 +13057,48 @@ function docPrefetchList(){
 }
 function prefetchDocs(){
   if(DOC_PREFETCH || document.hidden || ACTIVE_WRITES || !S.token || !S.me) return;
+  warmDocShots();                               // 이미 받아 둔 문서(판 · 저장본)의 사진은 내역을 기다리지 않고 바로 (2차)
   var nos=docPrefetchList();
-  if(!nos.length){ warmDocShots(); return; }
-  var at=areaVer('doc'), ep=S.epoch, token=S.token, rev=READ_REV, job=DOC_PREFETCH={};
+  if(!nos.length) return;
+  var ep=S.epoch, token=S.token, job=DOC_PREFETCH={}, tried={};
   function stop(){ if(DOC_PREFETCH===job) DOC_PREFETCH=null; }
-  (function next(i){
-    var part=nos.slice(i, i+DOC_PREFETCH_CHUNK);
+  (function next(){
     if(ep!==S.epoch || token!==S.token){ stop(); return; }                  // 계정 · 권한이 바뀌었다 — 그만 받는다
-    if(!part.length){ stop(); warmDocShots(); scheduleSnap(); return; }     // 다 받았다 — 사진을 데우고 저장본에도
-    callWithOptions({quiet:true},'api_docDetails', S.token, part).then(function(r){
-      if(!r || !r.ok || ep!==S.epoch || token!==S.token || rev!==READ_REV){ stop(); return; }
-      Object.keys(r.docs||{}).forEach(function(k){
-        if(S.docCache[k]) return;                 // 그사이 문서를 열어 받은 것이 있으면 그것을 둔다
-        S.docCache[k]=r.docs[k]; S.docCacheAt[k]=at;
-        docPaintIfWaiting(k);
-      });
-      next(i+DOC_PREFETCH_CHUNK);
-    }, stop);
-  })(0);
+    /* 그사이 열어서 받은 것 · 받는 중인 것 · 이미 물어본 것은 빼고 다음 묶음 */
+    var part=nos.filter(function(no){ return !tried[no] && !S.docCache[no] && !DOC_FETCHING[no]; }).slice(0, DOC_PREFETCH_CHUNK);
+    if(!part.length){ stop(); scheduleSnap(); return; }                     // 다 받았다 — 저장본에도
+    part.forEach(function(no){ tried[no]=1; });
+    docFetchBatch(part).then(function(ok){ if(ok) next(); else stop(); });
+  })();
+}
+
+/**
+ * 문서 상세 여러 건을 한 번에 받는다 (2026-10-28 2차) — 받는 중인 것은 겹쳐 묻지 않고(DOC_FETCHING),
+ * 묶음이 도착하면 곧바로 그 사진부터 받기 시작한다(예전엔 60건을 다 받은 뒤에야 사진을 받았다).
+ * 계정 · 권한이 바뀌었거나 그사이 저장이 있었으면 답을 버린다. 답이 오든 안 오든 받는 중 표시는 지운다.
+ */
+function docFetchBatch(nos, first){
+  var want=[];
+  (nos||[]).forEach(function(no){
+    if(no && !S.docCache[no] && !DOC_FETCHING[no] && want.indexOf(no)<0 && want.length<DOC_PREFETCH_CHUNK) want.push(no);
+  });
+  if(!want.length || !S.token){ warmDocShots(first); return Promise.resolve(true); }
+  var at=areaVer('doc'), ep=S.epoch, token=S.token, rev=READ_REV, job;
+  job=callWithOptions({quiet:true},'api_docDetails', S.token, want).then(function(r){
+    if(!r || !r.ok || ep!==S.epoch || token!==S.token || rev!==READ_REV) return false;
+    Object.keys(r.docs||{}).forEach(function(k){
+      if(S.docCache[k]) return;                 // 그사이 문서를 열어 받은 것이 있으면 그것을 둔다
+      S.docCache[k]=r.docs[k]; S.docCacheAt[k]=at;
+      docPaintIfWaiting(k);
+    });
+    warmDocShots(first);                        // 이 묶음이 오자마자 사진부터
+    return true;
+  }, function(){ return false; }).then(function(ok){
+    want.forEach(function(no){ if(DOC_FETCHING[no]===job) delete DOC_FETCHING[no]; });
+    return ok;
+  });
+  want.forEach(function(no){ DOC_FETCHING[no]=job; });
+  return job;
 }
 
 /** 열어 둔 창이 아직 '내역을 불러오는 중' 이면, 미리 받기가 먼저 가져온 내역으로 바로 그린다 */
@@ -13072,24 +13111,31 @@ function docPaintIfWaiting(no){
 /**
  * 결재 사진 미리 받기 (2026-10-28) — 상세의 썸네일과 **같은 주소**를 이 창에서 먼저 받아 두면
  * 문서를 열 때 브라우저가 다시 받지 않고 바로 그린다(드라이브가 주소를 돌려보내고 저장을 막아도 같은 창 안에서는 다시 쓴다).
- * 결재할 것 · 내가 올린 진행 중 문서의 사진만, 한 번에 20장 · 모두 60장까지. 데이터 절약 모드 · 숨긴 탭이면 하지 않는다.
+ * 차례: ① 지금 보고 있는 목록(종류별 보기 — first, 12장까지) ② 결재할 것 · 내가 올린 진행 중 문서
+ *       ③ 그 밖의 목록 앞쪽 15건(6장까지 — 지난 지출결의서도 조금씩, 2차). 한 번에 20장 · 모두 60장까지.
+ * 데이터 절약 모드 · 숨긴 탭이면 하지 않는다. ★ 미리 받기가 끝나기 전에 연 문서는 그때 받으므로 늘 0초는 아니다.
  */
 var SHOT_WARM=Object.create(null), SHOT_WARM_KEEP=60, SHOT_WARM_EACH=20;
 function docThumbSrc(id){ return 'https://drive.google.com/thumbnail?id='+id+'&sz=w400'; }
-function warmDocShots(){
+function warmDocShots(first){
   try{ if(navigator.connection && navigator.connection.saveData) return; }catch(e){}
   if(document.hidden) return;
-  var src=docSource(); if(!src) return;
-  var list=[].concat(src.toAct||[], (src.drafts||[]).filter(function(d){ return d && d.status==='진행중'; })), n=0;
-  list.forEach(function(d){
-    var r=d && S.docCache[d.no];
+  var src=docSource()||{}, n=0;
+  function warmDoc(no, cap){
+    var r=no && S.docCache[no], got=0;
     ((r && r.files) || []).forEach(function(f){
-      if(n>=SHOT_WARM_EACH || /\.pdf$/i.test(String(f.name||''))) return;
+      if(n>=SHOT_WARM_EACH || (cap && cap.left<=0) || /\.pdf$/i.test(String(f.name||''))) return;
       var id=driveId(f.url), s=id && docThumbSrc(id);
       if(!s || SHOT_WARM[s]) return;
-      var im=new Image(); im.decoding='async'; im.src=s; SHOT_WARM[s]=im; n++;
+      var im=new Image(); im.decoding='async'; im.src=s; SHOT_WARM[s]=im; n++; if(cap) cap.left--;
     });
-  });
+  }
+  var 보는것={left:12}, 그밖={left:6};
+  (first||[]).forEach(function(no){ warmDoc(no, 보는것); });
+  [].concat(src.toAct||[], (src.drafts||[]).filter(function(d){ return d && d.status==='진행중'; }))
+    .forEach(function(d){ warmDoc(d && d.no, null); });
+  [].concat((src.drafts||[]).filter(function(d){ return d && d.status!=='진행중'; }), src.others||[]).slice(0, 15)
+    .forEach(function(d){ warmDoc(d && d.no, 그밖); });
   var keys=Object.keys(SHOT_WARM);
   keys.slice(0, Math.max(0, keys.length-SHOT_WARM_KEEP)).forEach(function(k){ delete SHOT_WARM[k]; });
 }
@@ -13138,8 +13184,24 @@ function openDoc(no){
   }
 
   if(!b && !cached)$('modal').innerHTML=docSheetHtml({no:no,title:'결재 문서'},null);
-  var at=areaVer('doc'), ep=S.epoch, token=S.token;
-  call('api_docDetail', S.token, no).then(function(r){
+  /* ★ 미리 받기가 이 문서를 받는 중이면 따로 묻지 않는다 (2026-10-28 2차) — 먼저 떠난 요청이라 대개 더 빨리 온다.
+       그 답에 이 문서가 없으면(실패 · 권한) 그때 한 건만 묻는다 */
+  if(!cached && DOC_FETCHING[no]){
+    DOC_FETCHING[no].then(function(){ if(!S.docCache[no] && $('ddBody') && $('ddBody').dataset.no===no) docFetchOne(no); });
+    return;
+  }
+  docFetchOne(no);
+}
+
+/** 문서 한 건 상세를 받아 열린 창을 채운다 — 받는 동안은 미리 받기가 같은 문서를 묻지 않는다 */
+function docFetchOne(no){
+  var at=areaVer('doc'), ep=S.epoch, token=S.token, job;
+  job=call('api_docDetail', S.token, no);
+  if(!S.docCache[no]){
+    DOC_FETCHING[no]=job;
+    job.then(function(){ if(DOC_FETCHING[no]===job) delete DOC_FETCHING[no]; }, function(){ if(DOC_FETCHING[no]===job) delete DOC_FETCHING[no]; });
+  }
+  job.then(function(r){
     if(ep!==S.epoch || token!==S.token)return;
     var body=$('ddBody');
     if(!r.ok){if(body&&body.dataset.no===no)body.innerHTML='<p class="muted">내역을 불러오지 못했습니다.</p><button class="btn" data-no="'+esc(no)+'" onclick="openDoc(this.dataset.no)">다시 불러오기</button>';return;}
@@ -13351,15 +13413,30 @@ function openReceipt(id, i, px){
   box.id='rcptView';
   box.style.cssText='position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.92);'+
     'display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px';
+  /* ★ 화면에 이미 받아 둔 같은 사진(목록 · 상세의 작은 그림)이 있으면 그것을 먼저 크게 보여 주고,
+       고화질이 도착하면 바꿔 끼운다 (2026-10-28 2차 — 예전엔 누르면 큰 그림을 처음부터 받는 동안 빈 화면이었다) */
+  var 받은=Array.prototype.filter.call(document.querySelectorAll('img'), function(im){
+    return im.complete && im.naturalWidth && String(im.currentSrc||im.src).indexOf('id='+id+'&')>=0;
+  })[0];
+  var first=받은 ? (받은.currentSrc||받은.src) : full, 크기='max-width:100%;max-height:82vh';
+  if(받은){   // 고화질과 같은 비율 · 같은 크기로 미리 늘려 둔다 — 바꿔 끼워도 자리가 안 움직이고, 사진 밖을 누르면 그대로 닫힌다
+    var 비=받은.naturalWidth/받은.naturalHeight, 폭=Math.min(innerWidth-32, innerHeight*0.82*비);
+    크기='width:'+Math.round(폭)+'px;height:'+Math.round(폭/비)+'px;max-width:100%;max-height:82vh';
+  }
   box.innerHTML=
-    '<img src="'+esc(full)+'" alt="영수증" '+
-      'style="max-width:100%;max-height:82vh;object-fit:contain;border-radius:var(--r-sm)">'+
+    '<img id="rcptImg" src="'+esc(first)+'" alt="영수증" data-hi="'+(first===full?'1':'0')+'" '+
+      'style="'+크기+';object-fit:contain;border-radius:var(--r-sm)">'+
     '<div style="display:flex;gap:8px">'+
       '<a class="btn sm" href="'+esc(RCPT[i]||full)+'" target="_blank">원본 열기</a>'+
       '<button class="btn sm pri" onclick="closeReceipt()">닫기</button>'+
     '</div>';
   box.addEventListener('click', function(e){ if(e.target===box) closeReceipt(); });
   document.body.appendChild(box);
+  if(first!==full){
+    var hi=new Image(); hi.decoding='async';
+    hi.onload=function(){ var el=$('rcptImg'); if(el && $('rcptView')===box){ el.src=full; el.setAttribute('data-hi','1'); } };
+    hi.src=full;
+  }
 }
 function closeReceipt(){
   var b=$('rcptView');
