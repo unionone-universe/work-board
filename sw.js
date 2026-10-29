@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v165';  // 2026-10-29 앱 전체 말투 정리
+const CACHE = 'unionone-launcher-v166';  // 2026-10-29 결재 상세 상자 없이
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;

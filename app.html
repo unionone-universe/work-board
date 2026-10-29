@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v165">
+<meta name="uo-version" content="v166">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -1227,7 +1227,29 @@ html[data-theme="dark"] .stabs button[aria-selected="true"]{background:var(--wb-
 .dcmore .ic{width:16px;height:16px;transition:transform .15s}
 .dcmore[aria-expanded="true"] .ic{transform:rotate(180deg)}
 .dcmore:focus-visible{outline:3px solid var(--pri);outline-offset:2px;border-radius:var(--r-sm)}
-.dcfa{display:flex;gap:8px}
+.dcfa{display:flex;align-items:center;gap:0}
+/* ★ 결재 상세 — 상자 없이 선 · 간격으로 (2026-10-29 대표님 "박스도 겹치고 구분이 불분명해서 가독성이 떨어짐").
+     상태는 제목 아래 색 딱지 · 내용은 이름 칸 하나 · 결제 칸은 옅은 바탕 띠 · 아래 단추는 글자 단추. 테두리 상자는 하나도 두지 않는다 */
+.dchead{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;margin:0 0 14px}
+.dchead .byline{margin:0 0 0 2px}
+.dckv{grid-template-columns:76px minmax(0,1fr);gap:12px 14px;align-items:baseline;margin:0 0 16px;padding-top:14px;border-top:1px solid var(--line)}
+.dckv > div{min-width:0;overflow-wrap:anywhere}
+.dckv .dcamt{margin:0}
+.dckv .lrow.plain{padding:0;min-height:0;border:0}
+.dckv .lrow.plain > .m{min-height:0}
+.dckv .lrow.plain + .lrow.plain{margin-top:8px}
+.dcfiles{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px}
+.dckv .filechip{padding:0;border:0;background:none;color:var(--pri);font-size:var(--fs-body);text-decoration:underline;text-underline-offset:3px;min-height:var(--tap)}
+.dckv .work-linked{display:inline-flex;align-items:center;gap:4px;padding:0;border:0;background:none;color:var(--pri);font:inherit;font-weight:600;cursor:pointer;min-height:var(--tap);text-align:left}
+.dckv .work-linked .ic{width:16px;height:16px;flex:none}
+.paybox.slim{border:0;border-left:3px solid var(--wn-line);border-radius:var(--r-sm);background:var(--wn-bg);margin:0}
+.paybox.slim .payrow .t{color:var(--wn)}
+.paybox.slim.done{border-left-color:var(--line2);background:var(--panel2)}
+.paybox.slim.done .payrow .t{color:var(--t1)}
+.dclink{min-height:var(--tap);padding:0 10px;border:0;background:none;color:var(--pri);font:inherit;font-size:var(--fs-sm);font-weight:600;cursor:pointer}
+.dclink + .dclink::before{content:"·";margin:0 10px 0 -10px;color:var(--t3);font-weight:400}
+.dclink:focus-visible{outline:3px solid var(--pri);outline-offset:2px;border-radius:var(--r-sm)}
+.dclink:disabled{color:var(--t3);cursor:default}
 #dcMore{padding:0 0 6px}
 .dcsub+.dcsub{margin-top:10px}
 .dch{margin:6px 0 2px;font-size:var(--fs-sm);font-weight:700;color:var(--t2)}
@@ -13143,7 +13165,7 @@ function payBoxHtml(d){
   var 줄=완료 ? ['결제 완료', p.date? shortDate(p.date) : '', p.by||''].filter(function(x){return x;}).join(' · ') : '결제 대기';
   /* ★ 한 줄로 (2026-10-28 대표님 — 예전엔 설명 문장 · 결제일 · 메모 · 큰 단추가 늘 펼쳐져 화면의 3분의 1이었다).
        [결제 완료로 표시] 를 누르면 그 자리에 결제일(오늘) · 메모 · [저장] 이 열린다. 막는 규칙(docPay)은 그대로 */
-  var h='<div class="paybox slim" id="dpBox"><div class="payrow"><p class="t">'+(완료? ic('check') : '')+esc(줄)+'</p>';
+  var h='<div class="paybox slim'+(완료?' done':'')+'" id="dpBox"><div class="payrow"><p class="t">'+(완료? ic('check') : '')+esc(줄)+'</p>';
   if(d.canPay){
     h+= 완료
       ? '<button class="btn sm" onclick="docPay(\''+esc(d.no)+'\',false)">결제 완료 취소</button>'
@@ -13519,7 +13541,8 @@ function docSheetHtml(d, r){
   var head=[];
   if(d.who) head.push(d.who);
   if(d.at) head.push(shortDate(d.at));
-  if(d.status) head.push({ t:d.status, hot:(d.status==='반려') });
+  /* ★ 상태는 글자 줄에 묻지 않고 제목 아래 색 딱지로 (2026-10-29 대표님 — 목록의 딱지와 같은 색) */
+  var 딱지=(d.status? (d.status==='승인완료'? '<span class="tag ok">승인완료</span>' : d.status==='반려'? docBadge(d.status) : '<span class="tag gy">'+esc(d.status)+'</span>') : '')+(d.pay? payBadge(d.pay) : '');
   // 문서번호(EXP-260826-001)는 제목 아래에 쓰지 않는다 — 사람이 읽을 것이 아니다
 
   /* ★ 관리자 삭제는 ⋯ 안에 (2026-09-09). 상세 맨 아래 빨간 단추가 늘 떠 있었습니다.
@@ -13531,7 +13554,7 @@ function docSheetHtml(d, r){
     '<button class="btn sm" onclick="closeModal()">닫기</button></div>'+
     (관리자? '<div class="tdmenu" id="tdMenu">'+
       '<button id="docDeleteBtn" data-no="'+esc(d.no)+'" class="btn sm dg" onclick="deleteDoc(this.dataset.no)"'+(DOC_DELETING[d.no]?' disabled':'')+'>'+(DOC_DELETING[d.no]?'삭제 확인 중…':'삭제')+'</button></div><p id="docDeleteStatus" role="status" class="muted"></p>' : '')+
-    byline(head)+
+    '<div class="dchead">'+딱지+byline(head)+'</div>'+
     (d.amount && !r? docAmountLine(d.amount, '') : '')+
     '<div id="ddBody" data-no="'+esc(d.no)+'">'+ (r? docDetailBody(r) : waitingBody(d)) +'</div>'+
     '</div></div>';
@@ -13555,42 +13578,43 @@ function docAmountLine(amount, 수단){
 function docDetailBody(r){
   var d=r.doc, 수단='';
   (d.fields||[]).forEach(function(f){ if(f.name==='결제수단' && f.value) 수단=String(f.value); });
-  var 금액줄=!!d.amount;
-  var h=금액줄? docAmountLine(d.amount, 수단) : '';
-  h+=d.taskId?'<button class="work-linked work-back" data-task="'+esc(d.taskId)+'" onclick="openTask(this.dataset.task)">'+ic('chev-l')+'관련 업무 · '+esc(d.taskName||'업무 보기')+'</button>':'';
+  var 금액줄=!!d.amount, h='';
+  /* ★★ 상자 없이 이름 칸 하나로 (2026-10-29 대표님 "박스도 겹치고 구분이 불분명") — 금액 · 관련 업무 · 양식 칸 · 비고 · 내역 · 첨부가
+       같은 왼쪽 이름 칸에 서서 위에서 아래로 한 줄씩 읽힌다. 구역은 선과 간격으로만 가른다 */
+  var 줄들=[];
+  function 줄(k, html){ 줄들.push('<div class="k">'+esc(k)+'</div><div>'+html+'</div>'); }
+  if(금액줄) 줄('금액', '<span class="dcamt"><b class="num">'+won(d.amount)+'원</b>'+(수단? '<span>'+esc(수단)+'</span>' : '')+'</span>');
+  if(d.taskId) 줄('관련 업무', '<button class="work-linked work-back" data-task="'+esc(d.taskId)+'" onclick="openTask(this.dataset.task)">'+esc(d.taskName||'업무 보기')+ic('chev')+'</button>');
 
   /* ★★★ 비고는 `결재문서` 시트의 **열**이라 `fields` 에 안 들어옵니다 (2026-09-07) — doc.memo 로 따로 온다.
      ★ 빈 값이면 줄 자체를 만들지 않습니다 (CLAUDE.md). 결제수단은 금액 줄에 있으면 여기서 빼고 */
-  var 칸=[];
   (d.fields||[]).forEach(function(f){
     if(금액줄 && f.name==='결제수단') return;
     if(!String(f.value==null?'':f.value).trim()) return;
-    칸.push(row(f.name, f.value));
+    줄(f.name, esc(f.value));
   });
-  if(d.memo) 칸.push(row('비고', d.memo));
-  if(칸.length) h+='<div class="kv" style="margin-bottom:14px">'+칸.join('')+'</div>';
-  if(r.items.length>1) h+=sechead(d.itemsTitle||'내역', r.items.length);
+  if(d.memo) 줄('비고', esc(d.memo));
   var 비용문서 = !!COST_FORM_CODES[d.form];
   var 한줄=r.items.length===1 && String(r.items[0].memo||'').trim(), 기안날=String(d.at||'').slice(0,10);
   var 제목에있음=!!한줄 && String(d.title||'').indexOf(String(r.items[0].memo).trim())>=0;
+  var 품목=[];
   r.items.forEach(function(i){
     var 날=(i.date && String(i.date).slice(0,10)!==기안날)? shortDate(i.date) : '';
     var 분류=비용문서 ? (i.cat||'') : '';
     if(제목에있음 && !날 && !i.kind && !분류) return;          // 제목에 이미 있는 한 줄 — 같은 말을 두 번 적지 않는다
     var sub=[날, i.kind, 분류].filter(function(x){ return x; }).join(' · ');
-    h+='<div class="lrow plain"><div class="m"><p class="t">'+esc(i.memo)+'</p>'+
+    품목.push('<div class="lrow plain"><div class="m"><p class="t">'+esc(i.memo)+'</p>'+
        (sub? '<p class="b">'+esc(sub)+'</p>':'')+'</div>'+
-       (r.items.length>1?'<div class="r"><span class="v">'+won(i.amount)+'원</span></div>':'')+'</div>';
+       (r.items.length>1?'<div class="r"><span class="v">'+won(i.amount)+'원</span></div>':'')+'</div>');
   });
+  if(품목.length) 줄(r.items.length>1? (d.itemsTitle||'내역')+' '+r.items.length : '품목', 품목.join(''));
 
   // 영수증 — 눌러서 원본 크기로 크게 볼 수 있게 (v42) · PDF 는 이름 링크로 (2026-09-11)
   if(r.files.length){
-    h+='<div style="margin:12px 0;display:flex;flex-wrap:wrap;gap:8px">';
-    r.files.forEach(function(f, i2){
-      h+= /\.pdf$/i.test(String(f.name||'')) ? fileChip(f) : receiptThumb(f.url, i2);
-    });
-    h+='</div>';
+    var 파일=r.files.map(function(f, i2){ return /\.pdf$/i.test(String(f.name||'')) ? fileChip(f) : receiptThumb(f.url, i2); }).join('');
+    줄(r.files.some(function(f){ return !/\.pdf$/i.test(String(f.name||'')); }) && d.form==='EXP' ? '영수증' : '첨부', '<div class="dcfiles">'+파일+'</div>');
   }
+  if(줄들.length) h+='<div class="kv dckv">'+줄들.join('')+'</div>';
 
   h+=payBoxHtml(d);                                // 결제 대기 / 결제 완료 — 한 줄 (2026-10-27 · 2026-10-28)
 
@@ -13652,8 +13676,8 @@ function docDetailBody(r){
   var 이름=['결재·열람 '+r.lines.length+'명'].concat(분류바꾸기? ['비용 분류'] : []).join(' · ');
   h+='<div class="dcfoot"><button type="button" class="dcmore" id="dcMoreBtn" aria-expanded="false" aria-controls="dcMore" onclick="docMoreToggle()">'+
        '자세히<span>'+esc(이름)+'</span>'+ic('chev-d')+'</button>'+
-     (승인끝? '<span class="dcfa"><button class="btn sm" id="dcPdf" onclick="openDocPdf(\''+d.no+'\')">문서 보기</button>'+
-              '<button class="btn sm" onclick="shareDoc(\''+d.no+'\')">보내기</button></span>' : '')+
+     (승인끝? '<span class="dcfa"><button class="dclink" id="dcPdf" onclick="openDocPdf(\''+d.no+'\')">문서 보기</button>'+
+              '<button class="dclink" onclick="shareDoc(\''+d.no+'\')">보내기</button></span>' : '')+
      '</div>'+
      (승인끝? '<p class="muted" id="dcPdfMsg" style="margin:6px 0 0;font-size:var(--fs-sm)"></p>' : '')+
      '<div id="dcMore" hidden>'+안+'</div>';
