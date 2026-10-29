@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v164';  // 2026-10-28 결재 상세 간략하게 (금액 · 결제수단 한 줄 · 제목에 있는 품목 줄 뺌 · 결제 칸 한 줄 · 자세히 하나 · 문서 보기 작은 단추)
+const CACHE = 'unionone-launcher-v165';  // 2026-10-29 앱 전체 말투 정리
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;
@@ -118,7 +118,7 @@ self.addEventListener('push', (e) => {
          결재 요청이 댓글 알림 하나에 가려 사라질 수 있었다 */
     tag: n.tag || ('uo-' + Date.now() + '-' + Math.random().toString(36).slice(2, 6)),
     renotify: true,
-    requireInteraction: /결재|열람/.test(String(title || '')),   /* 결재 · 열람 요청은 누르거나 닫을 때까지 남긴다 */
+    requireInteraction: /결재|열람|확인 부탁/.test(String(title || '')),   /* 결재 · 열람 요청은 누르거나 닫을 때까지 남긴다 ('전무님, 확인 부탁드립니다' 도 · 2026-10-29) */
     data: { url: link }
   }));
 });
