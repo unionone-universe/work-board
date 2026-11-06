@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v166">
+<meta name="uo-version" content="v167">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -2348,6 +2348,17 @@ body:has(#modal .veil:not(.tdveil)) #writeDock,body:has(#modal .veil:not(.tdveil
 .paybox .b{margin:4px 0 0;font-size:var(--fs-sm);color:var(--t3)}
 .paybox .field{margin-top:10px}
 .paybox .actions{margin-top:10px}
+.nt-image{margin:12px 0 20px;min-width:0}
+.nt-image-open{display:block;width:100%;padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card);cursor:zoom-in}
+.nt-image-open img{display:block;width:100%;height:auto}
+.nt-image figcaption{margin-top:6px;overflow-wrap:anywhere}
+.nt-zoom{width:calc(100vw - 24px);max-width:1600px;max-height:calc(100vh - 24px);padding:16px;border:1px solid var(--line);border-radius:12px;background:var(--card);color:var(--t1)}
+.nt-zoom::backdrop{background:rgba(0,0,0,.75)}
+.nt-zoom-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.nt-zoom-head span{overflow-wrap:anywhere;min-width:0}
+.nt-zoom-body{overflow:auto;max-height:calc(100vh - 140px)}
+.nt-zoom-body img{display:block;width:100%;height:auto;cursor:zoom-in;max-width:none}
+.nt-zoom-body img.nt-natural{width:auto;cursor:zoom-out}
 </style>
 </head>
 <body>
@@ -16403,7 +16414,13 @@ function noteOpen(id){
   var r = noteById(id);
   if(!r){ toast('글을 찾지 못했습니다'); return; }
 
-  var 자료 = (r.files||[]).map(function(f){
+  var 자료 = (r.files||[]).map(function(f,i){
+    if(/\.(png|jpe?g|gif|webp)$/i.test(f.name||'')){
+      return '<figure class="nt-image" data-nt-image="'+i+'">'+
+        '<div class="nt-image-slot" role="status">이미지 불러오는 중…</div>'+
+        '<figcaption class="note t2">'+esc(f.name)+' · '+esc(noteSize(f.size))+
+        ' <button class="btn sm" onclick="noteFile(\''+f.id+'\')">다운로드</button></figcaption></figure>';
+    }
     return '<button class="btn sm" style="margin:0 6px 6px 0" '+
            'onclick="noteFile(\''+f.id+'\')">'+esc(f.name)+
            ' <span class="muted">'+esc(noteSize(f.size))+'</span></button>';
@@ -16435,6 +16452,8 @@ function noteOpen(id){
       (읽은 ? '<p class="note t2" style="margin-top:var(--sp-4)">읽음 · '+esc(읽은)+'</p>' : '')+
     '</div></div>';
 
+  noteImagesLoad(r.files||[]);
+
   /* 읽음은 뒤에서 남깁니다 (화면은 기다리지 않습니다) */
   if(r.unread){
     r.unread = false;
@@ -16447,6 +16466,52 @@ function noteOpen(id){
       }
     });
   }
+}
+
+/** 이미지도 기존 파일 조회 권한을 거치며 열린 창 안에만 둡니다. */
+function noteImagesLoad(files){
+  var account=accountStamp();
+  Array.prototype.forEach.call($('modal').querySelectorAll('[data-nt-image]'),function(box){
+    var f=files[Number(box.getAttribute('data-nt-image'))];
+    var slot=box.querySelector('.nt-image-slot');
+    function valid(){return sameAccount(account)&&box.isConnected;}
+    function failed(){if(valid())slot.textContent='미리보기를 불러오지 못했습니다. 다운로드로 확인해주세요.';}
+    call('api_noteFile',S.token,f.id).then(function(res){
+      if(!valid())return;
+      if(!res||!res.ok||!res.data||!/^image\/(png|jpeg|gif|webp)$/i.test(res.mime||'')){failed();return;}
+      var img=document.createElement('img');
+      img.alt=f.name||'첨부 이미지';
+      img.onload=function(){
+        if(!valid())return;
+        var btn=document.createElement('button');
+        btn.type='button';btn.className='nt-image-open';
+        btn.setAttribute('aria-label',img.alt+' 확대');
+        btn.onclick=function(){noteImageZoom(btn);};
+        btn.appendChild(img);slot.replaceChildren(btn);slot.removeAttribute('role');
+      };
+      img.onerror=failed;
+      img.src='data:'+res.mime+';base64,'+res.data;
+    }).catch(function(e){quiet('이미지 미리보기',e);failed();});
+  });
+}
+
+function noteImageZoom(button){
+  var source=button.querySelector('img');
+  if(!source)return;
+  var dialog=document.createElement('dialog');dialog.className='nt-zoom';
+  dialog.setAttribute('aria-label',source.alt+' 확대 보기');
+  dialog.innerHTML='<div class="nt-zoom-head"><span>'+esc(source.alt)+
+    '</span><button type="button" class="btn sm">닫기</button></div>'+
+    '<p class="note t2">이미지를 누르면 원본 크기로 볼 수 있습니다.</p><div class="nt-zoom-body"></div>';
+  var img=source.cloneNode();
+  img.setAttribute('tabindex','0');img.setAttribute('role','button');
+  img.setAttribute('aria-label','원본 크기 전환');img.setAttribute('aria-pressed','false');
+  img.onclick=function(){var on=img.classList.toggle('nt-natural');img.setAttribute('aria-pressed',String(on));};
+  img.onkeydown=function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();img.click();}};
+  dialog.querySelector('.nt-zoom-body').appendChild(img);
+  dialog.querySelector('button').onclick=function(){dialog.close();};
+  dialog.onclose=function(){dialog.remove();if(button.isConnected)button.focus();};
+  button.parentNode.appendChild(dialog);dialog.showModal();
 }
 
 function noteCmtHtml(c){
