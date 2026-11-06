@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v167';  // 2026-11-06 첨부 이미지 미리보기 · 확대
+const CACHE = 'unionone-launcher-v168';  // 2026-11-06 기록장 화면 손봄
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;

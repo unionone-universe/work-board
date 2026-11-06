@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v167">
+<meta name="uo-version" content="v168">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -547,9 +547,6 @@ label.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;fon
 .loginlogo .bmark{height:40px;width:auto}
 .loginlogo .bword{height:16px;width:auto}
 .loginlogo p{margin:6px 0 0;font-size:var(--fs-sm);color:var(--t3);letter-spacing:.2em}
-/* 폰에서 아래 탭에 없는 화면(기록장)의 돌아가기 */
-.backbar{display:flex;align-items:center;gap:8px;margin:0 0 var(--sp-3)}
-@media (min-width:720px){ .backbar{display:none} }
 .filters{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none}
 .filters::-webkit-scrollbar{display:none}
 
@@ -570,6 +567,10 @@ label.fl{display:block;font-size:var(--fs-sm);color:var(--t1);margin:0 0 6px;fon
   background:linear-gradient(100deg,transparent 22%,var(--rt-sheen) 50%,transparent 78%);transform:translateX(-130%)}
 .roomtab.on .rt-sweep{animation:rtSweep .9s cubic-bezier(.16,.9,.28,1) .1s 1 both}
 @keyframes rtSweep{to{transform:translateX(130%)}}
+/* 폰 아래 탭 — 이름이 길면 가지런히 두 줄까지 (2026-11-06 · 꺾일 때 새 글 점이 글자 아래로 밀렸다). 점은 아이콘 옆에 띄운다. 전체 이름은 title */
+.tabs .roomtab .rt-name{max-width:100%;padding:0 2px;font-size:12px;line-height:1.15;text-align:center;word-break:keep-all;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tabs .roomtab .rt-dot{position:absolute;top:8px;left:calc(50% + 10px);margin:0}
 .rt-bar{position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--t3);transform-origin:left center;transform:scaleX(0);border-radius:99px}
 .roomtab.on .rt-bar{animation:rtBar 5s linear 1 forwards}
 .roomtab.stay .rt-bar{animation:none;transform:scaleX(0)}
@@ -2348,6 +2349,44 @@ body:has(#modal .veil:not(.tdveil)) #writeDock,body:has(#modal .veil:not(.tdveil
 .paybox .b{margin:4px 0 0;font-size:var(--fs-sm);color:var(--t3)}
 .paybox .field{margin-top:10px}
 .paybox .actions{margin-top:10px}
+/* ── 기록장 (2026-11-06 대표님 — '배치 다시 필요') — 목록은 흰 판 위 줄, 글 보기는 공지 상세와 같은 틀 ── */
+.ntpagehead{align-items:center}
+@media (max-width:719px){ .ntpagehead{justify-content:flex-end} }
+.ntlist{background:var(--card);border:1px solid var(--line);border-radius:var(--wb-radius);overflow:hidden}
+.ntrow{display:block;width:100%;margin:0;padding:14px 18px;border:0;border-bottom:1px solid var(--line);background:transparent;
+  color:var(--t1);font:inherit;text-align:left;cursor:pointer}
+.ntrow:last-child{border-bottom:0}
+.ntrow:hover{background:var(--wb-hover)}
+.ntrow:focus-visible{outline:3px solid var(--pri);outline-offset:-3px}
+.ntrow .ntt{display:flex;align-items:center;gap:8px;min-width:0}
+.ntrow .ntt .cdot{margin:0}
+.ntrow .ntname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-row);font-weight:600;line-height:1.45}
+.ntrow.unread .ntname{font-weight:800}
+.ntrow .ntb{display:block;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-sm);color:var(--t3)}
+@media (max-width:719px){ .ntrow{padding:14px 16px} }
+.ntsheet .sheethead{flex-wrap:nowrap;align-items:flex-start}
+.ntsheet .sheethead h3{flex:1 1 auto;min-width:0;word-break:keep-all;overflow-wrap:anywhere}
+.ntsheet .sheethead .btn,.ntsheet .sheethead .tdico{flex:none}
+.ntsheet .ntbody{margin:var(--sp-3) 0 var(--sp-2);line-height:1.7;word-break:keep-all;overflow-wrap:anywhere}
+.ntsheet .sech{margin:var(--sp-5) 0 var(--sp-2);padding-top:var(--sp-4);border-top:1px solid var(--line)}
+.ntsheet .ntfiles{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.ntlink{display:inline-flex;align-items:center;gap:6px;min-height:var(--tap);padding:0;border:0;background:none;color:var(--pri);
+  font:inherit;font-weight:600;text-align:left;cursor:pointer}
+.ntlink span:first-of-type{text-decoration:underline;text-underline-offset:3px;overflow-wrap:anywhere}
+.ntlink .muted{font-weight:400}
+.ntlink .ic{width:18px;height:18px;flex:none}
+.ntlink:focus-visible{outline:3px solid var(--pri);outline-offset:2px;border-radius:var(--r-sm)}
+.nt-image figcaption .ntlink{min-height:0;text-decoration:underline;text-underline-offset:3px}
+.ntsheet .cmt .d .del{margin-left:auto}
+.ntsheet .cmempty{margin:4px 0;font-size:var(--fs-sm)}
+.ntsheet .tdwrite{margin-top:var(--sp-3)}
+.ntsheet .ntread{margin-top:var(--sp-4)}
+.ntkeep{display:flex;align-items:center;gap:8px;min-height:var(--tap);border-bottom:1px solid var(--line);color:var(--t2)}
+.ntkeep > .ic{width:18px;height:18px;flex:none;color:var(--t3)}
+.ntkeep .nm{flex:1;min-width:0;overflow-wrap:anywhere;color:var(--t1)}
+.ntkeep .muted{flex:none;font-size:var(--fs-sm)}
+#ntPickBox:not(:empty){margin-top:8px}
+.ntform .photobtn{margin-top:8px}
 .nt-image{margin:12px 0 20px;min-width:0}
 .nt-image-open{display:block;width:100%;padding:0;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--card);cursor:zoom-in}
 .nt-image-open img{display:block;width:100%;height:auto}
@@ -16284,6 +16323,7 @@ function roomReveal(){
     var b = $(id); if(!b) return;
     var t = b.querySelector('.rt-name');
     if(t) t.textContent = label;
+    b.title = label; b.setAttribute('aria-label', label);
     b.classList.add('show');
   });
   var tabs = document.querySelector('.tabs');
@@ -16383,27 +16423,28 @@ function renderNote(){
      서버가 어차피 거절하지만, 빈 화면이라도 '무언가 있다' 는 것을 알려선 안 됩니다. */
   if(!roomAllowed()){ box.innerHTML=''; go('board'); return; }
   var label = S.data.note.label;
-  var h = '<div class="backbar"><button class="btn sm" onclick="go(\'board\')">'+ic('back')+'워크보드</button></div>'+
-          '<div class="pagehead"><h3 class="tt">'+esc(label)+'</h3>'+
-          '<button class="btn pri sm" onclick="noteForm()">'+ic('plus')+'새 글</button></div>';
+  /* ★ 목록 줄 (2026-11-06 대표님 — '배치 다시 필요'). 예전에는 .lrow 안의 제목 · 이름을 span 으로 넣어
+       '피드백최원찬 · 11-06' 처럼 한 줄에 붙었고, 폰에서는 긴 제목이 화면 밖으로 밀려 옆으로 넘쳤다.
+       이제 흰 판 위에 줄마다 제목 한 줄(길면 …) + 아래 '누가 · 언제 · 댓글 N · 자료 N' 한 줄.
+       줄은 단추라 키보드로도 연다. 폰은 아래 탭으로 오가므로 [← 워크보드] 는 두지 않는다 */
+  var h = '<div class="pagehead ntpagehead"><h3 class="tt">'+esc(label)+'</h3>'+
+          '<button class="btn pri" onclick="noteForm()">'+ic('plus')+'새 글</button></div>';
 
   if(!NOTE.rows){
     h += '<p class="none">불러오는 중입니다</p>';
   } else if(!NOTE.rows.length){
     h += '<p class="none big">아직 글이 없습니다</p>';
   } else {
-    h += NOTE.rows.map(function(r){
-      var 곁 = [];
-      if(r.comments && r.comments.length) 곁.push('댓글 '+r.comments.length);
-      if(r.files && r.files.length) 곁.push('자료 '+r.files.length);
-      return '<div class="lrow" onclick="noteOpen(\''+r.id+'\')">'+
-        '<span class="m"><span class="t">'+esc(r.title)+
-          (r.unread ? '<span class="cdot"></span>' : '')+'</span>'+
-        '<span class="b">'+esc([r.who, shortDate(r.at)].filter(function(x){return x;}).join(' · '))+
-        '</span></span>'+
-        (곁.length ? '<span class="r"><span class="s">'+esc(곁.join(' · '))+'</span></span>' : '')+
-        '</div>';
-    }).join('');
+    h += '<div class="ntlist">'+NOTE.rows.map(function(r){
+      var 보조 = [r.who, shortDate(r.at)];
+      if(String(r.id).indexOf('_tmp') === 0) 보조.push('저장 중');
+      if(r.comments && r.comments.length) 보조.push('댓글 '+r.comments.length);
+      if(r.files && r.files.length) 보조.push('자료 '+r.files.length);
+      return '<button type="button" class="ntrow'+(r.unread ? ' unread' : '')+'" data-note="'+esc(r.id)+'" onclick="noteOpen(this.dataset.note)">'+
+        '<span class="ntt">'+(r.unread ? '<span class="cdot" aria-label="새 글"></span>' : '')+'<span class="ntname">'+esc(r.title)+'</span></span>'+
+        '<span class="ntb">'+esc(보조.filter(function(x){return x;}).join(' · '))+'</span>'+
+        '</button>';
+    }).join('')+'</div>';
   }
   box.innerHTML = h;
 }
@@ -16414,16 +16455,16 @@ function noteOpen(id){
   var r = noteById(id);
   if(!r){ toast('글을 찾지 못했습니다'); return; }
 
+  /* 자료는 이름 글자 링크로 (상자 단추 대신 — 결재 상세의 첨부와 같은 모양). 그림은 그 자리에서 미리 보기 */
   var 자료 = (r.files||[]).map(function(f,i){
     if(/\.(png|jpe?g|gif|webp)$/i.test(f.name||'')){
       return '<figure class="nt-image" data-nt-image="'+i+'">'+
         '<div class="nt-image-slot" role="status">이미지 불러오는 중…</div>'+
         '<figcaption class="note t2">'+esc(f.name)+' · '+esc(noteSize(f.size))+
-        ' <button class="btn sm" onclick="noteFile(\''+f.id+'\')">다운로드</button></figcaption></figure>';
+        ' <button type="button" class="ntlink" onclick="noteFile(\''+f.id+'\')">다운로드</button></figcaption></figure>';
     }
-    return '<button class="btn sm" style="margin:0 6px 6px 0" '+
-           'onclick="noteFile(\''+f.id+'\')">'+esc(f.name)+
-           ' <span class="muted">'+esc(noteSize(f.size))+'</span></button>';
+    return '<button type="button" class="ntlink ntfile" onclick="noteFile(\''+f.id+'\')">'+ic('clip')+
+           '<span>'+esc(f.name)+'</span> <span class="muted">'+esc(noteSize(f.size))+'</span></button>';
   }).join('');
 
   var 읽은 = (r.readers||[]).map(function(x){ return x.name; })
@@ -16432,24 +16473,28 @@ function noteOpen(id){
   var 댓 = (r.comments||[]).map(noteCmtHtml).join('');
 
   var 지울수있나 = r.mine || NOTE.grade >= 9;
+  var 메뉴 = r.mine || 지울수있나;
 
+  /* ★ 수정 · 삭제는 ⋯ 안에 (2026-11-06 — 공지 · 결재 상세와 같은 방식). 예전에는 [수정][삭제][닫기] 셋이 머리에 늘어서
+       폰에서는 제목 아래로 밀려 한 줄을 더 썼다. 댓글은 '댓글 N' 아래에, 적는 칸은 업무 상세와 같은 한 줄 칸 */
   $('modal').innerHTML =
-    '<div class="veil"><div class="sheet">'+
+    '<div class="veil"><div class="sheet ntsheet" data-note="'+esc(r.id)+'">'+
       '<div class="sheethead"><h3 class="tt">'+esc(r.title)+'</h3>'+
-        '<div style="display:flex;gap:6px">'+
-          (r.mine ? '<button class="btn sm" onclick="noteForm(\''+r.id+'\')">수정</button>' : '')+
-          (지울수있나 ? '<button class="btn sm" onclick="noteDelete(\''+r.id+'\')">삭제</button>' : '')+
-          '<button class="btn sm" onclick="closeModal()">닫기</button></div></div>'+
+        (메뉴 ? '<button class="tdico" onclick="taskMenu()" title="수정·삭제" aria-label="수정·삭제">'+ic('dots')+'</button>' : '')+
+        '<button class="btn sm" onclick="closeModal()">닫기</button></div>'+
+      (메뉴 ? '<div class="tdmenu" id="tdMenu">'+
+        (r.mine ? '<button class="btn sm" onclick="noteForm(\''+r.id+'\')">수정</button>' : '')+
+        (지울수있나 ? '<button class="btn sm dg" onclick="noteDelete(\''+r.id+'\')">삭제</button>' : '')+'</div>' : '')+
       byline([r.who, shortDate(r.at)])+
-      '<div style="margin:var(--sp-3) 0 var(--sp-4)">'+fmt(r.body||'')+'</div>'+
-      (자료 ? '<hr class="tdsep"><p class="note t2">자료</p>'+자료 : '')+
-      '<hr class="tdsep">'+
-      '<div id="ntCmt">'+댓+'</div>'+
-      '<div style="display:flex;gap:6px;margin-top:var(--sp-3)">'+
-        '<textarea class="in" id="ntCmtIn" rows="1" style="flex:1;min-width:0" '+
+      '<div class="ntbody">'+fmt(r.body||'')+'</div>'+
+      (자료 ? '<h4 class="sech">자료 '+(r.files||[]).length+'</h4><div class="ntfiles">'+자료+'</div>' : '')+
+      '<h4 class="sech">댓글 <span id="ntCmtN">'+(r.comments||[]).length+'</span></h4>'+
+      '<div id="ntCmt">'+(댓 || noteCmtEmpty())+'</div>'+
+      '<div class="tdwrite">'+
+        '<textarea id="ntCmtIn" rows="1" aria-label="댓글" '+
           'onkeydown="noteCmtKey(event,\''+r.id+'\')"></textarea>'+
-        '<button class="btn sm" onclick="noteComment(\''+r.id+'\')">등록</button></div>'+
-      (읽은 ? '<p class="note t2" style="margin-top:var(--sp-4)">읽음 · '+esc(읽은)+'</p>' : '')+
+        '<button class="btn sm pri" onclick="noteComment(\''+r.id+'\')">등록</button></div>'+
+      (읽은 ? '<p class="note t2 ntread">읽음 · '+esc(읽은)+'</p>' : '')+
     '</div></div>';
 
   noteImagesLoad(r.files||[]);
@@ -16516,10 +16561,20 @@ function noteImageZoom(button){
 
 function noteCmtHtml(c){
   return '<div class="cmt" data-cid="'+esc(c.id)+'">'+
-    '<p class="byline">'+esc(c.who)+' · '+esc(shortDate(c.at))+
+    '<div class="d"><b>'+esc(c.who)+'</b><span class="muted">'+esc(shortDate(c.at))+'</span>'+
       ((c.mine || NOTE.grade >= 9) ?
-        ' <button class="btn sm" onclick="noteCmtDel(\''+c.id+'\')" aria-label="댓글 삭제">'+ic('x')+'</button>' : '')+
-    '</p><div>'+fmt(c.text||'')+'</div></div>';
+        '<button class="del" title="댓글 삭제" aria-label="댓글 삭제" onclick="noteCmtDel(\''+c.id+'\')">'+ic('x')+'</button>' : '')+
+    '</div><div class="body">'+fmt(c.text||'')+'</div></div>';
+}
+function noteCmtEmpty(){ return '<p class="muted cmempty">아직 댓글이 없습니다</p>'; }
+/** 댓글 수 · '아직 댓글이 없습니다' 를 지금 줄 수에 맞춘다 */
+function noteCmtSync(){
+  var box = $('ntCmt'); if(!box) return;
+  var n = box.querySelectorAll('.cmt:not([hidden])').length;
+  var e = box.querySelector('.cmempty');
+  if(n && e) e.remove();
+  if(!n && !e) box.insertAdjacentHTML('beforeend', noteCmtEmpty());
+  var c = $('ntCmtN'); if(c) c.textContent = n;
 }
 
 /** 지금 시각 (화면에만 쓰는 값. 서버가 준 값으로 곧 갈아끼워집니다) */
@@ -16558,6 +16613,7 @@ function noteComment(id){
   el.value = '';
   var box = $('ntCmt');
   if(box) box.insertAdjacentHTML('beforeend', noteCmtHtml(임시));
+  noteCmtSync();
 
   call('api_noteComment', S.token, id, t).then(function(res){
     if(res && res.ok){
@@ -16570,6 +16626,7 @@ function noteComment(id){
     r.comments = r.comments.filter(function(x){ return x !== 임시; });
     var el2 = box && box.querySelector('[data-cid^="_tmp"]');
     if(el2) el2.remove();
+    noteCmtSync();
     toast((res && res.msg) || '댓글을 남기지 못했습니다');
   });
 }
@@ -16579,16 +16636,17 @@ function noteCmtDel(cid){
   if(!confirm('댓글을 삭제할까요?')) return;
   var box = $('ntCmt');
   var el = box && box.querySelector('[data-cid="'+cid+'"]');
-  if(el) el.style.display = 'none';
+  if(el){ el.hidden = true; noteCmtSync(); }
   call('api_noteCommentDelete', S.token, cid).then(function(r){
     if(r && r.ok){
       (NOTE.rows||[]).forEach(function(p){
         p.comments = (p.comments||[]).filter(function(c){ return c.id !== cid; });
       });
       if(el) el.remove();
+      noteCmtSync();
       return;
     }
-    if(el) el.style.display = '';
+    if(el){ el.hidden = false; noteCmtSync(); }
     toast((r && r.msg) || '삭제하지 못했습니다');
   });
 }
@@ -16601,24 +16659,25 @@ function noteForm(id){
   var 붙은것 = r ? (r.files||[]).slice() : [];
   NOTE.keep = 붙은것.map(function(f){ return f.id; });
 
+  /* ★ 결재 올리기 창과 같은 틀 (2026-11-06) — 폰은 화면 전체 · [취소] · [저장] 은 늘 맨 아래.
+       위 [닫기] 는 [취소] 와 같은 일이라 뺐다. 자료는 브라우저 기본 '파일 선택' 칸 대신 [파일 첨부] 단추 */
   $('modal').innerHTML =
-    '<div class="veil"><div class="sheet">'+
-      '<div class="sheethead"><h3 class="tt">'+(r ? '글 수정' : '새 글')+'</h3>'+
-        '<button class="btn sm" onclick="closeModal()">닫기</button></div>'+
+    '<div class="veil dfveil"><div class="sheet dform ntform">'+
+      '<div class="sheethead"><h3 class="tt">'+(r ? '글 수정' : '새 글')+'</h3></div>'+
       /* ★★ `type="text"` 를 빠뜨리면 **칸이 좁게 나옵니다** (2026-09-03).
        앱의 입력칸 규칙이 `input[type=text]` 로 걸려 있어서, type 을 안 적으면
        그 규칙이 하나도 안 붙습니다. 오류는 안 나고 모양만 어긋납니다. */
-    '<div class="field"><label class="fl">제목</label>'+
+    '<div class="field"><label class="fl req" for="ntTitle">제목</label>'+
         '<input type="text" id="ntTitle" value="'+esc(r ? r.title : '')+'"></div>'+
       '<div class="field"><label class="fl">내용</label>'+
         mkEditor('ntBody', r ? r.body : '', 160)+'</div>'+
-      '<div class="field"><label class="fl">자료</label>'+
+      '<div class="field"><span class="fl">자료</span>'+
         '<div id="ntFiles">'+noteKeepHtml(붙은것)+'</div>'+
-        '<input type="file" id="ntPick" multiple style="margin-top:6px" '+
-          'onchange="notePicked(this)">'+
+        '<input type="file" class="photoin" id="ntPick" multiple onchange="notePicked(this)">'+
+        '<label class="btn photobtn" for="ntPick">'+ic('clip')+'파일 첨부</label>'+
         '<div id="ntPickBox"></div></div>'+
-      '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:var(--sp-4)">'+
-        '<button class="btn sm" onclick="closeModal()">취소</button>'+
+      '<div class="actions tfoot">'+
+        '<button class="btn" onclick="closeModal()">취소</button>'+
         '<button class="btn pri" id="ntSave" onclick="noteSave(\''+(id||'')+'\')">저장</button></div>'+
     '</div></div>';
   var di = (NOTE.drafts||[]).findIndex(function(x){ return x.id === (id||''); }), d = di >= 0 ? NOTE.drafts[di] : null;
@@ -16637,9 +16696,9 @@ function noteForm(id){
 function noteKeepHtml(files){
   if(!files.length) return '';
   return files.map(function(f){
-    return '<span class="tag gy" style="margin:0 6px 6px 0;display:inline-block">'+
-      esc(f.name)+' <button class="btn sm" aria-label="삭제" '+
-      'onclick="noteDropKeep(\''+f.id+'\',this)">'+ic('x')+'</button></span>';
+    return '<div class="ntkeep">'+ic('clip')+'<span class="nm">'+esc(f.name)+'</span>'+
+      '<button type="button" class="itdel" aria-label="'+esc(f.name)+' 빼기" '+
+      'onclick="noteDropKeep(\''+f.id+'\',this)">'+ic('x')+'</button></div>';
   }).join('');
 }
 
@@ -16668,8 +16727,8 @@ function notePicked(input){
 function notePickPaint(fs){
   var box = $('ntPickBox'); if(!box) return;
   box.innerHTML = (fs||[]).map(function(f){
-    return '<span class="tag gy" style="margin:6px 6px 0 0;display:inline-block">'+
-           esc(f.name)+' <span class="muted">'+esc(noteSize(f.size))+'</span></span>';
+    return '<div class="ntkeep">'+ic('clip')+'<span class="nm">'+esc(f.name)+'</span>'+
+           '<span class="muted">'+esc(noteSize(f.size))+'</span></div>';
   }).join('');
 }
 
