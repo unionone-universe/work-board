@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v169">
+<meta name="uo-version" content="v170">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -8040,13 +8040,13 @@ function taskImagesHtml(files, content){
     if(url.protocol!=='https:' || url.hostname!=='drive.google.com') return;
     var id=driveId(url.href);if(!mkImgOk(id) || seen[id]) return;
     seen[id]=true;
-    var src='https://drive.google.com/thumbnail?id='+id+'&amp;sz=w', name=escA(f.name||'첨부 이미지');
+    var src='https://drive.google.com/thumbnail?id='+id+'&amp;sz=w', name='첨부 이미지';
     h+='<figure class="task-attachment"><button type="button" class="task-image-open" aria-label="'+name+' 확대" '+
       'onclick="openReceipt(&#39;'+id+'&#39;,&#39;&#39;,2560)">'+
       '<img src="'+src+'1000" srcset="'+src+'800 800w, '+src+'1200 1200w, '+src+'1600 1600w" '+
       'sizes="(max-width: 760px) 100vw, 720px" loading="lazy" decoding="async" alt="'+name+'" '+
-      'onerror="this.parentNode.hidden=true"></button><figcaption><a href="'+escA(url.href)+'" target="_blank" rel="noopener">'+
-      name+'</a></figcaption></figure>';
+      'onerror="this.parentNode.hidden=true;this.closest(&#39;figure&#39;).querySelector(&#39;figcaption&#39;).hidden=false"></button>'+
+      '<figcaption hidden><a href="'+escA(url.href)+'" target="_blank" rel="noopener">이미지 열기</a></figcaption></figure>';
   });
   return h;
 }

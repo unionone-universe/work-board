@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v169';  // 2026-11-09 업무 첨부 이미지 본문 표시
+const CACHE = 'unionone-launcher-v170';  // 2026-11-09 본문 이미지 파일명 숨김
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;
