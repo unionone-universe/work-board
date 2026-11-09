@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v168">
+<meta name="uo-version" content="v169">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -808,6 +808,11 @@ table.mk-tb .al-c{text-align:center} table.mk-tb .al-r{text-align:right}
   background:rgba(0,0,0,.66);color:#fff;font-size:12px;line-height:1.2}
 .mkbar .mkimgbtn{width:auto;padding:0 9px;gap:4px;white-space:nowrap;font-size:var(--fs-sm);font-weight:600;display:inline-flex;align-items:center}
 .mkbar .mkimgbtn .ic{width:16px;height:16px}
+.task-attachment{margin:20px 0 0;max-width:100%}
+.task-image-open{display:block;max-width:100%;padding:0;border:0;background:transparent;cursor:zoom-in}
+.task-image-open img{display:block;max-width:100%;height:auto;border-radius:6px}
+.task-attachment figcaption{margin-top:6px;font-size:var(--fs-sm);overflow-wrap:anywhere}
+.task-attachment figcaption a{color:var(--t2);text-decoration:underline}
 
 /* 펼친 줄 · 색판 · 표판 — 모두 같은 모양의 '판' 이다.
    ★ 묶음마다 왼쪽에 이름을 붙인다. 버튼만 늘어놓으면 무엇이 무엇인지 알 수 없다. */
@@ -4272,6 +4277,7 @@ function mkImgShrink(file){
 var MK_IMG_CHAIN=Promise.resolve();
 function mkImgFiles(id, files){
   var ed=$(id); if(!ed) return;
+  var account=accountStamp();
   var list=[].filter.call(files||[], function(f){ return f && (/^image\//.test(f.type||'') || /\.(heic|heif)$/i.test(f.name||'')); });
   if(!list.length){ toast('사진만 넣을 수 있습니다'); return; }
   var room=MK_IMG_MAX-ed.querySelectorAll('figure.mk-img').length;
@@ -4285,19 +4291,19 @@ function mkImgFiles(id, files){
     /* 한 장씩 차례로 — 서버에 몰리지 않게 */
     MK_IMG_CHAIN=MK_IMG_CHAIN.then(function(){
       /* ★ 원본 사진(Blob 주소)은 줄인 그림을 만들자마자 놓아 준다 — 넣고 빼기를 되풀이해도 원본이 쌓이지 않게 (Astra 1차) */
-      if(!mkImgLive(fig)){ URL.revokeObjectURL(url); return; }      // 올리기 전에 지웠거나 창이 바뀌었다
+      if(!sameAccount(account) || !mkImgLive(fig)){ URL.revokeObjectURL(url); return; }      // 계정·창이 바뀌거나 지운 사진은 올리지 않는다
       return mkImgShrink(file).then(function(data){
         img.src=data; URL.revokeObjectURL(url);                     // 미리보기는 줄인 그림으로 (원본보다 훨씬 작다)
-        if(!mkImgLive(fig)) return { ok:true, gone:true };            // 줄이는 사이에 지웠거나 창이 바뀌었다 — 올리지 않는다
-        return call('api_inlineImage', {data:data});
+        if(!sameAccount(account) || !mkImgLive(fig)) return { ok:true, gone:true };
+        return call('api_inlineImage', account.token, {data:data});
       }).then(function(r){
-        if(r && r.gone) return;
+        if(!sameAccount(account) || !mkImgLive(fig) || (r && r.gone)) return;
         if(!r || !r.ok || !mkImgOk(r.id)) throw new Error((r && r.msg) || '');
         fig.setAttribute('data-img', r.id); img.setAttribute('data-img', r.id); fig.classList.remove('up');
       }).catch(function(e){
         if(fig.parentNode) fig.parentNode.removeChild(fig);
         URL.revokeObjectURL(url);
-        toast((e && e.message) || '사진을 넣지 못했습니다. 다시 시도해주세요');
+        if(sameAccount(account)) toast((e && e.message) || '사진을 넣지 못했습니다. 다시 시도해주세요');
       });
     });
   });
@@ -7732,7 +7738,7 @@ function tdPanesHtml(t, r){
     '<section class="tdpane" data-pane="info" role="tabpanel">'+
     '<section class="tdsec"><h4 class="tdh">'+ic('list')+'업무 내용</h4>'+
       (t.content ? '<div class="tdcontent">'+fmt(t.content)+'</div>'
-                 : '<p class="tdnone">내용이 없습니다</p>')+'</section>';
+                 : '<p class="tdnone">내용이 없습니다</p>')+taskImagesHtml(파일, t.content)+'</section>';
   var 정보=siteInfo_(t);
   if(정보) h+='<section class="tdsec"><h4 class="tdh">'+ic('pin')+'현장 정보</h4><dl class="tdinfo">'+정보+'</dl></section>';
   var 협업=[];
@@ -8022,6 +8028,27 @@ function fileBox_(t, files, edit){
          '<div id="tfFiles">'+fileRows_(t, files, true)+'</div>'+
          '<input type="file" id="tfFile" multiple '+
            'onchange="addTaskFile(&quot;'+esc(t.id)+'&quot;,this)"></div>';
+}
+
+/** 업무에 첨부한 이미지는 개요 본문 아래에 바로 표시한다. 이미 본문에 넣은 사진은 한 번만. */
+function taskImagesHtml(files, content){
+  var seen=Object.create(null), h='';
+  String(content||'').replace(/\{img:([A-Za-z0-9_-]{20,100})\}/g,function(_,id){seen[id]=true;return _;});
+  (Array.isArray(files)?files:[]).forEach(function(f){
+    if(!f || !/\.(jpe?g|png|webp|gif|heic|heif|bmp)$/i.test(String(f.name||''))) return;
+    var url;try{url=new URL(f.url);}catch(e){return;}
+    if(url.protocol!=='https:' || url.hostname!=='drive.google.com') return;
+    var id=driveId(url.href);if(!mkImgOk(id) || seen[id]) return;
+    seen[id]=true;
+    var src='https://drive.google.com/thumbnail?id='+id+'&amp;sz=w', name=escA(f.name||'첨부 이미지');
+    h+='<figure class="task-attachment"><button type="button" class="task-image-open" aria-label="'+name+' 확대" '+
+      'onclick="openReceipt(&#39;'+id+'&#39;,&#39;&#39;,2560)">'+
+      '<img src="'+src+'1000" srcset="'+src+'800 800w, '+src+'1200 1200w, '+src+'1600 1600w" '+
+      'sizes="(max-width: 760px) 100vw, 720px" loading="lazy" decoding="async" alt="'+name+'" '+
+      'onerror="this.parentNode.hidden=true"></button><figcaption><a href="'+escA(url.href)+'" target="_blank" rel="noopener">'+
+      name+'</a></figcaption></figure>';
+  });
+  return h;
 }
 
 function fileRows_(t, files, edit){
