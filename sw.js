@@ -29,7 +29,7 @@
  *   달라진 것은 안 바뀐 날에 225KB 를 다시 안 받는다는 것뿐입니다.
  * ────────────────────────────────────────────────────────────
  */
-const CACHE = 'unionone-launcher-v170';  // 2026-11-09 본문 이미지 파일명 숨김
+const CACHE = 'unionone-launcher-0.01';  // 2026-11-23 세 앱 버전 0.01 로 통일
 
 const VERSION=CACHE.split('-').pop();
 const NET_WAIT_MS=2500;

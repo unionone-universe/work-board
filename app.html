@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="v170">
+<meta name="uo-version" content="0.01">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -4910,6 +4910,7 @@ function taskRO(t){ return teamScope() && !!t && !myPhone(t.owner); }
 
 /** 사람·권한이 바뀌었을 때 이 화면이 들고 있던 것을 전부 버린다 (2026-09-30) */
 function resetUserCaches(){
+  DOC_SENDING=[];
   S.acctGen=(S.acctGen||0)+1;
   S.epoch++;
   deleteNoticeClose();outboxHide();
@@ -10284,6 +10285,7 @@ function photoAdd(id, el){
     }).then(function(더줄임){
       return photoMakeUrls(id).then(function(){
         photoDraw(id);
+        if(id==='dfPhoto') docPreUpload(id);      // 결재 첨부는 고르는 순간 미리 올린다 (2026-11-23 상신 속도)
         /* ★ 조용히 빠뜨리지 않는다. 예전에는 못 읽은 사진이 아무 말 없이 사라졌다 */
         if(너무큼) toast('PDF 는 한 개 8MB 까지입니다. '+너무큼+'개는 첨부하지 못했습니다.');
         if(못담음) toast(못담음+'개는 첨부하지 못했습니다. 다시 선택해주세요.');
@@ -10365,6 +10367,45 @@ function photoDraw(id){
          'aria-label="삭제">&times;</button></div>';
   });
   box.innerHTML = h;
+}
+
+/* ── 결재 첨부 미리 올리기 (2026-11-23 상신 속도) ──
+   상신이 느린 가장 큰 까닭은 영수증 사진(장당 2~5MB)을 상신 요청에 실어 보내는 것이었다.
+   고르는 순간 한 개씩 올려 두고(사람이 나머지 칸을 적는 동안 끝난다) 상신에는 주소와 확인표만 싣는다.
+   못 올린 것 · 그 뒤에 다시 줄인 것은 예전처럼 상신 요청에 실어 보낸다 (빠지는 첨부가 없다) */
+function docPreUpload(id){
+  var account=accountStamp();
+  (PICKED[id]||[]).forEach(function(o){
+    if(!o.url || o.upFor===o.url) return;
+    var mine=o.url; o.upFor=mine; o.sent=null;
+    o.up=call('api_docUpload', account.token, {data:mine, name:o.name, pdf:!!o.pdf}).then(function(r){
+      if(o.upFor===mine && sameAccount(account) && r && r.ok && r.url && r.key) o.sent={url:r.url, key:r.key, pdf:!!o.pdf, name:o.pdf? o.name : ''};
+    },function(){});
+  });
+}
+/** 상신할 때 — 미리 올린 것은 uploaded 로, 나머지는 photos · files 로 나눠 싣는다. 올리는 중인 것은 기다린다 */
+function docAttachReady(picked, p){
+  return Promise.all(picked.map(function(o){ return o.up||null; })).then(function(){
+    p.uploaded=[]; p.photos=[]; p.files=[];
+    picked.forEach(function(o){
+      if(o.sent && o.upFor===o.url) p.uploaded.push(o.sent);
+      else if(o.pdf) p.files.push({data:o.url, name:o.name});
+      else p.photos.push(o.url);
+    });
+  });
+}
+/* ── 올리는 중인 결재 (2026-11-23) — 누르는 즉시 '내가 올린 문서' 맨 위에 '올리는 중' 으로 보인다.
+   서버가 문서번호를 주면 진짜 줄로 바뀌고, 실패하면 빠지고 적던 창이 다시 열린다. 이 기기에 적지 않는다 */
+var DOC_SENDING=[];
+function docSendingAdd(p, f, amount){
+  var row={ no:'_up'+Date.now()+Math.floor(Math.random()*1000), title:p.title, amount:amount||0, corp:p.corp, formName:(f&&f.name)||'', form:p.formCode,
+            status:'진행중', who:(S.me&&S.me.name)||'', at:nowStamp(), canAct:false, canRead:false, proxy:false, sending:true };
+  DOC_SENDING.unshift(row); return row.no;
+}
+function docSendingDrop(no){ DOC_SENDING=DOC_SENDING.filter(function(d){ return d.no!==no; }); }
+function docSendingView(r){
+  if(!DOC_SENDING.length || !r) return r;
+  return { toAct:r.toAct||[], drafts:DOC_SENDING.concat(r.drafts||[]), others:r.others||[] };
 }
 
 /** 저장할 때 꺼내 쓴다 — 사진 주소 배열 (PDF 는 photoFiles 로 따로) */
@@ -11942,8 +11983,8 @@ function deleteComment(id){
 /* ===================== 결재 ===================== */
 /** 결재 목록은 워크보드를 받을 때 이미 같이 왔다. 탭에 들어갈 때 서버에 가지 않는다 */
 function docSource(){
-  if(S.data && S.data.docs) return S.data.docs;
-  return S.docs || null;
+  if(S.data && S.data.docs) return docSendingView(S.data.docs);
+  return docSendingView(S.docs || null);
 }
 
 function renderDocs(){
@@ -13174,7 +13215,7 @@ function docSec(title, arr, hot, 종류표시){
        섞여 있는 구역에서만 붙입니다 — 종류별 칸 안에서는 창 제목이 이미 그 종류입니다.
        ★ 태그를 붙이면 보조 줄의 양식 이름은 뺍니다 (같은 말을 두 번 적지 않습니다). */
     var 태그 = 종류표시 ? '<span class="tag gy">'+esc(d.formName||d.form||'')+'</span> ' : '';
-    var sub=[d.who, shortDate(d.at), (종류표시? '' : d.formName), (!hot && st==='진행중')? '진행중' : '']
+    var sub=[d.who, shortDate(d.at), (종류표시? '' : d.formName), d.sending? '올리는 중' : ((!hot && st==='진행중')? '진행중' : '')]
       .filter(function(x){ return x; }).join(' · ');
     var tags=(d.proxy? '<span class="tag wn">대리</span>':'');
     /* 체크칸은 실제로 결재할 수 있는 문서에만. 눌러도 창이 안 열리게 막는다 */
@@ -13541,6 +13582,7 @@ function takeDocMore(m){
 }
 
 function openDoc(no){
+  if(String(no).indexOf('_up')===0){ toast('서버에 올리는 중입니다. 잠시 뒤 열 수 있습니다'); return; }
   var b=findDocBrief(no);
   var cached=S.docCache[no];
   /* 목록과 어긋난 상세(옛것)는 그리지 않는다 — 목록의 제목 · 상태로 열고 새로 받는다 (2026-10-28 "이랬다 저랬다") */
@@ -14542,15 +14584,23 @@ function saveDoc(){
   var account=accountStamp(), token=S.token;
   var progressTimer=setTimeout(function(){if(msg.isConnected)msg.textContent='서버에서 저장 결과를 확인하는 중입니다. 잠시만 기다려 주세요.';},2500);
 
-  if(shots.length+pdfs.length) msg.textContent='첨부 '+(shots.length+pdfs.length)+'개 올리는 중입니다...';
-  p.photos = shots;
-  p.files = pdfs;
+  var picked=(PICKED['dfPhoto']||[]).slice();
+  var 합계=0; items.forEach(function(it){ 합계+=Number(it.amount||0); });
 
   if(WRITE_FORM&&WRITE_FORM.root===btn.closest('.sheet'))writeFormClear(WRITE_FORM);
   var background=writeFormStart(btn.closest('.sheet'),'상신','','doc');
+  /* ★ 누르는 즉시 결재 목록에 '올리는 중' 으로 보인다 (2026-11-23 상신 속도 — 서버를 기다리지 않는다) */
+  var sendingNo=docSendingAdd(p, f, 합계);
+  if(background){ toast('결재를 올리는 중입니다 · 결재 목록에서 볼 수 있습니다'); if(S.view==='doc') renderDocs(); }
   // 통신이 끊기거나 몰리면 같은 요청 번호로 저절로 다시 보낸다 — 서버 영수증이 문서를 두 번 만들지 않는다 (2026-10-22)
-  return reliableCall({kind:'doc',title:p.title,persist:false,form:background,cap:background?0:OUTBOX_FORM_CAP},'api_saveDoc',[p,S.corp]).then(function(r){
+  var corpNow=S.corp;                       // 첨부를 기다리는 사이 법인 · 계정이 바뀌면 보내지 않는다 (Astra 2차)
+  return docAttachReady(picked, p).then(function(){
+    if(!sameAccount(account)) return {ok:false,stale:true};
+    return reliableCall({kind:'doc',title:p.title,persist:false,form:background,cap:background?0:OUTBOX_FORM_CAP},'api_saveDoc',[p,corpNow]);
+  }).then(function(r){
     clearTimeout(progressTimer);
+    docSendingDrop(sendingNo);
+    if(!(r&&r.ok) && S.view==='doc' && sameAccount(account)) renderDocs();
     btn.disabled=false; btn.textContent='상신';
     if(!sameAccount(account)){writeFormDiscard(background);return;}
     if(!r.ok){writeFormFinish(background,r);if(r.net||r.code==='SERVER_ERROR'||r.code==='WRITE_UNCONFIRMED'||r.code==='IN_PROGRESS'||r.code==='EXPIRED'){btn.disabled=true;btn.textContent='결재 목록에서 결과 확인';} msg.textContent=r.net?'상신 결과를 확인하지 못했습니다. 다시 올리기 전에 결재 목록을 확인해 주세요.':r.msg; return; }
@@ -15259,7 +15309,7 @@ function paintSettingsNow(r){
     /* 등급 숫자는 사람에게 보여주지 않습니다 — `현장` 만으로 충분합니다 (2026-09-09).
        숫자는 관리자의 직원 정보 창에서만 봅니다. */
     $('meInfo').innerHTML=meInfoHtml(me);
-    $('verText').textContent='버전 '+((S.meta&&S.meta.version)||'')+
+    $('verText').textContent='버전 '+((document.querySelector('meta[name=uo-version]')||{}).content||'')+
       ((S.meta&&S.meta.code)? ' · 코드 '+S.meta.code : ' · 코드 (옛 버전)');
 
     /* 서버가 준 등급으로 다시 정합니다 (여기가 최종입니다) */
@@ -15490,7 +15540,61 @@ function openStaff(phone){
       ? '<p class="note t2"><button class="linkbtn" onclick="openMove(\''+phone+'\')">'+
           (t.move.resume? '번호 변경 이관 이어서 하기' : '번호 변경 이관 (같은 사람이 번호를 바꾼 경우)')+'</button></p>'
       : (!t.hasPin && t.move && t.move.why ? '<p class="note t2 mwhy">'+ic('alert')+'<span>번호 변경 이관 안 됨: '+esc(t.move.why)+'</span></p>' : ''))+
+    /* 직원 기록까지 삭제 (2026-11-23) — 본인 줄에는 없다. 서버가 관리자 · 마지막 관리자를 다시 본다 */
+    (phone!==String(S.me&&S.me.phone||'') ? '<p class="note t2"><button class="linkbtn dg" onclick="openPurge(\''+phone+'\')">이 직원 정보 삭제 (기록 포함)</button></p>' : '')+
     '</div></div>';
+}
+/* ---- 직원 기록까지 삭제 (관리자만, 2026-11-23) — 무엇이 지워지는지 서버가 세어 보여 주고, 확인란을 켜야 지운다 ---- */
+var PURGE=null;
+function openPurge(phone){
+  var t=null; (S.staffCache||[]).forEach(function(x){ if(x.phone===phone) t=x; });
+  if(!t) return;
+  PURGE={phone:phone, name:t.name, counts:null, busy:false};
+  drawPurge();
+  var account=accountStamp();
+  call('api_purgeStaffPreview', S.token, phone).then(function(r){
+    if(!PURGE || PURGE.phone!==phone || !sameAccount(account)) return;
+    if(!r || !r.ok){ PURGE.err=(r&&r.msg)||'확인하지 못했습니다. 다시 시도해주세요.'; }
+    else PURGE.counts=r.counts;
+    drawPurge();
+  });
+}
+function drawPurge(){
+  var p=PURGE; if(!p) return;
+  var c=p.counts, rows='';
+  if(c){
+    [['담당 업무',c.tasks,'건'],['작업 기록',c.logs,'건'],['댓글',c.comments,'건'],['일정',c.events,'건'],['휴가 기록',c.leaves,'건'],['받은 알림',c.notis,'건']].forEach(function(x){
+      rows+='<div class="k">'+x[0]+'</div><div class="v">'+x[1]+x[2]+'</div>';
+    });
+  }
+  $('modal').innerHTML='<div class="veil"><div class="sheet">'+
+    '<div class="sheethead"><h3 class="tt">직원 정보 삭제</h3></div>'+
+    '<p><b>'+esc(p.name)+'</b>님의 직원 정보와 아래 기록을 삭제합니다. 삭제하면 되돌릴 수 없습니다.</p>'+
+    (p.err? '<p class="ferr">'+esc(p.err)+'</p>' : (c? '<div class="kv">'+rows+'</div>'+
+      ((c.keptTasks||c.docs)? '<p class="note t2">남는 것: '+[c.keptTasks? '결재 · 정산이 걸린 업무 '+c.keptTasks+'건':'', c.docs? '올린 결재 문서 '+c.docs+'건':''].filter(function(x){return x;}).join(', ')+' (회사 돈 기록이라 지우지 않습니다)</p>':'')+
+      '<p class="note t2">출퇴근 앱 · 견적 앱에 남은 자료와 드라이브 파일은 지우지 않습니다.</p>'+
+      '<label class="chk" style="display:flex;gap:8px;align-items:center;margin-top:12px"><input type="checkbox" id="pgOk" onchange="$(&#39;pgGo&#39;).disabled=!this.checked"> <span>삭제하면 되돌릴 수 없다는 것을 확인했습니다</span></label>'
+      : '<p class="none">삭제할 기록을 확인하는 중입니다...</p>'))+
+    '<p class="ferr" id="pgMsg" hidden></p>'+
+    '<div class="actions"><button class="btn" onclick="PURGE=null;closeOk()">취소</button>'+
+    '<button class="btn dg" id="pgGo" disabled onclick="runPurge()">삭제</button></div>'+
+    '</div></div>';
+}
+function runPurge(){
+  var p=PURGE; if(!p || p.busy || !p.counts || !($('pgOk')&&$('pgOk').checked)) return;
+  p.busy=true; var btn=$('pgGo'); btn.disabled=true; btn.textContent='삭제 중...';
+  var account=accountStamp();
+  call('api_purgeStaff', S.token, p.phone, p.name, true).then(function(r){
+    if(!sameAccount(account) || PURGE!==p) return;
+    p.busy=false;
+    if(r && (r.ok || r.gone)){
+      PURGE=null; closeOk(); toast(r.ok? (r.msg||'삭제했습니다') : '이미 삭제된 직원입니다');
+      SETTINGS_GEN++; settingsRefresh(true); softRefresh(0);
+    }else{
+      var m=$('pgMsg'); if(m){ m.hidden=false; m.textContent=(r&&r.msg)||'삭제 결과를 확인하지 못했습니다. 직원 목록에서 확인해주세요.'; }
+      if(btn.isConnected){ btn.disabled=false; btn.textContent='삭제'; }
+    }
+  });
 }
 
 /* ---- 번호 변경 이관 (관리자만, 2026-10-06 · 23 지시) ----
