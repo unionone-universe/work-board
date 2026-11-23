@@ -3,7 +3,7 @@
 <head>
 <base target="_top">
 <meta charset="utf-8">
-<meta name="uo-version" content="0.02">
+<meta name="uo-version" content="0.01.3">
 <title>UNION ONE WORK BOARD</title>
 <link rel="preconnect" href="https://drive.google.com">
 <link rel="preconnect" href="https://lh3.googleusercontent.com">
@@ -17,7 +17,7 @@
   --line:#D2D9DF; --line2:#B4BEC8;     /* 줄 구분 · 단추 테두리 — 흰 면 위에서 또렷하게 (예전 #E4E9E2 는 거의 안 보였다) */
   --fieldline:#76838F;   /* 입력칸 테두리 — 흰 바탕 대비 3:1 이상 */
   --rt-sheen:rgba(36,95,214,.12);
-  --t1:#192537; --t2:#465469; --t3:#5E6C80;
+  --t1:#192537; --t2:#2F3B4C; --t3:#4A586B;   /* 2026-11-23 가독성 — 보조 글자를 한 단계 진하게 (예전 #465469 · #5E6C80) */
   --pri:#245FD6; --pri-press:#184EB8; --on-pri:#FFFFFF;
   --soft:#EAF1FF;        /* 고른 것 — 녹색은 선택 · 주요 행동에만 */
   --run-bg:#F0F3F5;
@@ -50,11 +50,11 @@
   --fs-page:28px;
   --fs-title:28px;
   --fs-h1:20px;
-  --fs-row:17px;
-  --fs-h2:16px;
-  --fs-body:16px;
-  --fs-sm:14px;
-  --fs-xs:14px;
+  --fs-row:18px;
+  --fs-h2:17px;
+  --fs-body:17px;
+  --fs-sm:15px;
+  --fs-xs:15px;      /* 2026-11-23 가독성 — 업무 이름 18 · 본문 17 · 보조 15 (예전 17 · 16 · 14) */
   --fs-num-lg:28px; --fs-num-md:20px; --fs-num-sm:16px;
   --fs-icon:18px; --fs-icon-lg:20px; --fs-cnt:14px; --fs-pin:22px;
 
@@ -1002,7 +1002,7 @@ table.mk-tb .al-c{text-align:center} table.mk-tb .al-r{text-align:right}
 
 /* ★★ 판 토큰 — 결재 · 달력 쪽에서도 씁니다 */
 :root{
-  --wb-fs-title:17px; --wb-fs-body:16px; --wb-fs-meta:14px; --wb-fs-label:14px;
+  --wb-fs-title:18px; --wb-fs-body:17px; --wb-fs-meta:15px; --wb-fs-label:15px;
   --wb-pad:16px; --wb-gap:12px; --wb-radius:10px; --wb-bar:6px; --wb-ctl:44px; --wb-icon:22px;
   --wb-hover:#F0F5FF; --wb-sel:#FFFFFF; --wb-shutbg:#E8ECF0; --wb-pick:#EAF1FF;
 }
@@ -2494,6 +2494,35 @@ body:has(#modal .veil:not(.tdveil)) #writeDock,body:has(#modal .veil:not(.tdveil
 .nt-zoom-body{overflow:auto;max-height:calc(100vh - 140px)}
 .nt-zoom-body img{display:block;width:100%;height:auto;cursor:zoom-in;max-width:none}
 .nt-zoom-body img.nt-natural{width:auto;cursor:zoom-out}
+/* ── 가독성 (2026-11-23 대표님 — '화면 자체 가독성 개선', 초안 확인 뒤 반영) ──
+   보조 글자(최근 기록 · 담당 · 마감 · 오른쪽 칸)를 15~16px 로 키우고 한 단계 진하게, 업무명은 18px 굵게, 줄 사이를 조금 넓게.
+   글자 크기는 :root 의 --fs-* · --wb-fs-* 가 정한다 — 여기에는 굵기 · 색 · 간격만 */
+.trow{padding-top:18px;padding-bottom:18px}
+.trow .cn{font-weight:700;letter-spacing:-.01em}
+.trow .clog{font-size:var(--fs-h2);color:var(--t1);margin-top:2px}
+.clog .cd{color:var(--t3)}
+.trow .ctop{color:var(--t2);margin-top:6px;gap:4px 16px}
+.trow .tdue{font-weight:600}
+.trow button.who{font-weight:600;color:var(--t2)}
+.crow .ct{font-size:var(--fs-h2);font-weight:600;color:var(--t1)}
+.crow .cm,.crow .cx{color:var(--t2)}
+.lrow .b,.ucard .b,.byline,.note,.muted{color:var(--t2)}
+.lrow .t,.ucard .t{font-weight:700}
+.tdmeta,.tdnone,.tdempty{color:var(--t2)}
+.tabs button{font-size:14px;font-weight:600}
+/* 폰 — 글자가 커져도 '확인할 일' · '출근' 이 한 줄에 */
+@media (max-width:719px){
+  .aentry{flex:1 1 0;flex-wrap:nowrap;padding-left:10px;padding-right:8px;gap:6px}
+  .aentry .al{font-size:16px;overflow:hidden;text-overflow:ellipsis}
+  .aentry .ahot{font-size:14px;padding:2px 6px}
+  .achip{flex:none;font-size:15px}
+}
+@media (max-width:379px){
+  .aentry .ai{display:none}
+  .aentry{padding-left:12px;padding-right:6px}
+  .achip{padding:0 10px}
+  .achip .ic{display:none}
+}
 </style>
 </head>
 <body>
@@ -15734,7 +15763,7 @@ function paintSettingsNow(r){
     /* 등급 숫자는 사람에게 보여주지 않습니다 — `현장` 만으로 충분합니다 (2026-09-09).
        숫자는 관리자의 직원 정보 창에서만 봅니다. */
     $('meInfo').innerHTML=meInfoHtml(me);
-    $('verText').textContent='버전 '+((document.querySelector('meta[name=uo-version]')||{}).content||'')+
+    $('verText').textContent='버전 '+String((document.querySelector('meta[name=uo-version]')||{}).content||'').split('.').slice(0,2).join('.')+   /* 표시는 0.01 — 셋째 자리는 기기에 저장된 화면을 갈아끼우는 번호 */
       ((S.meta&&S.meta.code)? ' · 코드 '+S.meta.code : ' · 코드 (옛 버전)');
 
     /* 서버가 준 등급으로 다시 정합니다 (여기가 최종입니다) */
